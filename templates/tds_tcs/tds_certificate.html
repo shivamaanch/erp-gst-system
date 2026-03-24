@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TDS Certificate - {{ bill.bill_no }}</title>
+    <style>
+        @page { margin: 20mm; size: A4; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; }
+        .certificate { max-width: 800px; margin: 0 auto; border: 2px solid #2c3e50; padding: 30px; }
+        .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
+        .company-name { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+        .company-address { color: #7f8c8d; margin-bottom: 3px; }
+        .company-gstin { color: #34495e; font-size: 12px; }
+        .section-title { font-weight: bold; color: #2c3e50; border-bottom: 1px solid #ecf0f1; padding-bottom: 5px; margin-bottom: 15px; margin-top: 20px; }
+        .details-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .details-table td { padding: 8px; border-bottom: 1px solid #ecf0f1; }
+        .details-table .label { font-weight: bold; width: 30%; }
+        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 12px; border-top: 1px solid #ecf0f1; padding-top: 15px; }
+        .signature { margin-top: 50px; }
+        .signature-line { border-bottom: 1px solid #2c3e50; width: 200px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="certificate">
+        <!-- Company Header -->
+        <div class="header">
+            <div class="company-name">{{ company.name }}</div>
+            <div class="company-address">{{ company.address or "Company Address" }}</div>
+            <div class="company-gstin">GSTIN: {{ company.gstin or "Not Available" }} | PAN: {{ company.pan or "Not Available" }}</div>
+        </div>
+
+        <!-- Certificate Title -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h2 style="color: #2c3e50;">TAX DEDUCTED AT SOURCE CERTIFICATE</h2>
+            <h4 style="color: #34495e;">Under Section 194 of the Income Tax Act, 1961</h4>
+        </div>
+
+        <!-- Deductee Details -->
+        <div class="section-title">Deductee Details</div>
+        <table class="details-table">
+            <tr><td class="label">Name of Deductee:</td><td>{{ party.name }}</td></tr>
+            <tr><td class="label">PAN:</td><td>{{ party.pan or "Not Available" }}</td></tr>
+            <tr><td class="label">Address:</td><td>{{ party.address or "Not Available" }}</td></tr>
+            <tr><td class="label">GSTIN:</td><td>{{ party.gstin or "Not Available" }}</td></tr>
+        </table>
+
+        <!-- Deductor Details -->
+        <div class="section-title">Deductor Details</div>
+        <table class="details-table">
+            <tr><td class="label">Name of Deductor:</td><td>{{ company.name }}</td></tr>
+            <tr><td class="label">PAN:</td><td>{{ company.pan or "Not Available" }}</td></tr>
+            <tr><td class="label">TAN:</td><td>{{ company.tan or "Not Available" }}</td></tr>
+            <tr><td class="label">Address:</td><td>{{ company.address or "Not Available" }}</td></tr>
+        </table>
+
+        <!-- Transaction Details -->
+        <div class="section-title">Transaction Details</div>
+        <table class="details-table">
+            <tr><td class="label">Bill No:</td><td>{{ bill.bill_no }}</td></tr>
+            <tr><td class="label">Bill Date:</td><td>{{ bill.bill_date.strftime('%d-%b-%Y') }}</td></tr>
+            <tr><td class="label">Nature of Payment:</td><td>Purchase of Goods/Services</td></tr>
+            <tr><td class="label">Taxable Amount:</td><td>₹{{ "{:,.2f}".format(bill.taxable_amount or 0) }}</td></tr>
+            <tr><td class="label">TDS Rate:</td><td>{{ "%.2f"|format(tds_rate * 100) }}%</td></tr>
+            <tr><td class="label">TDS Amount:</td><td>₹{{ "{:,.2f}".format(tds_amount) }}</td></tr>
+            <tr><td class="label">Net Amount:</td><td>₹{{ "{:,.2f"|format(bill.total_amount - tds_amount) }}</td></tr>
+        </table>
+
+        <!-- Financial Year -->
+        <div class="section-title">Financial Year</div>
+        <table class="details-table">
+            <tr><td class="label">Financial Year:</td><td>{{ bill.fin_year }}</td></tr>
+            <tr><td class="label">Period:</td><td>{{ bill.bill_date.strftime('%d-%b-%Y') }} to {{ bill.bill_date.strftime('%d-%b-%Y') }}</td></tr>
+        </table>
+
+        <!-- Declaration -->
+        <div class="section-title">Declaration</div>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <p style="margin: 0;">
+                <strong>Certified that:</strong><br>
+                1. The TDS has been deducted/paid as per the provisions of the Income Tax Act, 1961.<br>
+                2. The details furnished above are true and correct to the best of my knowledge and belief.<br>
+                3. The deductee has been issued a copy of this certificate.
+            </p>
+        </div>
+
+        <!-- Signature -->
+        <div class="signature">
+            <div class="signature-line"></div>
+            <div style="text-align: center; margin-top: 5px;">
+                <strong>{{ company.name }}</strong><br>
+                <small>Authorized Signatory</small>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div><strong>This is a computer-generated TDS certificate</strong></div>
+            <div>Generated on {{ datetime.now().strftime('%d-%b-%Y %H:%M:%S') }}</div>
+            <div>Certificate No: TDS/{{ bill.bill_no }}/{{ bill.bill_date.strftime('%Y') }}</div>
+        </div>
+    </div>
+</body>
+</html>

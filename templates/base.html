@@ -37,18 +37,30 @@
     <div class="sidebar-section">Transactions</div>
     <a href="{{ url_for('clients.index') }}" class="nav-link {{ 'active' if 'clients' in (request.endpoint or '') }}">
       <i class="bi bi-people"></i> Parties / Clients</a>
-    <a href="{{ url_for('invoice.index', type='Sales') }}" class="nav-link {{ 'active' if request.endpoint=='invoice.index' and request.args.get('type','Sales')=='Sales' }}">
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Sales') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type','Sales')=='Sales' }}">
       <i class="bi bi-receipt"></i> Sales Invoice</a>
-    <a href="{{ url_for('invoice.index', type='Purchase') }}" class="nav-link {{ 'active' if request.endpoint=='invoice.index' and request.args.get('type')=='Purchase' }}">
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Purchase') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type')=='Purchase' }}">
       <i class="bi bi-cart3"></i> Purchase</a>
+    <a href="{{ url_for('milk.entry_list') }}" class="nav-link {{ 'active' if 'milk' in (request.endpoint or '') }}">
+      <i class="bi bi-droplet"></i> Milk Entry</a>
     <a href="{{ url_for('journal.index') }}" class="nav-link {{ 'active' if 'journal' in (request.endpoint or '') }}">
       <i class="bi bi-journal-text"></i> Journal Entries</a>
+    <a href="{{ url_for('banking.accounts') }}" class="nav-link {{ 'active' if 'banking' in (request.endpoint or '') }}">
+      <i class="bi bi-bank"></i> Banking</a>
 
     <div class="sidebar-section">GST & Tax</div>
-    <a href="{{ url_for('gst.gstr1') }}" class="nav-link {{ 'active' if 'gst' in (request.endpoint or '') }}">
-      <i class="bi bi-file-earmark-text"></i> GST Returns</a>
-    <a href="{{ url_for('tds.index') }}" class="nav-link {{ 'active' if 'tds' in (request.endpoint or '') }}">
+    <a href="{{ url_for('gst_reports.gstr1') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr1' }}">
+      <i class="bi bi-file-earmark-text"></i> GSTR-1 (Sales)</a>
+    <a href="{{ url_for('gst_reports.gstr2b') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr2b' }}">
+      <i class="bi bi-file-earmark-arrow-down"></i> GSTR-2B (Purchases)</a>
+    <a href="{{ url_for('gst_reports.gstr3b') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr3b' }}">
+      <i class="bi bi-file-earmark-check"></i> GSTR-3B (Summary)</a>
+    <a href="{{ url_for('gst_reports.reconcile') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.reconcile' }}">
+      <i class="bi bi-arrow-left-right"></i> GST Reconciliation</a>
+    <a href="{{ url_for('tds_tcs.tds_index') }}" class="nav-link {{ 'active' if request.endpoint=='tds_tcs.tds_index' }}">
       <i class="bi bi-percent"></i> TDS</a>
+    <a href="{{ url_for('tds_tcs.tcs_index') }}" class="nav-link {{ 'active' if request.endpoint=='tds_tcs.tcs_index' }}">
+      <i class="bi bi-cash-stack"></i> TCS</a>
     <a href="{{ url_for('alerts.index') }}" class="nav-link {{ 'active' if 'alerts' in (request.endpoint or '') }}">
       <i class="bi bi-bell"></i> Compliance Alerts</a>
 
@@ -70,6 +82,12 @@
     <a href="{{ url_for('reports.outstanding') }}" class="nav-link">
       <i class="bi bi-exclamation-circle"></i> Outstanding</a>
 
+    <div class="sidebar-section">Masters</div>
+    <a href="{{ url_for('items.index') }}" class="nav-link {{ 'active' if 'items' in (request.endpoint or '') }}">
+      <i class="bi bi-box-seam"></i> Items Master</a>
+    <a href="{{ url_for('accounts.index') }}" class="nav-link {{ 'active' if 'accounts' in (request.endpoint or '') }}">
+      <i class="bi bi-journal-bookmark"></i> Chart of Accounts</a>
+
     <div class="sidebar-section">Settings</div>
     <a href="{{ url_for('users.index') }}" class="nav-link {{ 'active' if 'users' in (request.endpoint or '') }}">
       <i class="bi bi-people-fill"></i> Users</a>
@@ -89,6 +107,24 @@
     <div class="d-flex align-items-center gap-3">
       <span class="badge bg-primary">FY: {{ session.get("fin_year","—") }}</span>
       {% if current_user.is_authenticated %}
+      <!-- Company Switcher -->
+      {% if current_user.accessible_companies.count() > 1 %}
+      <div class="dropdown">
+        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="bi bi-building"></i> {{ session.get('company_name', 'Select Company') }}
+        </button>
+        <ul class="dropdown-menu">
+          {% for company in current_user.accessible_companies %}
+          <li><a class="dropdown-item {{ 'active' if company.id == session.get('company_id') }}" href="{{ url_for('auth.switch_company', company_id=company.id) }}">
+            {{ company.name }}
+            {% if company.id == session.get('company_id') %}
+            <span class="badge bg-success ms-2">Current</span>
+            {% endif %}
+          </a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       <span class="text-muted small"><i class="bi bi-person-circle"></i> {{ current_user.username }}</span>
       <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger py-0">Logout</a>
       {% endif %}

@@ -9,9 +9,17 @@
   <div class="card-body">
     <form method="POST">
       <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label fw-bold">Company Name *</label>
           <input type="text" name="name" class="form-control" required value="{{ company.name }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Business Type</label>
+          <select name="business_type" class="form-select">
+            {% for bt in business_types %}
+            <option value="{{ bt }}" {% if company.business_type == bt %}selected{% endif %}>{{ bt }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="col-md-3">
           <label class="form-label fw-bold">GSTIN</label>

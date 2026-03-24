@@ -3,7 +3,18 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">📊 Trial Balance</h4>
-  <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
+  <div class="d-flex gap-2">
+    <form method="GET" class="d-flex gap-2">
+      <select name="period" class="form-select" onchange="this.form.submit()">
+        {% set current_period = request.args.get('period', current_date.strftime('%m-%Y')) %}
+        <option value="">Select Period</option>
+        {% for value, label, selected in month_options %}
+        <option value="{{ value }}" {% if selected %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
+  </div>
 </div>
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-warning text-dark">

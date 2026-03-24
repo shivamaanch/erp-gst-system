@@ -98,3 +98,75 @@ def party_search():
         query = query.filter(Party.name.ilike(f"%{q}%"))
     results = [{"id": p.id, "name": p.name, "gstin": p.gstin or "", "type": p.party_type} for p in query.limit(20).all()]
     return jsonify(results)
+
+@clients_bp.route("/clients/quick-add", methods=["POST"])
+@login_required
+def quick_add():
+    try:
+        cid = session.get("company_id")
+        name = request.form.get("name","").strip()
+        if not name:
+            return jsonify({"success": False, "error": "Party name required"}), 400
+        
+        p = Party(
+            company_id=cid,
+            name=name,
+            gstin=request.form.get("gstin","").strip().upper() or None,
+            phone=request.form.get("phone","").strip() or None,
+            party_type=request.form.get("party_type","Customer"),
+            is_active=True
+        )
+        db.session.add(p)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "party": {
+                "id": p.id,
+                "name": p.name,
+                "gstin": p.gstin or "",
+                "phone": p.phone or ""
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@clients_bp.route("/clients/quick-add-item", methods=["POST"])
+@login_required
+def quick_add_item():
+    try:
+        from models import Item
+        cid = session.get("company_id")
+        name = request.form.get("name","").strip()
+        if not name:
+            return jsonify({"success": False, "error": "Item name required"}), 400
+        
+        item = Item(
+            company_id=cid,
+            name=name,
+            hsn_code=request.form.get("hsn_code","").strip() or None,
+            unit=request.form.get("unit","Nos"),
+            gst_rate=float(request.form.get("gst_rate",18)),
+            sale_rate=float(request.form.get("sale_rate",0)),
+            purchase_rate=float(request.form.get("purchase_rate",0)),
+            is_active=True
+        )
+        db.session.add(item)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "item": {
+                "id": item.id,
+                "name": item.name,
+                "hsn_code": item.hsn_code or "",
+                "unit": item.unit or "Nos",
+                "gst_rate": float(item.gst_rate or 18),
+                "sale_rate": float(item.sale_rate or 0),
+                "purchase_rate": float(item.purchase_rate or 0)
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500

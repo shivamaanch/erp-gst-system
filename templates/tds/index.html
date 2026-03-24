@@ -25,18 +25,14 @@
             <td class="text-end">₹{{ "{:,.2f}".format(p.total_amount) }}</td>
             <td><code>{{ p.pan or 'Not Available' }}</code></td>
             <td class="text-center">
-              {% if p.total_amount > 50000 %}
-              1%
+              {% if p.tds_rate %}
+              {{ "%.2f"|format(p.tds_rate * 100) }}%
               {% else %}
               0%
               {% endif %}
             </td>
             <td class="text-end">
-              {% if p.total_amount > 50000 %}
-              ₹{{ "{:,.2f}".format(p.total_amount * 0.01) }}
-              {% else %}
-              ₹0.00
-              {% endif %}
+              ₹{{ "{:,.2f}".format(p.tds_amount or 0) }}
             </td>
             <td>
               <a href="{{ url_for('tds.certificate', bill_id=p.id) }}" class="btn btn-sm btn-outline-primary">

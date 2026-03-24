@@ -23,6 +23,7 @@ def edit():
     company = Company.query.get_or_404(cid)
     if request.method == "POST":
         company.name    = request.form["name"].strip()
+        company.business_type = request.form.get("business_type", "Trading")
         company.gstin   = request.form.get("gstin","").strip().upper() or None
         company.address = request.form.get("address","").strip() or None
         company.phone   = request.form.get("phone","").strip() or None
@@ -33,7 +34,8 @@ def edit():
         db.session.commit()
         flash("Company profile updated!", "success")
         return redirect(url_for("company.index"))
-    return render_template("company/edit.html", company=company)
+    business_types = ["Trading", "Manufacturing", "Service", "Milk", "Mixed"]
+    return render_template("company/edit.html", company=company, business_types=business_types)
 
 @company_bp.route("/company/fy/add", methods=["GET","POST"])
 @login_required

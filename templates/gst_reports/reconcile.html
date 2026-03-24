@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}GST Reconciliation{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🔄 GST Reconciliation - 2B vs Books</h4>
+  <div class="btn-group">
+    <a href="{{ url_for('gst_reports.gstr2b', period=period) }}" class="btn btn-sm btn-outline-info">
+      <i class="bi bi-file-earmark-arrow-down"></i> Import 2B
+    </a>
+    <a href="{{ url_for('gst_reports.gstr1', period=period) }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-file-earmark-text"></i> GSTR-1
+    </a>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-2">
+      <div class="col-md-4">
+        <input type="text" name="period" class="form-control" value="{{ period }}" placeholder="MM-YYYY">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="bi bi-search"></i> Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-success text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">✅ Matched</h5>
+        <h3>{{ matched_count }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-warning text-dark">
+      <div class="card-body text-center">
+        <h5 class="card-title">❓ Mismatched</h5>
+        <h3>{{ mismatch_count }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-danger text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">❌ Missing in Books</h5>
+        <h3>{{ missing_books_count }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-info text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">❌ Missing in 2B</h5>
+        <h3>{{ missing_2b_count }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Matched Invoices -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-success text-white">
+    <h6 class="mb-0">✅ Matched Invoices ({{ matched_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier GSTIN</th><th>Supplier</th><th>Invoice No</th><th>Date</th><th>2B Amount</th><th>Books Amount</th><th>Difference</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in matched %}
+        <tr>
+          <td><code>{{ inv.gstin }}</code></td>
+          <td>{{ inv.supplier }}</td>
+          <td>{{ inv.invoice_no }}</td>
+          <td>{{ inv.invoice_date.strftime('%d-%m-%Y') if inv.invoice_date else 'N/A' }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_2b) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_books) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.diff) }}</td>
+          <td><span class="badge bg-success">Matched</span></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-3">No matched invoices found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Mismatched Invoices -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-warning text-dark">
+    <h6 class="mb-0">⚠️ Amount Mismatched ({{ mismatch_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier GSTIN</th><th>Supplier</th><th>Invoice No</th><th>Date</th><th>2B Amount</th><th>Books Amount</th><th>Difference</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in mismatched %}
+        <tr>
+          <td><code>{{ inv.gstin }}</code></td>
+          <td>{{ inv.supplier }}</td>
+          <td>{{ inv.invoice_no }}</td>
+          <td>{{ inv.invoice_date.strftime('%d-%m-%Y') if inv.invoice_date else 'N/A' }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_2b) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_books) }}</td>
+          <td class="text-end text-warning">₹{{ "{:,.2f}".format(inv.diff) }}</td>
+          <td><span class="badge bg-warning">Mismatch</span></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-3">No mismatched invoices found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Missing in Books -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-danger text-white">
+    <h6 class="mb-0">❌ Missing in Books ({{ missing_books_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier GSTIN</th><th>Supplier</th><th>Invoice No</th><th>Date</th><th>2B Amount</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in missing_in_books %}
+        <tr>
+          <td><code>{{ inv.gstin }}</code></td>
+          <td>{{ inv.supplier }}</td>
+          <td>{{ inv.invoice_no }}</td>
+          <td>{{ inv.invoice_date.strftime('%d-%m-%Y') if inv.invoice_date else 'N/A' }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_2b) }}</td>
+          <td><span class="badge bg-danger">Missing in Books</span></td>
+          <td>
+            <a href="{{ url_for('enhanced_invoice.list_invoices', type='Purchase') }}" class="btn btn-sm btn-outline-primary">
+              Record Invoice
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-3">No missing invoices in books</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Missing in 2B -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-info text-white">
+    <h6 class="mb-0">❌ Missing in GSTR-2B ({{ missing_2b_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier GSTIN</th><th>Supplier</th><th>Invoice No</th><th>Date</th><th>Books Amount</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in missing_in_2b %}
+        <tr>
+          <td><code>{{ inv.gstin }}</code></td>
+          <td>{{ inv.supplier }}</td>
+          <td>{{ inv.invoice_no }}</td>
+          <td>{{ inv.invoice_date.strftime('%d-%m-%Y') if inv.invoice_date else 'N/A' }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable_books) }}</td>
+          <td><span class="badge bg-info">Missing in 2B</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-warning" onclick="alert('Follow up with supplier for GSTR-1 filing')">
+              Follow Up
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-3">No missing invoices in 2B</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-info mt-3">
+  <h6><i class="bi bi-info-circle"></i> GST Reconciliation Information</h6>
+  <p class="mb-0">
+    <strong>Reconciliation Process:</strong><br>
+    1. Import GSTR-2B from GSTN portal<br>
+    2. Compare with your purchase books<br>
+    3. Identify matched, mismatched, and missing invoices<br>
+    4. Take action on discrepancies<br><br>
+    
+    <strong>Actions Required:</strong><br>
+    • <strong>Matched:</strong> No action needed<br>
+    • <strong>Mismatched:</strong> Verify amounts and correct if needed<br>
+    • <strong>Missing in Books:</strong> Record missing purchase invoices<br>
+    • <strong>Missing in 2B:</strong> Follow up with suppliers for GSTR-1 filing
+  </p>
+</div>
+
+<div class="alert alert-warning">
+  <h6><i class="bi bi-exclamation-triangle"></i> Important Notes</h6>
+  <p class="mb-0">
+    <strong>ITC Impact:</strong> Missing or mismatched invoices may affect ITC claim.<br>
+    <strong>Compliance:</strong> Ensure all purchase invoices are recorded and matched.<br>
+    <strong>Documentation:</strong> Keep proper documentation for audit purposes.
+  </p>
+</div>
+{% endblock %}

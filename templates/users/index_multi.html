@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}User Management (Multi-Company){% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">👥 Multi-Company User Management</h4>
+  <div class="d-flex gap-2">
+    {% if current_user.is_super_admin %}
+    <a href="{{ url_for('users.add_company') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Company
+    </a>
+    {% endif %}
+    <a href="{{ url_for('users.add') }}" class="btn btn-sm btn-success">
+      <i class="bi bi-person-plus"></i> Add User
+    </a>
+  </div>
+</div>
+
+<!-- Super Admin View -->
+{% if current_user.is_super_admin %}
+<div class="alert alert-info">
+  <h6><i class="bi bi-info-circle"></i> Super Admin View</h6>
+  <p class="mb-0">You can see all users across all companies and manage their access permissions.</p>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Companies</th>
+            <th>Roles</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for data in user_data %}
+          <tr>
+            <td>
+              <strong>{{ data.user.username }}</strong>
+              {% if data.user.id == current_user.id %}<span class="badge bg-info">You</span>{% endif %}
+            </td>
+            <td>{{ data.user.email or "—" }}</td>
+            <td>
+              {% for company in data.companies %}
+                <span class="badge bg-primary me-1">{{ company.name }}</span>
+              {% endfor %}
+              {% if data.companies|length == 0 %}
+                <span class="badge bg-secondary">No Access</span>
+              {% endif %}
+            </td>
+            <td>
+              {% for company in data.companies %}
+                <span class="badge {{ 'bg-success' if company.role == 'admin' else 'bg-warning text-dark' if company.role == 'accountant' else 'bg-secondary' }}">
+                  {{ company.role|title }}
+                </span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if data.user.is_active %}<span class="badge bg-success">Active</span>
+              {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('users.edit', uid=data.user.id) }}" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{{ url_for('users.toggle', uid=data.user.id) }}" class="btn btn-outline-warning btn-sm">
+                  <i class="bi bi-toggle-on"></i>
+                </a>
+                <a href="{{ url_for('users.companies', uid=data.user.id) }}" class="btn btn-outline-info btn-sm">
+                  <i class="bi bi-building"></i> Companies
+                </a>
+                <a href="{{ url_for('users.reset_password', uid=data.user.id) }}" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-key"></i> Reset
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Regular User View -->
+{% else %}
+<div class="alert alert-warning">
+  <h6><i class="bi bi-info-circle"></i> Company View</h6>
+  <p class="mb-0">You can see users for the current company: <strong>{{ session.get('company_name') }}</strong></p>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td><strong>{{ u.username }}</strong> {% if u.id == current_user.id %}<span class="badge bg-info">You</span>{% endif %}</td>
+            <td>{{ u.email or "—" }}</td>
+            <td>
+              {% if u.role == "admin" %}<span class="badge bg-danger">Admin</span>
+              {% elif u.role == "accountant" %}<span class="badge bg-warning text-dark">Accountant</span>
+              {% else %}<span class="badge bg-secondary">Viewer</span>{% endif %}
+            </td>
+            <td>
+              {% if u.is_active %}<span class="badge bg-success">Active</span>
+              {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('users.edit', uid=u.id) }}" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{{ url_for('users.toggle', uid=u.id) }}" class="btn btn-outline-warning btn-sm">
+                  <i class="bi bi-toggle-on"></i>
+                </a>
+                <a href="{{ url_for('users.reset_password', uid=u.id) }}" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-key"></i> Reset
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="alert alert-info mt-3">
+  <h6><i class="bi bi-info-circle"></i> Multi-Customer System Features</h6>
+  <p class="mb-0">
+    <strong>Super Admin:</strong> Can manage all companies and users across the entire system<br>
+    <strong>Regular Users:</strong> Can access only assigned companies with specific roles<br>
+    <strong>Company Switching:</strong> Easy switching between accessible companies<br>
+    <strong>Data Isolation:</strong> Complete data separation between companies
+  </p>
+</div>
+
+<div class="alert alert-success mt-3">
+  <h6><i class="bi bi-check-circle"></i> Benefits of Multi-Customer System</h6>
+  <p class="mb-0">
+    <strong>For Accounting Firms:</strong> Manage multiple client companies from one interface<br>
+    <strong>For Consultants:</strong> Provide services to multiple businesses<br>
+    <strong>For Franchise Owners:</strong> Manage multiple franchise locations<br>
+    <strong>For Business Groups:</strong> Manage multiple business entities
+  </p>
+</div>
+{% endblock %}

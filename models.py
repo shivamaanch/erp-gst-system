@@ -8,6 +8,7 @@ class Company(db.Model):
     __tablename__ = "companies"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
+    business_type = db.Column(db.String(20), default="Trading")
     gstin = db.Column(db.String(15))
     pan = db.Column(db.String(10))
     state_code = db.Column(db.String(2))
@@ -16,6 +17,10 @@ class Company(db.Model):
     email = db.Column(db.String(100))
     logo_path = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Multi-company relationships
+    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", lazy="dynamic")
+    user_companies = db.relationship("UserCompany", back_populates="company", lazy="dynamic")
 
 class FinancialYear(db.Model):
     __tablename__ = "financial_years"
@@ -30,14 +35,98 @@ class FinancialYear(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
     username = db.Column(db.String(80), unique=True)
     email = db.Column(db.String(120), unique=True)
     password_hash = db.Column(db.String(256))
-    role = db.Column(db.String(20), default="Staff")
+    is_super_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    
+    # Legacy field for backward compatibility
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
+    
+    # Relationships for multi-company access
+    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic")
+    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic")
+    
+    @property
+    def current_company(self):
+        """Get current active company from session"""
+        from flask import session
+        company_id = session.get('company_id')
+        if company_id:
+            return Company.query.get(company_id)
+        return None
+    
+    @property
+    def current_role(self):
+        """Get current role for active company"""
+        from flask import session
+        company_id = session.get('company_id')
+        if company_id:
+            user_company = UserCompany.query.filter_by(
+                user_id=self.id, 
+                company_id=company_id, 
+                is_active=True
+            ).first()
+            return user_company.role if user_company else 'viewer'
+        return self.role
+    
+    def has_access_to_company(self, company_id):
+        """Check if user has access to a specific company"""
+        return UserCompany.query.filter_by(
+            user_id=self.id, 
+            company_id=company_id, 
+            is_active=True
+        ).first() is not None
+    
+    def get_role_in_company(self, company_id):
+        """Get user's role in a specific company"""
+        user_company = UserCompany.query.filter_by(
+            user_id=self.id, 
+            company_id=company_id, 
+            is_active=True
+        ).first()
+        return user_company.role if user_company else 'viewer'
+    
+    def can_manage_all_companies(self):
+        """Check if user is super admin"""
+        return self.is_super_admin
+
+class UserCompany(db.Model):
+    __tablename__ = "user_companies"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    role = db.Column(db.String(20), default="viewer")  # Role per company
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)  # Optional expiry date for temporary access
+    
+    # Relationships
+    user = db.relationship("User", back_populates="user_companies")
+    company = db.relationship("Company", back_populates="user_companies")
+    
+    def __repr__(self):
+        return f"<UserCompany {self.user.username} -> {self.company.name} ({self.role})>"
+
+class CompanyAccessLog(db.Model):
+    __tablename__ = "company_access_log"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # 'login', 'logout', 'switch', 'grant', 'revoke'
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    
+    # Relationships
+    user = db.relationship("User", backref="access_logs")
+    company = db.relationship("Company", backref="access_logs")
+    
+    def __repr__(self):
+        return f"<CompanyAccessLog {self.user.username} -> {self.company.name} ({self.action})>"
 
 class Account(db.Model):
     __tablename__ = "accounts"
@@ -86,6 +175,8 @@ class Party(db.Model):
     email = db.Column(db.String(100))
     address = db.Column(db.Text)
     state_code = db.Column(db.String(2))
+    opening_balance = db.Column(Numeric(18,2), default=0)
+    balance_type = db.Column(db.String(2), default="Dr")
     is_active = db.Column(db.Boolean, default=True)
 
 class Item(db.Model):
@@ -104,22 +195,27 @@ class Bill(db.Model):
     __tablename__ = "bills"
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
-    fin_year = db.Column(db.String(10))
-    bill_type = db.Column(db.String(20))
-    bill_no = db.Column(db.String(50))
-    bill_date = db.Column(db.Date)
     party_id = db.Column(db.Integer, db.ForeignKey("parties.id"))
+    bill_type = db.Column(db.String(20))  # Sales, Purchase
+    bill_no = db.Column(db.String(50))
+    bill_date = db.Column(db.Date, nullable=False)
+    fin_year = db.Column(db.String(10))
+    narration = db.Column(db.Text)
     taxable_amount = db.Column(Numeric(18,2), default=0)
     cgst = db.Column(Numeric(18,2), default=0)
     sgst = db.Column(Numeric(18,2), default=0)
     igst = db.Column(Numeric(18,2), default=0)
     total_amount = db.Column(Numeric(18,2), default=0)
     paid_amount = db.Column(Numeric(18,2), default=0)
+    tds_rate = db.Column(Numeric(5,2), default=0)
+    tds_amount = db.Column(Numeric(18,2), default=0)
+    tcs_rate = db.Column(Numeric(5,2), default=0)
+    tcs_amount = db.Column(Numeric(18,2), default=0)
+    template_type = db.Column(db.String(20), default="Trading")
     is_cancelled = db.Column(db.Boolean, default=False)
-    narration = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    party = db.relationship("Party")
-    items = db.relationship("BillItem", backref="bill", lazy=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    items = db.relationship("BillItem", backref="bill", lazy=True, cascade="all, delete-orphan")
 
 class BillItem(db.Model):
     __tablename__ = "bill_items"
@@ -135,27 +231,6 @@ class BillItem(db.Model):
     igst = db.Column(Numeric(18,2), default=0)
     item = db.relationship("Item")
 
-class Gstr2bRecord(db.Model):
-    __tablename__ = "gstr2b_records"
-    id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
-    fin_year = db.Column(db.String(10))
-    period = db.Column(db.String(10))
-    supplier_gstin = db.Column(db.String(15))
-    supplier_name = db.Column(db.String(200))
-    invoice_no = db.Column(db.String(50))
-    invoice_date = db.Column(db.Date)
-    invoice_type = db.Column(db.String(20))
-    taxable_value = db.Column(Numeric(18,2), default=0)
-    cgst = db.Column(Numeric(18,2), default=0)
-    sgst = db.Column(Numeric(18,2), default=0)
-    igst = db.Column(Numeric(18,2), default=0)
-    itc_available = db.Column(db.Boolean, default=True)
-    status = db.Column(db.String(30), default="pending")
-    recon_status = db.Column(db.String(30))
-    diff_amount = db.Column(Numeric(18,2), default=0)
-    itc_accepted = db.Column(db.Boolean, default=False)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class StockLedger(db.Model):
     __tablename__ = "stock_ledgers"
@@ -452,6 +527,26 @@ class BankTransaction(db.Model):
     is_reconciled = db.Column(db.Boolean, default=False)
     import_batch = db.Column(db.String(50))     # batch id for bulk imports
     hash_key = db.Column(db.String(64), unique=True)  # duplicate prevention
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Gstr2bRecord(db.Model):
+    __tablename__ = "gstr2b_records"
+    __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
+    fin_year = db.Column(db.String(10))
+    period = db.Column(db.String(10))  # MM-YYYY
+    supplier_gstin = db.Column(db.String(15))
+    supplier_name = db.Column(db.String(200))
+    invoice_no = db.Column(db.String(100))
+    invoice_date = db.Column(db.Date)
+    invoice_type = db.Column(db.String(20), default="B2B")
+    taxable_value = db.Column(Numeric(18,2))
+    igst = db.Column(Numeric(18,2), default=0)
+    cgst = db.Column(Numeric(18,2), default=0)
+    sgst = db.Column(Numeric(18,2), default=0)
+    itc_available = db.Column(db.Boolean, default=True)
+    status = db.Column(db.String(20), default="pending")  # pending, matched, mismatched
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class BankImportLog(db.Model):

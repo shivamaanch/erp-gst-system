@@ -14,7 +14,8 @@ def index():
     fy   = session.get("fin_year")
     payments = db.session.query(Bill, Party).join(Party, Bill.party_id==Party.id).filter(
         Bill.company_id==cid, Bill.fin_year==fy,
-        Bill.bill_type=="Purchase", Bill.is_cancelled==False
+        Bill.bill_type=="Purchase", Bill.is_cancelled==False,
+        Bill.tds_amount > 0
     ).order_by(Bill.bill_date.desc()).all()
     return render_template("tds/index.html", payments=payments, fy=fy)
 
@@ -23,7 +24,12 @@ def index():
 def certificate(bill_id):
     cid  = session.get("company_id")
     bill = Bill.query.filter_by(id=bill_id, company_id=cid).first_or_404()
-    tds_rate   = 0.01 if bill.total_amount > 50000 else 0
-    tds_amount = round(float(bill.total_amount) * tds_rate, 2)
+    # Use database values if available, otherwise calculate
+    tds_rate = float(bill.tds_rate or 0)
+    if tds_rate == 0:
+        tds_rate = 0.01 if bill.total_amount > 50000 else 0
+    tds_amount = float(bill.tds_amount or 0)
+    if tds_amount == 0:
+        tds_amount = round(float(bill.total_amount) * tds_rate, 2)
     return render_template("tds/certificate.html", bill=bill,
                            tds_rate=tds_rate, tds_amount=tds_amount)

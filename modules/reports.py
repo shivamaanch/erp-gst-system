@@ -15,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
+from utils.filters import get_month_options, get_period_from_request, parse_period
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -50,31 +51,31 @@ def money(v): return round(float(v or 0), 2)
 def hub():
     cid    = session.get("company_id")
     fy     = session.get("fin_year")
-    period = request.args.get("period", date.today().strftime("%m-%Y"))
-
-    # Quick summary numbers for the cards
-    sales_total = db.session.query(func.sum(Bill.total_amount)).filter_by(
-        company_id=cid, fin_year=fy, bill_type="Sales", is_cancelled=False
-    ).scalar() or 0
-
-    purchase_total = db.session.query(func.sum(Bill.total_amount)).filter_by(
-        company_id=cid, fin_year=fy, bill_type="Purchase", is_cancelled=False
-    ).scalar() or 0
-
-    pending_alerts = ComplianceAlert.query.filter_by(
-        company_id=cid, status="pending"
-    ).count()
-
-    pending_gst_returns = GstReturn.query.filter_by(
-        company_id=cid, status="pending"
-    ).count() if hasattr(GstReturn, "__tablename__") else 0
-
-    return render_template("reports/hub.html",
-        period=period, fy=fy,
-        sales_total=money(sales_total),
-        purchase_total=money(purchase_total),
-        pending_alerts=pending_alerts,
-        pending_gst_returns=pending_gst_returns)
+    period = get_period_from_request()
+    start_date, end_date = parse_period(period)
+    
+    bills  = Bill.query.filter(
+        Bill.company_id == cid, 
+        Bill.is_cancelled == False,
+        Bill.bill_date >= start_date,
+        Bill.bill_date <= end_date
+    ).all()
+    
+    sales  = [b for b in bills if b.bill_type == "Sales"]
+    purch  = [b for b in bills if b.bill_type == "Purchase"]
+    sales_count = len(sales)
+    purchase_count = len(purch)
+    total_sales    = sum(float(b.total_amount or 0) for b in sales)
+    total_purchases = sum(float(b.total_amount or 0) for b in purch)
+    
+    return render_template("reports/hub.html", 
+                         sales_count=sales_count, 
+                         purchase_count=purchase_count,
+                         total_sales=total_sales, 
+                         total_purchases=total_purchases, 
+                         fy=fy,
+                         month_options=get_month_options(),
+                         current_date=date.today())
 
 # ═══════════════════════════════════════════
 #  2. LEDGER
@@ -203,7 +204,7 @@ def trial_balance():
 
     return render_template("reports/trial_balance.html",
         data=data, total_dr=round(total_dr,2),
-        total_cr=round(total_cr,2), fy=fy)
+        total_cr=round(total_cr,2), fy=fy, current_date=date.today())
 
 # ═══════════════════════════════════════════
 #  4. PROFIT & LOSS
@@ -213,8 +214,9 @@ def trial_balance():
 def profit_loss():
     cid    = session.get("company_id")
     fy     = session.get("fin_year")
+    period = get_period_from_request()
     export = request.args.get("export","")
-    start, end = fy_dates(fy)
+    start, end = parse_period(period)
 
     INCOME_GROUPS  = ["Sales","Direct Income","Indirect Income","Other Income"]
     EXPENSE_GROUPS = ["Purchase","Direct Expense","Indirect Expense",
@@ -249,7 +251,8 @@ def profit_loss():
     return render_template("reports/profit_loss.html",
         income_data=income_data, expense_data=expense_data,
         total_income=total_income, total_expense=total_expense,
-        net_profit=net_profit, fy=fy)
+        net_profit=net_profit, fy=fy, month_options=get_month_options(),
+        current_date=date.today())
 
 # ═══════════════════════════════════════════
 #  5. BALANCE SHEET
@@ -297,7 +300,7 @@ def balance_sheet():
         assets=assets, liabilities=liabilities,
         total_assets=round(total_assets,2),
         total_liabilities=round(total_liabilities,2),
-        fy=fy)
+        fy=fy, current_date=date.today())
 
 # ═══════════════════════════════════════════
 #  6. CASH FLOW

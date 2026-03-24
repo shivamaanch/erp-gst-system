@@ -22,7 +22,8 @@ def hub():
     return render_template("reports/hub.html", fy=fy,
                            total_sales=total_sales, total_purchases=total_purchases,
                            sales_count=sales_count, purchase_count=purchase_count,
-                           net_profit=total_sales - total_purchases)
+                           net_profit=total_sales - total_purchases,
+                           current_date=date.today())
 
 @reports_bp.route("/reports/profit_loss")
 @login_required
@@ -37,7 +38,8 @@ def profit_loss():
                            debtor_sales=sales_total, other_sales=0,
                            creditor_purchases=purchase_total, supplier_purchases=0,
                            gross_profit=sales_total - purchase_total,
-                           fiscal_year_end=f"31 Mar {fy[:4]+str(int(fy[:4])+1)}")
+                           fiscal_year_end=f"31 Mar {fy[:4]+str(int(fy[:4])+1)}",
+                           current_date=date.today())
 
 @reports_bp.route("/reports/balance_sheet")
 @login_required
@@ -59,7 +61,8 @@ def balance_sheet():
                            debtors=debtors, creditors=creditors,
                            retained_earnings=retained, capital=capital,
                            total_liabilities=total_liabilities, total_assets=total_liabilities,
-                           fiscal_year_end=f"31 Mar {int(fy[:4])+1}")
+                           fiscal_year_end=f"31 Mar {int(fy[:4])+1}",
+                           current_date=date.today())
 
 @reports_bp.route("/reports/trial_balance")
 @login_required
@@ -80,7 +83,8 @@ def trial_balance():
             total_credit += bal
     return render_template("reports/trial_balance.html", fy=fy,
                            tb_data=tb_data, total_debit=total_debit, total_credit=total_credit,
-                           fiscal_year_end=f"31 Mar {int(fy[:4])+1}")
+                           fiscal_year_end=f"31 Mar {int(fy[:4])+1}",
+                           current_date=date.today())
 
 @reports_bp.route("/reports/ledger")
 @reports_bp.route("/reports/ledger/<int:party_id>")

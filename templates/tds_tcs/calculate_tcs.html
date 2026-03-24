@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Calculate TCS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">💰 Calculate TCS - {{ bill.bill_no }}</h4>
+  <a href="{{ url_for('tds_tcs.tcs_index') }}" class="btn btn-sm btn-outline-secondary">← Back to TCS</a>
+</div>
+
+<div class="row">
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Bill Details</label>
+            <div class="mb-2">
+              <small class="text-muted">Bill No:</small> <strong>{{ bill.bill_no }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Date:</small> <strong>{{ bill.bill_date.strftime('%d-%b-%Y') }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Customer:</small> <strong>{{ party.name }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Total Amount:</small> <strong>₹{{ "{:,.2f}".format(bill.total_amount) }}</strong>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Current TCS Information</label>
+            <div class="mb-2">
+              <small class="text-muted">Current Rate:</small> <strong>{{ "%.2f"|format(bill.tcs_rate * 100) }}%</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Current Amount:</small> <strong>₹{{ "{:,.2f}".format(bill.tcs_amount) }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Total with TCS:</small> <strong>₹{{ "{:,.2f"|format(bill.total_amount + bill.tcs_amount) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Calculate TCS</h5>
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label fw-bold">TCS Section</label>
+            <select name="tcs_section" class="form-select" required>
+              {% for section, info in tcs_sections.items() %}
+              <option value="{{ section }}" {% if current_section == section %}selected{% endif %}>
+                {{ info.section }} - {{ info.rate * 100 }}%
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="alert alert-info">
+            <h6><i class="bi bi-info-circle"></i> TCS Calculation</h6>
+            <p class="mb-0">
+              <strong>Taxable Amount:</strong> ₹{{ "{:,.2f}".format(bill.taxable_amount or 0) }}<br>
+              <strong>TCS Rate:</strong> {{ tcs_sections[current_section].rate * 100 }}%<br>
+              <strong>TCS Amount:</strong> ₹{{ "{:,.2f"|format(bill.taxable_amount * tcs_sections[current_section].rate) }}<br>
+              <strong>Total Amount:</strong> ₹{{ "{:,.2f"|format(bill.total_amount + (bill.taxable_amount * tcs_sections[current_section].rate)) }}
+            </p>
+          </div>
+          
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-calculator"></i> Calculate TCS
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">TCS Section Reference</h5>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>Section</th><th>Description</th><th>Rate</th><th>Applicable On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for section, info in tcs_sections.items() %}
+          <tr>
+            <td><strong>{{ section }}</strong></td>
+            <td>{{ info.section }}</td>
+            <td>{{ info.rate * 100 }}%</td>
+            <td>
+              {% if section == "206C" %}
+                Sale of motor vehicles above ₹10 lakh
+              {% elif section == "206CII" %}
+                Sale of scrap
+              {% elif section == "206CI" %}
+                Sale of alcohol, liquor, etc.
+              {% else %}
+                Other taxable sales
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-warning mt-3">
+  <h6><i class="bi bi-exclamation-triangle"></i> Important Note</h6>
+  <p class="mb-0">
+    <strong>TCS (Tax Collected at Source)</strong> is collected by the seller from the buyer.
+    <br>
+    <strong>Due dates:</strong> Monthly by 7th of following month.
+    <br>
+    <strong>Refund:</strong> Buyer can claim TCS credit in their income tax return.
+  </p>
+</div>
+{% endblock %}
