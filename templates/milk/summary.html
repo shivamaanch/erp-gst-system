@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Milk Summary{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 Milk Summary — FY {{ fy }}</h4>
+  <a href="{{ url_for('milk.entry_list') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>Type</th><th>Party</th><th class="text-end">Total Qty (L)</th>
+            <th class="text-center">Avg FAT%</th><th class="text-center">Avg SNF%</th>
+            <th class="text-end">Total Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for d in data %}
+        <tr>
+          <td><span class="badge {{ 'bg-success' if d.txn_type=='Sale' else 'bg-primary' }}">{{ d.txn_type }}</span></td>
+          <td>{{ d.name }}</td>
+          <td class="text-end">{{ "{:,.2f}".format(d.total_qty) }}</td>
+          <td class="text-center">{{ "{:.2f}".format(d.avg_fat) }}%</td>
+          <td class="text-center">{{ "{:.2f}".format(d.avg_snf) }}%</td>
+          <td class="text-end fw-bold">₹{{ "{:,.2f}".format(d.total_amt) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

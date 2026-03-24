@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ party.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">👤 {{ party.name }}</h4>
+  <div>
+    <a href="{{ url_for('clients.edit', pid=party.id) }}" class="btn btn-sm btn-warning">Edit</a>
+    <a href="{{ url_for('clients.index') }}" class="btn btn-sm btn-outline-secondary ms-2">← Back</a>
+  </div>
+</div>
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="fw-bold text-muted mb-3">Party Details</h6>
+        <table class="table table-sm table-borderless">
+          <tr><td class="text-muted">Type</td><td><strong>{{ party.party_type }}</strong></td></tr>
+          <tr><td class="text-muted">GSTIN</td><td><code>{{ party.gstin or "—" }}</code></td></tr>
+          <tr><td class="text-muted">PAN</td><td><code>{{ party.pan or "—" }}</code></td></tr>
+          <tr><td class="text-muted">Phone</td><td>{{ party.phone or "—" }}</td></tr>
+          <tr><td class="text-muted">Email</td><td>{{ party.email or "—" }}</td></tr>
+          <tr><td class="text-muted">Address</td><td>{{ party.address or "—" }}</td></tr>
+          <tr><td class="text-muted">Opening Bal.</td>
+              <td><strong>₹{{ "{:,.2f}".format(party.opening_balance or 0) }} {{ party.balance_type or "Dr" }}</strong></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-bold">📋 Transaction History</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Bill No</th><th>Date</th><th>Type</th><th class="text-end">Amount</th></tr>
+          </thead>
+          <tbody>
+            {% for b in bills %}
+            <tr>
+              <td><a href="{{ url_for('invoice.view', bid=b.id) }}">{{ b.bill_no }}</a></td>
+              <td>{{ b.bill_date.strftime("%d/%m/%Y") }}</td>
+              <td><span class="badge {{ 'bg-success' if b.bill_type=='Sales' else 'bg-warning text-dark' }}">{{ b.bill_type }}</span></td>
+              <td class="text-end">₹{{ "{:,.2f}".format(b.total_amount) }}</td>
+              <td><span class="badge bg-success">Active</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No transactions yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

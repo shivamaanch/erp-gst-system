@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Loan / CMA{% endblock %}
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-bank text-primary"></i> Loan & CMA Management</h5>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header fw-bold bg-primary text-white">New Loan Entry</div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="mb-2">
+          <label class="form-label small fw-bold">Borrower Name</label>
+          <input type="text" name="borrower" class="form-control form-control-sm" required>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small fw-bold">Principal (₹)</label>
+            <input type="number" name="principal" id="principal" class="form-control form-control-sm" oninput="calcEMI()" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold">Annual Rate (%)</label>
+            <input type="number" name="rate" id="rate" class="form-control form-control-sm" step="0.01" oninput="calcEMI()">
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small fw-bold">Tenure (Months)</label>
+            <input type="number" name="tenure" id="tenure" class="form-control form-control-sm" oninput="calcEMI()">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold">Type</label>
+            <select name="loan_type" class="form-select form-select-sm" onchange="calcEMI()">
+              <option value="flat">Flat Rate</option>
+              <option value="reducing">Reducing Balance</option>
+            </select>
+          </div>
+        </div>
+        <div class="alert alert-info py-2 small" id="emiResult">Enter values to calculate EMI</div>
+        <button type="submit" class="btn btn-primary btn-sm w-100">Save Loan</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header fw-bold bg-success text-white">SMF / Milk Rate Calculator</div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label small fw-bold">Fat %</label>
+          <input type="number" id="fat" class="form-control form-control-sm" step="0.1" value="3.5" oninput="calcSMF()">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-bold">SNF %</label>
+          <input type="number" id="sn" class="form-control form-control-sm" step="0.1" value="8.5" oninput="calcSMF()">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label small fw-bold">Fat Base Rate (₹/kg)</label>
+          <input type="number" id="fatRate" class="form-control form-control-sm" value="400" oninput="calcSMF()">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-bold">SNF Base Rate (₹/kg)</label>
+          <input type="number" id="snfRate" class="form-control form-control-sm" value="65" oninput="calcSMF()">
+        </div>
+      </div>
+      <div class="alert alert-success py-2" id="smfResult">Rate: ₹0.00 / Litre</div>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function calcEMI() {
+  const P = parseFloat(document.getElementById("principal").value)||0;
+  const r = parseFloat(document.getElementById("rate").value)||0;
+  const n = parseInt(document.getElementById("tenure").value)||1;
+  const type = document.querySelector("[name=loan_type]").value;
+  let emi, totalInt;
+  if (type === "flat") {
+    totalInt = P * (r/100) * (n/12);
+    emi = (P + totalInt) / n;
+  } else {
+    const mr = r / 1200;
+    emi = mr === 0 ? P/n : P * mr * Math.pow(1+mr,n) / (Math.pow(1+mr,n)-1);
+    totalInt = emi * n - P;
+  }
+  document.getElementById("emiResult").innerHTML =
+    `EMI: <strong>₹${emi.toFixed(2)}</strong> | Total Interest: <strong>₹${totalInt.toFixed(2)}</strong> | Total: <strong>₹${(P+totalInt).toFixed(2)}</strong>`;
+}
+function calcSMF() {
+  const fat = parseFloat(document.getElementById("fat").value)||0;
+  const snf = parseFloat(document.getElementById("sn").value)||0;
+  const fr  = parseFloat(document.getElementById("fatRate").value)||400;
+  const sr  = parseFloat(document.getElementById("snfRate").value)||65;
+  const fatVal = (fat/100) * fr * 10;
+  const snfVal = (snf/100) * sr * 10;
+  const total  = fatVal + snfVal;
+  document.getElementById("smfResult").innerHTML =
+    `Fat Value: ₹${fatVal.toFixed(2)} | SNF Value: ₹${snfVal.toFixed(2)} | <strong>Total Rate: ₹${total.toFixed(2)} / Litre</strong>`;
+}
+calcSMF();
+</script>
+{% endblock %}

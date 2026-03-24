@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Profit & Loss Statement{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📈 Profit & Loss Statement</h4>
+  <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <span>Financial Year: {{ fy }}</span>
+      <span class="fs-6">For the period ended {{ fiscal_year_end }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-borderless">
+        <thead>
+          <tr><th class="text-start" width="60%">Particulars</th><th class="text-end">Amount (₹)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="fw-bold">Revenue from Operations</td><td class="text-end fw-bold">₹{{ "{:,.2f}".format(debtor_sales + other_sales) }}</td></tr>
+          <tr><td>  Sales to Debtors</td><td class="text-end">₹{{ "{:,.2f}".format(debtor_sales) }}</td></tr>
+          <tr><td>  Other Sales</td><td class="text-end">₹{{ "{:,.2f}".format(other_sales) }}</td></tr>
+          <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+          <tr><td class="fw-bold">Expenses</td><td class="text-end fw-bold">₹{{ "{:,.2f}".format(creditor_purchases + supplier_purchases) }}</td></tr>
+          <tr><td>  Purchases from Creditors</td><td class="text-end">₹{{ "{:,.2f}".format(creditor_purchases) }}</td></tr>
+          <tr><td>  Purchases from Suppliers</td><td class="text-end">₹{{ "{:,.2f}".format(supplier_purchases) }}</td></tr>
+          <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+          <tr><td class="fw-bold text-uppercase">GROSS PROFIT</td><td class="text-end fw-bold text-{{ 'success' if gross_profit>=0 else 'danger' }}">₹{{ "{:,.2f}".format(gross_profit) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

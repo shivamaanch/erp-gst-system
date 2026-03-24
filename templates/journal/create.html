@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}New Journal Entry{% endblock %}
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-plus-circle text-primary"></i> New Journal Entry</h5>
+<div class="card shadow-sm"><div class="card-body">
+<form method="POST" id="jForm">
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <label class="form-label small fw-bold">Voucher No</label>
+      <input type="text" name="voucher_no" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-bold">Date</label>
+      <input type="date" name="voucher_date" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-bold">Type</label>
+      <select name="voucher_type" class="form-select form-select-sm">
+        <option>Journal</option><option>Payment</option>
+        <option>Receipt</option><option>Contra</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-bold">Narration</label>
+      <input type="text" name="narration" class="form-control form-control-sm">
+    </div>
+  </div>
+  <table class="table table-sm table-bordered" id="linesTable">
+    <thead class="table-dark"><tr><th>Account</th><th>Debit</th><th>Credit</th><th></th></tr></thead>
+    <tbody id="lineBody">
+      <tr>
+        <td><select name="account_id[]" class="form-select form-select-sm">
+          <option value="">-- Select --</option>
+          {% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}
+        </select></td>
+        <td><input type="number" name="debit[]"  class="form-control form-control-sm dr" step="0.01" value="0"></td>
+        <td><input type="number" name="credit[]" class="form-control form-control-sm cr" step="0.01" value="0"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
+      </tr>
+    </tbody>
+    <tfoot><tr class="table-light fw-bold">
+      <td>Total</td>
+      <td id="totalDr">0.00</td>
+      <td id="totalCr">0.00</td>
+      <td></td>
+    </tr></tfoot>
+  </table>
+  <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="addRow()">+ Add Line</button>
+  <div id="balAlert" class="alert alert-danger d-none py-2">Dr ≠ Cr — Entry not balanced!</div>
+  <button type="submit" class="btn btn-primary">Save Entry</button>
+</form>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const accounts = `{% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}`;
+function addRow() {
+  const tbody = document.getElementById("lineBody");
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><select name="account_id[]" class="form-select form-select-sm"><option value="">-- Select --</option>${accounts}</select></td>
+    <td><input type="number" name="debit[]"  class="form-control form-control-sm dr" step="0.01" value="0"></td>
+    <td><input type="number" name="credit[]" class="form-control form-control-sm cr" step="0.01" value="0"></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>`;
+  tbody.appendChild(tr);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("input", calcTotals));
+}
+function removeRow(btn) { btn.closest("tr").remove(); calcTotals(); }
+function calcTotals() {
+  let dr=0,cr=0;
+  document.querySelectorAll(".dr").forEach(i=>dr+=parseFloat(i.value||0));
+  document.querySelectorAll(".cr").forEach(i=>cr+=parseFloat(i.value||0));
+  document.getElementById("totalDr").textContent = dr.toFixed(2);
+  document.getElementById("totalCr").textContent = cr.toFixed(2);
+  const bal = document.getElementById("balAlert");
+  bal.classList.toggle("d-none", Math.abs(dr-cr)<0.01);
+}
+document.querySelectorAll(".dr,.cr").forEach(i=>i.addEventListener("input",calcTotals));
+document.getElementById("jForm").addEventListener("submit", function(e) {
+  const dr = parseFloat(document.getElementById("totalDr").textContent);
+  const cr = parseFloat(document.getElementById("totalCr").textContent);
+  if (Math.abs(dr-cr)>0.01) { e.preventDefault(); alert("Entry not balanced!"); }
+});
+</script>
+{% endblock %}

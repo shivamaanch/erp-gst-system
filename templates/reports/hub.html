@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Reports Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 Reports Dashboard</h4>
+</div>
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0">Sales Performance</h5>
+      </div>
+      <div class="card-body text-center">
+        <div class="display-4">{{ sales_count }}</div>
+        <p class="text-muted">Sales Invoices</p>
+        <div class="mt-3">
+          <div class="fs-5">₹{{ "{:,.2f}".format(total_sales) }}</div>
+          <p class="text-muted">Total Sales Value</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">Purchase Performance</h5>
+      </div>
+      <div class="card-body text-center">
+        <div class="display-4">{{ purchase_count }}</div>
+        <p class="text-muted">Purchase Bills</p>
+        <div class="mt-3">
+          <div class="fs-5">₹{{ "{:,.2f}".format(total_purchases) }}</div>
+          <p class="text-muted">Total Purchase Value</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Profitability</h5>
+      </div>
+      <div class="card-body text-center">
+        {% set net_profit = total_sales - total_purchases %}
+        <div class="display-4 text-{{ 'success' if net_profit>=0 else 'danger' }}">
+          ₹{{ "{:,.2f}".format(net_profit) }}
+        </div>
+        <p class="text-muted">Net Profit</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">Financial Position</h5>
+      </div>
+      <div class="card-body text-center">
+        <div class="display-4">
+          ₹{{ "{:,.2f}".format(total_sales - total_purchases + 100000) }}
+        </div>
+        <p class="text-muted">Estimated Capital</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4">
+  <div class="row g-3">
+    <div class="col-md-3">
+      <a href="{{ url_for('reports.profit_loss') }}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-graph-up me-2"></i>Profit & Loss Statement
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{{ url_for('reports.balance_sheet') }}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-layout-text-window me-2"></i>Balance Sheet
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{{ url_for('reports.trial_balance') }}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-list-columns me-2"></i>Trial Balance
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{{ url_for('reports.ledger') }}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-book me-2"></i>Party Ledger
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

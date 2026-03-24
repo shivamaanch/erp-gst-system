@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Financial Year Closing{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📅 Financial Year Management</h4>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% if fys|length > 0 %}
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th><th>Financial Year</th><th>Period</th>
+            <th>Status</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fy in fys %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td><strong>{{ fy.year_name }}</strong></td>
+            <td class="small text-muted">{{ fy.start_date }} to {{ fy.end_date }}</td>
+            <td>
+              {% if fy.is_closed %}
+              <span class="badge bg-secondary">Closed</span>
+              {% elif fy.is_active %}
+              <span class="badge bg-success">Active</span>
+              {% else %}
+              <span class="badge bg-light text-dark">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if not fy.is_closed and not fy.is_active %}
+              <a href="{{ url_for('year.open_fy', fy_id=fy.id) }}" class="btn btn-sm btn-outline-success">Reopen</a>
+              {% elif fy.is_active and not fy.is_closed %}
+              <form action="{{ url_for('year.close_fy', fy_id=fy.id) }}" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Close FY {{ fy.year_name }}? This action cannot be undone.')">
+                  Close FY
+                </button>
+              </form>
+              {% else %}
+              <span class="text-muted"> — </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4">
+      <i class="bi bi-info-circle display-4 text-muted"></i>
+      <p class="text-muted">No financial years configured. Please add one from Company Settings.</p>
+      <a href="{{ url_for('company.add_fy') }}" class="btn btn-primary">
+        + Add Financial Year
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

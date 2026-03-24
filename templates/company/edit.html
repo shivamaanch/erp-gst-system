@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Edit Company{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">✏️ Edit Company Profile</h4>
+  <a href="{{ url_for('company.index') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Company Name *</label>
+          <input type="text" name="name" class="form-control" required value="{{ company.name }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">GSTIN</label>
+          <input type="text" name="gstin" class="form-control text-uppercase" maxlength="15" value="{{ company.gstin or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">PAN</label>
+          <input type="text" name="pan" class="form-control text-uppercase" maxlength="10" value="{{ company.pan or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ company.phone or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ company.email or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">State Code</label>
+          <input type="text" name="state_code" class="form-control" value="{{ company.state_code if company.state_code is defined else '' }}" placeholder="03 for Punjab">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-bold">Address</label>
+          <textarea name="address" class="form-control" rows="2">{{ company.address or '' }}</textarea>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary px-4">💾 Save Changes</button>
+        <a href="{{ url_for('company.index') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

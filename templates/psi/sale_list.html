@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between mb-3">
+    <h4>🧾 Sale Invoices</h4>
+    <a href="/invoice/sale" class="btn btn-success">+ New Sale</a>
+  </div>
+  <table class="table table-bordered table-hover table-sm">
+    <thead class="table-dark"><tr>
+      <th>Invoice No</th><th>Date</th><th>Party</th><th>Item</th>
+      <th>Qty(L)</th><th>FAT%</th><th>SNF%</th><th>Rate</th>
+      <th>B.F.Rt</th><th>SNF.Rt</th><th>B.F.Kgs</th><th>SNF.Kgs</th>
+      <th>Taxable</th><th>GST</th><th class="text-success">Total</th>
+    </tr></thead>
+    <tbody>
+    {% for inv in invoices %}
+    <tr>
+      <td>{{inv.invoice_no}}</td>
+      <td>{{inv.invoice_date.strftime("%d/%m/%Y")}}</td>
+      <td>{{inv.party.name}}</td>
+      <td>{{inv.item_name}}</td>
+      <td>{{inv.qty_liters}}</td>
+      <td>{{inv.fat_percent}}</td>
+      <td>{{inv.snf_percent}}</td>
+      <td>{{inv.rate_per_liter}}</td>
+      <td>{{inv.fat_rate}}</td>
+      <td>{{inv.snf_rate}}</td>
+      <td>{{inv.fat_kgs}}</td>
+      <td>{{inv.snf_kgs}}</td>
+      <td>{{inv.taxable_amount}}</td>
+      <td>{{inv.gst_amount}}</td>
+      <td class="text-success fw-bold">₹{{inv.total_amount}}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="14" class="text-end fw-bold">TOTAL</td>
+      <td class="text-success fw-bold">₹{{total}}</td></tr></tfoot>
+  </table>
+</div>
+{% endblock %}

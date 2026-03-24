@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Upload 2B{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-6">
+<div class="card shadow-sm"><div class="card-header bg-primary text-white fw-bold">
+  <i class="bi bi-upload"></i> Import GSTR-2B
+</div>
+<div class="card-body">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label class="form-label fw-bold">Period (MM-YYYY)</label>
+      <input type="text" name="period" class="form-control" value="{{ period }}" placeholder="03-2026">
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-bold">Upload File</label>
+      <input type="file" name="file" class="form-control" accept=".json,.xlsx,.xls" required>
+      <div class="form-text">Supports: GSTN Official JSON or Excel (.xlsx)</div>
+    </div>
+    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-cloud-upload"></i> Import</button>
+  </form>
+</div></div>
+</div></div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ title }}</h4>
+  <a href="{{ url_for('clients.index') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Party Name *</label>
+          <input type="text" name="name" class="form-control" required
+                 value="{{ party.name if party else '' }}" placeholder="Full legal name">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Party Type *</label>
+          <select name="party_type" class="form-select" required>
+            {% for pt in party_types %}
+            <option value="{{ pt }}" {{ 'selected' if (party and party.party_type==pt) or (not party and pt=='Debtor') }}>{{ pt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">GSTIN</label>
+          <input type="text" name="gstin" class="form-control text-uppercase"
+                 maxlength="15" value="{{ party.gstin if party else '' }}" placeholder="15-char GSTIN">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ party.phone if party else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ party.email if party else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">PAN</label>
+          <input type="text" name="pan" class="form-control text-uppercase
+                 maxlength="10" value="{{ party.pan if party else '' }}" placeholder="ABCDE1234F">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-bold">Address</label>
+          <textarea name="address" class="form-control" rows="2">{{ party.address if party else '' }}</textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Opening Balance (₹)</label>
+          <input type="number" step="0.01" name="opening_balance" class="form-control"
+                 value="{{ party.opening_balance if party else 0 }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Balance Type</label>
+          <select name="balance_type" class="form-select">
+            <option value="Dr" {{ 'selected' if not party or party.balance_type=='Dr' }}>Dr (Receivable)</option>
+            <option value="Cr" {{ 'selected' if party and party.balance_type=='Cr' }}>Cr (Payable)</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-save"></i> {{ "Update" if party else "Save" }} Party
+        </button>
+        <a href="{{ url_for('clients.index') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

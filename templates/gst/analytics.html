@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}GST Analytics{% endblock %}
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-bar-chart-line text-primary"></i> GST Analytics — {{ fy }}</h5>
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card text-center bg-primary text-white shadow-sm">
+    <div class="card-body py-2"><div class="small">Total Sales</div>
+    <div class="fs-5 fw-bold">₹{{ "{:,.2f}".format(total_sales) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center bg-warning text-dark shadow-sm">
+    <div class="card-body py-2"><div class="small">Total Purchase</div>
+    <div class="fs-5 fw-bold">₹{{ "{:,.2f}".format(total_purchase) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center bg-danger text-white shadow-sm">
+    <div class="card-body py-2"><div class="small">CGST Collected</div>
+    <div class="fs-5 fw-bold">₹{{ "{:,.2f}".format(total_cgst) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center bg-success text-white shadow-sm">
+    <div class="card-body py-2"><div class="small">SGST Collected</div>
+    <div class="fs-5 fw-bold">₹{{ "{:,.2f}".format(total_sgst) }}</div></div></div></div>
+</div>
+<div class="card shadow-sm"><div class="card-body">
+  <canvas id="analyticsChart" height="70"></canvas>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const d = {{ chart_json|safe }};
+new Chart(document.getElementById("analyticsChart"), {
+  type:"bar",
+  data:{
+    labels:d.map(x=>x.month),
+    datasets:[
+      {label:"Sales",    data:d.map(x=>x.sales),    backgroundColor:"rgba(0,123,255,.7)"},
+      {label:"Purchase", data:d.map(x=>x.purchase), backgroundColor:"rgba(255,193,7,.7)"},
+      {label:"CGST",     data:d.map(x=>x.cgst),     backgroundColor:"rgba(220,53,69,.7)"},
+    ]
+  },
+  options:{responsive:true,plugins:{legend:{position:"top"}},
+           scales:{y:{ticks:{callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}
+});
+</script>
+{% endblock %}

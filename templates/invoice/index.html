@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ btype }} Invoices{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ "🧾 Sales Invoices" if btype=="Sales" else "🛒 Purchase Bills" }}</h4>
+  <div>
+    <a href="{{ url_for('invoice.index', type='Sales') }}" class="btn btn-sm {{ 'btn-success' if btype=='Sales' else 'btn-outline-success' }}">Sales</a>
+    <a href="{{ url_for('invoice.index', type='Purchase') }}" class="btn btn-sm {{ 'btn-warning' if btype=='Purchase' else 'btn-outline-warning' }}">Purchase</a>
+    <a href="{{ url_for('invoice.create', btype=btype) }}" class="btn btn-sm btn-primary ms-2">
+      <i class="bi bi-plus-circle"></i> New {{ btype }}
+    </a>
+  </div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total {{ btype }}</div>
+      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(total) }}</div>
+    </div>
+  </div>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>#</th><th>Bill No</th><th>Date</th><th>Party</th><th>FY</th><th class="text-end">Amount</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td><strong>{{ b.bill_no }}</strong></td>
+          <td>{{ b.bill_date.strftime("%d/%m/%Y") }}</td>
+          <td>{{ b.party.name if b.party else "—" }}</td>
+          <td><span class="badge bg-secondary">{{ b.fin_year }}</span></td>
+          <td class="text-end fw-bold">₹{{ "{:,.2f}".format(b.total_amount) }}</td>
+          <td>
+            <a href="{{ url_for('invoice.view', bid=b.id) }}" class="btn btn-sm btn-outline-info py-0">View</a>
+            <form action="{{ url_for('invoice.cancel', bid=b.id) }}" method="POST" class="d-inline"
+                  onsubmit="return confirm('Cancel this invoice?')">
+              <button class="btn btn-sm btn-outline-danger py-0">Cancel</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          No {{ btype }} invoices yet. <a href="{{ url_for('invoice.create', btype=btype) }}">Create one!</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

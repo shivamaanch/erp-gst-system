@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}TDS Certificate{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📄 TDS Certificate</h4>
+  <a href="{{ url_for('tds.index') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="mb-4">
+      <h5>Certificate No: TDS/{{ fy }}/{{ loop.index000 | string }}</h5>
+      <p class="text-muted">Issued on: {{ date.today().strftime('%d-%b-%Y') }}</p>
+    </div>
+    
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h6>Deductor Details</h6>
+        <p><strong>Company:</strong> {{ company.name }}</p>
+        <p><strong>GSTIN:</strong> <code>{{ company.gstin }}</code></p>
+        <p><strong>PAN:</strong> <code>{{ company.pan }}</code></p>
+        <p><strong>Address:</strong> {{ company.address }}</p>
+      </div>
+      <div class="col-md-6">
+        <h6>Deductee Details</h6>
+        <p><strong>Name:</strong> {{ bill.party.name }}</p>
+        <p><strong>Address:</strong> {{ bill.party.address }}</p>
+        <p><strong>PAN:</strong> <code>{{ bill.party.pan or 'Not Available' }}</code></p>
+      </div>
+    </div>
+    
+    <div class="mt-4">
+      <h6>Payment Details</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless">
+          <tr><th>Bill No</th><td>{{ bill.bill_no }}</td></tr>
+          <tr><th>Bill Date</th><td>{{ bill.bill_date.strftime('%d-%m-%Y') }}</td></tr>
+          <tr><th>Nature of Payment</th><td>Purchase of Goods/Services</td></tr>
+          <tr><th>Amount Paid/Credited</th><td>₹{{ "{:,.2f}".format(bill.total_amount) }}</td></tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="mt-4">
+      <h6>TDS Calculation</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless">
+          <tr>
+            <th>Rate of TDS</th>
+            <td>{{ "1%" if bill.total_amount > 50000 else "0%" }}</td>
+          </tr>
+          <tr>
+            <th>Amount on which TDS deducted</th>
+            <td>₹{{ "{:,.2f}".format(bill.total_amount if bill.total_amount > 50000 else 0) }}</td>
+          </tr>
+          <tr>
+            <th>TDS Deducted</th>
+            <td>₹{{ "{:,.2f}".format(tds_amount) }}</td>
+          </tr>
+          <tr>
+            <th>TDS Deposited</th>
+            <td>₹{{ "{:,.2f}".format(tds_amount) }} (Due by 7th of next month)</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="mt-4 text-center">
+      <a href="{{ url_for('tds.certificate', bill_id=bill.id) }}" class="btn btn-sm btn-outline-primary me-2">
+        <i class="bi bi-printer"></i> Print
+      </a>
+      <a href="{{ url_for('tds.index') }}" class="btn btn-sm btn-outline-secondary">
+        Back to TDS
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
