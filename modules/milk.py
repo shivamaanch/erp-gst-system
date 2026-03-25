@@ -23,7 +23,7 @@ def next_bill_no(company_id, fin_year, bill_type):
 def rates():
     cid = session.get("company_id")
     charts = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
-    return render_template("milk/rates.html", charts=charts)
+    return render_template("milk/rates_traditional.html", charts=charts)
 
 @milk_bp.route("/milk/rates/add", methods=["GET","POST"])
 @login_required
@@ -65,7 +65,7 @@ def entry_list():
     txns = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).order_by(MilkTransaction.txn_date.desc()).limit(200).all()
     total_qty = sum(float(t.qty_liters) for t in txns)
     total_amt = sum(float(t.amount) for t in txns)
-    return render_template("milk/entry_list.html", txns=txns, total_qty=total_qty, total_amt=total_amt)
+    return render_template("milk/entry_list_traditional.html", txns=txns, total_qty=total_qty, total_amt=total_amt)
 
 @milk_bp.route("/milk/entry/add", methods=["GET","POST"])
 @login_required
@@ -146,4 +146,27 @@ def summary():
     ).join(Party,MilkTransaction.party_id==Party.id).filter(
         MilkTransaction.company_id==cid,MilkTransaction.fin_year==fy
     ).group_by(MilkTransaction.txn_type,Party.name).all()
-    return render_template("milk/summary.html", data=data, fy=fy)
+    # Calculate traditional summary data
+    traditional_data = []
+    for row in data:
+        total_qty = float(row.total_qty)
+        avg_fat = float(row.avg_fat)
+        avg_snf = float(row.avg_snf)
+        total_amt = float(row.total_amt)
+        
+        # Calculate component weights
+        total_bf_kgs = total_qty * avg_fat / 100
+        total_snf_kgs = total_qty * avg_snf / 100
+        
+        traditional_data.append({
+            'txn_type': row.txn_type,
+            'name': row.name,
+            'total_qty': total_qty,
+            'avg_fat': avg_fat,
+            'avg_snf': avg_snf,
+            'total_bf_kgs': total_bf_kgs,
+            'total_snf_kgs': total_snf_kgs,
+            'total_amt': total_amt
+        })
+    
+    return render_template("milk/summary_traditional.html", data=traditional_data, fy=fy)

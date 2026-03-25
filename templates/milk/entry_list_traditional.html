@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Milk Entries{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 Milk Transaction Register (Traditional)</h4>
+  <div>
+    <a href="{{ url_for('milk.add_entry') }}" class="btn btn-sm btn-success">+ New Entry</a>
+    <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">📊 Summary</a>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-3">
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total Qty (L)</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_qty) }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Avg FAT%</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_qty / (total_qty / (sum(t.fat for t in txns) / len(txns) if txns else 0)) if txns else 0) }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Avg SNF%</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.snf for t in txns) / len(txns) if txns else 0) }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total BF Kgs</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.qty_liters * t.fat / 100 for t in txns)) }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total SNF Kgs</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.qty_liters * t.snf / 100 for t in txns)) }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total Amount</div>
+      <div class="fw-bold fs-5 text-success">₹{{ "{:,.2f}".format(total_amt) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Date</th>
+          <th>Shift</th>
+          <th>Type</th>
+          <th>Party</th>
+          <th class="text-end">Qty (L)</th>
+          <th class="text-center">FAT%</th>
+          <th class="text-center">SNF%</th>
+          <th class="text-end">BF Kgs</th>
+          <th class="text-end">SNF Kgs</th>
+          <th class="text-center">Ratio</th>
+          <th class="text-end">Rate/L</th>
+          <th class="text-end">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in txns %}
+        <tr>
+          <td>{{ t.txn_date.strftime('%d-%b-%Y') }}</td>
+          <td><span class="badge {{ 'bg-warning text-dark' if t.shift=='Evening' else 'bg-info' }}">{{ t.shift }}</span></td>
+          <td><span class="badge {{ 'bg-success' if t.txn_type=='Sale' else 'bg-primary' }}">{{ t.txn_type }}</span></td>
+          <td>{{ t.party.name if t.party else '—' }}</td>
+          <td class="text-end">{{ t.qty_liters }}</td>
+          <td class="text-center">{{ t.fat }}%</td>
+          <td class="text-center">{{ t.snf }}%</td>
+          <td class="text-end">{{ "{:,.3f}".format(t.qty_liters * t.fat / 100) }}</td>
+          <td class="text-end">{{ "{:,.3f}".format(t.qty_liters * t.snf / 100) }}</td>
+          <td class="text-center">{{ "{:,.2f}".format((t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0) }}</td>
+          <td class="text-end">₹{{ "{:,.4f}".format(t.rate) }}</td>
+          <td class="text-end fw-bold">₹{{ "{:,.2f}".format(t.amount) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="12" class="text-center text-muted py-4">
+          No entries yet. <a href="{{ url_for('milk.add_entry') }}">Add first entry!</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
