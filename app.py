@@ -20,6 +20,91 @@ def create_app():
     login_manager.init_app(app)
     migrate.init_app(app, db)
     
+    # AUTOMATIC DATABASE MIGRATION FOR NORTHFLANK
+    with app.app_context():
+        try:
+            # Check if is_super_admin column exists
+            from sqlalchemy import text
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_super_admin'"))
+            if not result.fetchone():
+                print("🔄 Running automatic database migration...")
+                
+                # Add is_super_admin column
+                try:
+                    db.session.execute(text("ALTER TABLE users ADD COLUMN is_super_admin BOOLEAN DEFAULT FALSE"))
+                    print("✅ Added is_super_admin column")
+                except Exception as e:
+                    print(f"⚠️  is_super_admin column might already exist: {e}")
+                
+                # Create user_companies table
+                try:
+                    db.session.execute(text("""
+                        CREATE TABLE IF NOT EXISTS user_companies (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                            role VARCHAR(20) DEFAULT 'viewer',
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """))
+                    print("✅ Created user_companies table")
+                except Exception as e:
+                    print(f"⚠️  Error creating user_companies: {e}")
+                
+                # Create company_access_log table
+                try:
+                    db.session.execute(text("""
+                        CREATE TABLE IF NOT EXISTS company_access_log (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                            action VARCHAR(50) NOT NULL,
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address VARCHAR(45),
+                            user_agent TEXT
+                        )
+                    """))
+                    print("✅ Created company_access_log table")
+                except Exception as e:
+                    print(f"⚠️  Error creating company_access_log: {e}")
+                
+                # Create indexes
+                try:
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_user_companies_user_id ON user_companies(user_id)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_user_companies_company_id ON user_companies(company_id)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_user_companies_active ON user_companies(is_active)"))
+                    print("✅ Created indexes")
+                except Exception as e:
+                    print(f"⚠️  Error creating indexes: {e}")
+                
+                # Migrate existing user-company relationships
+                try:
+                    db.session.execute(text("""
+                        INSERT INTO user_companies (user_id, company_id, role)
+                        SELECT id, company_id, role FROM users WHERE company_id IS NOT NULL
+                        ON CONFLICT DO NOTHING
+                    """))
+                    print("✅ Migrated user-company relationships")
+                except Exception as e:
+                    print(f"⚠️  Error migrating relationships: {e}")
+                
+                # Update first user to super admin
+                try:
+                    db.session.execute(text("UPDATE users SET is_super_admin = TRUE WHERE id = 1"))
+                    print("✅ Updated first user to super admin")
+                except Exception as e:
+                    print(f"⚠️  Error updating super admin: {e}")
+                
+                db.session.commit()
+                print("🎉 Automatic migration completed!")
+            else:
+                print("✅ Database schema already up to date")
+                
+        except Exception as e:
+            print(f"❌ Migration error: {e}")
+            db.session.rollback()
+    
     # TEMPORARY: Setup login bypass for Northflank deployment
     @login_manager.unauthorized_handler
     def unauthorized():
