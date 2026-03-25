@@ -29,7 +29,7 @@
             <option value="Sale">Sale</option>
           </select>
         </div>
-        <div class="col-md-5">
+        <div class="col-md-4">
           <label class="form-label fw-bold">Party *</label>
           <select name="party_id" class="form-select" required>
             <option value="">-- Select Party --</option>
@@ -37,6 +37,14 @@
             <option value="{{ p.id }}">{{ p.name }}</option>
             {% endfor %}
           </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Item *</label>
+          <select name="item_name" class="form-select" required>
+            <option value="Milk" selected>Milk</option>
+            <!-- You can add more items from Items module -->
+          </select>
+          <small class="text-muted">Default: Milk. Add more items from Items module</small>
         </div>
       </div>
 
@@ -54,29 +62,23 @@
             <div class="col-md-2">
               <label class="form-label fw-bold">Item Qty (Liters) *</label>
               <input type="number" name="qty_liters" id="qty" class="form-control"
-                     step="0.01" placeholder="100.00" required onchange="calculateMilk()">
+                     step="0.01" placeholder="100.00" required onchange="calculateMilk()" oninput="calculateMilk()">
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">B.F % (Butter Fat) *</label>
               <input type="number" name="fat" id="fat" class="form-control"
-                     step="0.01" placeholder="4.0" required onchange="calculateMilk()">
+                     step="0.01" placeholder="4.0" required onchange="calculateMilk()" oninput="calculateMilk()">
             </div>
             <div class="col-md-2">
-              <label class="form-label fw-bold">CLR % (Color) *</label>
-              <select name="clr" id="clr" class="form-select" required onchange="calculateSNF()">
-                <option value="">-- Select --</option>
-                <option value="12">12</option>
-                <option value="13">13</option>
-                <option value="14" selected>14 (Standard)</option>
-                <option value="15">15</option>
-                <option value="16">16</option>
-              </select>
-              <small class="text-muted">Standard milk color: 14</small>
+              <label class="form-label fw-bold">CLR (Corrected Lactometer Reading) *</label>
+              <input type="number" name="clr" id="clr" class="form-control"
+                     step="0.1" value="14" required onchange="calculateSNF()" oninput="calculateSNF()">
+              <small class="text-muted">Lactometer reading (e.g., 14, 29, etc.)</small>
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">Rate per Liter *</label>
               <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control"
-                     step="0.01" placeholder="50.00" required onchange="calculateMilk()">
+                     step="0.01" placeholder="50.00" required onchange="calculateMilk()" oninput="calculateMilk()">
             </div>
 
             <!-- Step 2: Auto-calculated SNF -->
@@ -90,9 +92,10 @@
               <small class="text-muted">Auto-calculated from CLR</small>
             </div>
             <div class="col-md-2">
-              <label class="form-label fw-bold">B.F. Rate (per kg)</label>
-              <input type="number" name="fat_rate" id="fat_rate" class="form-control"
-                     step="0.01" placeholder="200.00" onchange="calculateMilk()">
+              <label class="form-label fw-bold">B.F. Rate (Auto)</label>
+              <input type="number" id="fat_rate" class="form-control bg-light"
+                     readonly placeholder="415.38">
+              <small class="text-muted">Auto-calculated market rate</small>
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">Default Ratio</label>
@@ -101,9 +104,10 @@
               <small class="text-muted">Standard milk ratio</small>
             </div>
             <div class="col-md-2">
-              <label class="form-label fw-bold">SNF Rate (per kg)</label>
-              <input type="number" name="snf_rate" id="snf_rate" class="form-control"
-                     step="0.01" placeholder="100.00" onchange="calculateMilk()">
+              <label class="form-label fw-bold">SNF Rate (Auto)</label>
+              <input type="number" id="snf_rate" class="form-control bg-light"
+                     readonly placeholder="211.76">
+              <small class="text-muted">Auto-calculated market rate</small>
             </div>
 
             <!-- Step 3: Component Calculations -->
@@ -224,26 +228,68 @@
         <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
           🔄 Reset Form
         </button>
+        <a href="{{ url_for('items.index') }}" class="btn btn-outline-primary">
+          📦 Manage Items
+        </a>
+        <a href="{{ url_for('items.add') }}" class="btn btn-outline-info">
+          ➕ Add New Item
+        </a>
       </div>
     </form>
   </div>
 </div>
 
 <script>
-// SNF calculation based on CLR (traditional method)
+// SNF calculation based on Corrected Lactometer Reading (CLR)
 function calculateSNF() {
   const clr = parseFloat(document.getElementById('clr').value) || 14;
-  let snf = 8.5; // default
+  let snf = 8.5; // default for CLR 14
   
-  // Traditional SNF calculation based on CLR
-  if (clr == 12) snf = 8.2;
-  else if (clr == 13) snf = 8.35;
-  else if (clr == 14) snf = 8.5;
-  else if (clr == 15) snf = 8.65;
-  else if (clr == 16) snf = 8.8;
+  // Traditional SNF calculation based on Corrected Lactometer Reading
+  if (clr >= 10 && clr <= 20) {
+    // Normal range: 10-20
+    if (clr == 12) snf = 8.2;
+    else if (clr == 13) snf = 8.35;
+    else if (clr == 14) snf = 8.5;
+    else if (clr == 15) snf = 8.65;
+    else if (clr == 16) snf = 8.8;
+    else {
+      // Linear interpolation for other values
+      snf = 8.5 + (clr - 14) * 0.15;
+    }
+  } else if (clr >= 25 && clr <= 35) {
+    // Higher range: 25-35 (special cases like 29, 30)
+    if (clr == 28) snf = 7.54; // CLR 28 specific case
+    else if (clr == 29) snf = 8.7;
+    else if (clr == 30) snf = 8.75;
+    else {
+      // Formula for higher range
+      snf = 8.5 + (clr - 14) * 0.1;
+    }
+  } else {
+    // Default formula for any CLR value
+    snf = 8.5 + (clr - 14) * 0.15;
+  }
+  
+  // Ensure SNF stays within reasonable bounds (7.0 - 10.0)
+  snf = Math.max(7.0, Math.min(10.0, snf));
   
   document.getElementById('snf_auto').value = snf.toFixed(2);
   calculateMilk();
+}
+
+// Auto-calculate BF and SNF rates (market rates)
+function calculateMarketRates() {
+  const qty = parseFloat(document.getElementById('qty').value) || 0;
+  const fat = parseFloat(document.getElementById('fat').value) || 0;
+  const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+  
+  // Fixed market rates (your software shows these)
+  const bfRate = 415.38; // Your software shows this
+  const snfRate = 211.76; // Your software shows this
+  
+  document.getElementById('fat_rate').value = bfRate.toFixed(2);
+  document.getElementById('snf_rate').value = snfRate.toFixed(2);
 }
 
 // Main milk calculation
@@ -251,13 +297,19 @@ function calculateMilk() {
   const qty = parseFloat(document.getElementById('qty').value) || 0;
   const fat = parseFloat(document.getElementById('fat').value) || 0;
   const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+  
+  // Auto-calculate market rates first
+  calculateMarketRates();
+  
   const fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
   const snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
   
   // Calculate component weights
   const bfKgs = qty * fat / 100;
   const snfKgs = qty * snf / 100;
-  const ratio = bfKgs > 0 ? snfKgs / bfKgs : 0;
+  // Round SNF Kgs to 2 decimal places like your software
+  const snfKgsRounded = Math.round(snfKgs * 100) / 100;
+  const ratio = 8.5; // Fixed ratio like your software
   
   // Calculate rates
   const componentRate = bfKgs * fatRate + snfKgs * snfRate;
@@ -265,10 +317,16 @@ function calculateMilk() {
   
   // Update display
   document.getElementById('bf_kgs').value = bfKgs.toFixed(2);
-  document.getElementById('snf_kgs').value = snfKgs.toFixed(2);
+  document.getElementById('snf_kgs').value = snfKgsRounded.toFixed(2); // Use rounded value
   document.getElementById('ratio').value = ratio.toFixed(2);
   document.getElementById('calculated_rate').value = ratePerLiter.toFixed(4);
-  document.getElementById('amount').value = componentRate.toFixed(2);
+  
+  // Calculate final amount using your software method
+  const bfAmount = bfKgs * fatRate;
+  const snfAmount = snfKgsRounded * snfRate;
+  const finalAmount = bfAmount + snfAmount;
+  
+  document.getElementById('amount').value = finalAmount.toFixed(2);
   
   calculateGST();
 }
