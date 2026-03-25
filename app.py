@@ -508,6 +508,8 @@ def run_database_migration():
                 ("address", "TEXT"),
                 ("phone", "VARCHAR(15)"),
                 ("email", "VARCHAR(100)"),
+                ("opening_balance", "DECIMAL(18,2) DEFAULT 0.00"),
+                ("balance_type", "VARCHAR(2) DEFAULT 'Dr'"),
                 ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
             ],
             "items": [
@@ -551,6 +553,8 @@ def run_database_migration():
         try:
             cursor.execute("UPDATE companies SET business_type = 'service' WHERE business_type IS NULL")
             cursor.execute("UPDATE parties SET gstin = '' WHERE gstin IS NULL")
+            cursor.execute("UPDATE parties SET opening_balance = 0.00 WHERE opening_balance IS NULL")
+            cursor.execute("UPDATE parties SET balance_type = 'Dr' WHERE balance_type IS NULL")
             cursor.execute("UPDATE items SET gst_rate = 0.00 WHERE gst_rate IS NULL")
             cursor.execute("UPDATE accounts SET opening_balance = 0.00 WHERE opening_balance IS NULL")
             cursor.execute("UPDATE financial_years SET is_active = TRUE WHERE is_active IS NULL")
