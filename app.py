@@ -12,10 +12,35 @@ def create_app():
     app.config["SECRET_KEY"]                     = os.getenv("SECRET_KEY", "dev-secret")
     app.config["SQLALCHEMY_DATABASE_URI"]        = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    # TEMPORARY: Disable login requirement for Northflank deployment
+    app.config["DISABLE_LOGIN"] = os.getenv("DISABLE_LOGIN", "false").lower() == "true"
 
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
+    
+    # TEMPORARY: Setup login bypass for Northflank deployment
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        if app.config.get('DISABLE_LOGIN', False):
+            # Auto-login and redirect instead of showing login page
+            from models import User, Company, FinancialYear
+            user = User.query.first()
+            if user:
+                from flask_login import login_user
+                login_user(user)
+                
+                # Set up session for first company
+                company = Company.query.first()
+                if company:
+                    fy = FinancialYear.query.filter_by(company_id=company.id, is_active=True).first()
+                    session["company_id"] = company.id
+                    session["company_name"] = company.name
+                    session["fin_year"] = fy.year_name if fy else "2025-26"
+                    session["user_role"] = "admin"
+                return redirect(url_for("reports.hub"))
+        return redirect(url_for("auth.login"))
 
     from modules.auth           import auth_bp
     from modules.journal        import journal_bp
@@ -77,9 +102,49 @@ def create_app():
 
     @app.route("/")
     def index():
+        # TEMPORARY BYPASS FOR NORTHFLANK DEPLOYMENT
+        # Remove this block after setting up proper authentication
+        if not current_user.is_authenticated:
+            # Auto-login as first user for deployment testing
+            from models import User, Company, FinancialYear, UserCompany
+            user = User.query.first()
+            if user:
+                from flask_login import login_user
+                login_user(user)
+                
+                # Set up session for first company
+                company = Company.query.first()
+                if company:
+                    fy = FinancialYear.query.filter_by(company_id=company.id, is_active=True).first()
+                    session["company_id"] = company.id
+                    session["company_name"] = company.name
+                    session["fin_year"] = fy.year_name if fy else "2025-26"
+                    session["user_role"] = "admin"
+        
         if current_user.is_authenticated:
             return redirect(url_for("reports.hub"))
         return redirect(url_for("auth.login"))
+
+    @app.route("/bypass")
+    def bypass_login():
+        """TEMPORARY: Direct access to reports hub for Northflank testing"""
+        # Auto-login as first user
+        from models import User, Company, FinancialYear
+        user = User.query.first()
+        if user:
+            from flask_login import login_user
+            login_user(user)
+            
+            # Set up session for first company
+            company = Company.query.first()
+            if company:
+                fy = FinancialYear.query.filter_by(company_id=company.id, is_active=True).first()
+                session["company_id"] = company.id
+                session["company_name"] = company.name
+                session["fin_year"] = fy.year_name if fy else "2025-26"
+                session["user_role"] = "admin"
+        
+        return redirect(url_for("reports.hub"))
 
     return app
 
