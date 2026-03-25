@@ -125,53 +125,277 @@ def run_database_migration():
         except Exception as e:
             print(f"⚠️  Error creating company_access_log: {e}")
         
-        # 5. Create missing tables if they don't exist
+        # 5. Create ALL missing tables if they don't exist
         tables_to_create = {
             "gst_returns": """
                 CREATE TABLE IF NOT EXISTS gst_returns (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL REFERENCES companies(id),
-                    return_type VARCHAR(10) NOT NULL,
-                    return_period VARCHAR(20) NOT NULL,
-                    total_turnover DECIMAL(15,2) DEFAULT 0.00,
-                    total_tax DECIMAL(15,2) DEFAULT 0.00,
-                    igst DECIMAL(15,2) DEFAULT 0.00,
-                    cgst DECIMAL(15,2) DEFAULT 0.00,
-                    sgst DECIMAL(15,2) DEFAULT 0.00,
-                    cess DECIMAL(15,2) DEFAULT 0.00,
-                    status VARCHAR(20) DEFAULT 'draft',
-                    filed_at TIMESTAMP,
+                    return_type VARCHAR(20),
+                    period VARCHAR(10),
+                    fin_year VARCHAR(10),
+                    status VARCHAR(20) DEFAULT 'pending',
+                    filed_at DATE,
+                    arn VARCHAR(50),
+                    total_tax DECIMAL(14,2) DEFAULT 0.00,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "tds_returns": """
+                CREATE TABLE IF NOT EXISTS tds_returns (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10) NOT NULL,
+                    quarter VARCHAR(5),
+                    form_type VARCHAR(10) DEFAULT '26Q',
+                    status VARCHAR(20) DEFAULT 'Pending',
+                    filed_on DATE,
+                    total_tds DECIMAL(14,2) DEFAULT 0.00,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "alerts": """
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    alert_type VARCHAR(30),
+                    severity VARCHAR(10) DEFAULT 'info',
+                    title VARCHAR(100),
+                    message TEXT,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    due_date DATE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "loan_applications": """
+                CREATE TABLE IF NOT EXISTS loan_applications (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    applicant_name VARCHAR(100) NOT NULL,
+                    business_name VARCHAR(150),
+                    loan_amount DECIMAL(14,2) NOT NULL,
+                    loan_purpose VARCHAR(100),
+                    tenure_months INTEGER,
+                    existing_loans DECIMAL(14,2) DEFAULT 0.00,
+                    collateral_details TEXT,
+                    projected_turnover DECIMAL(14,2) DEFAULT 0.00,
+                    projected_profit DECIMAL(14,2) DEFAULT 0.00,
+                    status VARCHAR(20) DEFAULT 'Pending',
+                    created_date DATE DEFAULT CURRENT_DATE,
+                    remarks TEXT
+                )
+            """,
+            "milk_rate_charts": """
+                CREATE TABLE IF NOT EXISTS milk_rate_charts (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    chart_name VARCHAR(100) NOT NULL,
+                    effective_date DATE NOT NULL,
+                    fat_rate DECIMAL(8,4) NOT NULL,
+                    snf_rate DECIMAL(8,4) NOT NULL,
+                    base_fat DECIMAL(5,2) DEFAULT 0.00,
+                    base_snf DECIMAL(5,2) DEFAULT 0.00,
+                    txn_type VARCHAR(20) DEFAULT 'Both',
+                    is_active BOOLEAN DEFAULT TRUE
+                )
+            """,
+            "milk_transactions": """
+                CREATE TABLE IF NOT EXISTS milk_transactions (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10) NOT NULL,
+                    party_id INTEGER NOT NULL REFERENCES parties(id),
+                    txn_date DATE NOT NULL,
+                    shift VARCHAR(10) DEFAULT 'Morning',
+                    txn_type VARCHAR(20) NOT NULL,
+                    qty_liters DECIMAL(10,2) NOT NULL,
+                    fat DECIMAL(5,2) NOT NULL,
+                    snf DECIMAL(5,2) NOT NULL,
+                    rate DECIMAL(10,4) NOT NULL,
+                    amount DECIMAL(14,2) NOT NULL,
+                    chart_id INTEGER REFERENCES milk_rate_charts(id),
+                    narration TEXT
+                )
+            """,
+            "purchase_invoices": """
+                CREATE TABLE IF NOT EXISTS purchase_invoices (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10) NOT NULL,
+                    invoice_no VARCHAR(50) NOT NULL UNIQUE,
+                    invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    party_id INTEGER NOT NULL REFERENCES parties(id),
+                    item_name VARCHAR(100),
+                    qty_liters DECIMAL(10,2),
+                    fat_percent DECIMAL(5,2),
+                    clr_percent DECIMAL(5,2),
+                    rate_per_liter DECIMAL(10,2),
+                    snf_percent DECIMAL(5,2),
+                    fat_rate DECIMAL(10,2),
+                    snf_rate DECIMAL(10,2),
+                    fat_kgs DECIMAL(10,2),
+                    snf_kgs DECIMAL(10,2),
+                    taxable_amount DECIMAL(14,2),
+                    gst_rate DECIMAL(5,2) DEFAULT 0.00,
+                    gst_amount DECIMAL(14,2),
+                    total_amount DECIMAL(14,2),
+                    narration TEXT,
+                    is_cancelled BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "sale_invoices": """
+                CREATE TABLE IF NOT EXISTS sale_invoices (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10) NOT NULL,
+                    invoice_no VARCHAR(50) NOT NULL UNIQUE,
+                    invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    party_id INTEGER NOT NULL REFERENCES parties(id),
+                    item_name VARCHAR(100),
+                    qty_liters DECIMAL(10,2),
+                    fat_percent DECIMAL(5,2),
+                    clr_percent DECIMAL(5,2),
+                    rate_per_liter DECIMAL(10,2),
+                    snf_percent DECIMAL(5,2),
+                    fat_rate DECIMAL(10,2),
+                    snf_rate DECIMAL(10,2),
+                    fat_kgs DECIMAL(10,2),
+                    snf_kgs DECIMAL(10,2),
+                    taxable_amount DECIMAL(14,2),
+                    gst_rate DECIMAL(5,2) DEFAULT 0.00,
+                    gst_amount DECIMAL(14,2),
+                    total_amount DECIMAL(14,2),
+                    narration TEXT,
+                    is_cancelled BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "bank_accounts": """
+                CREATE TABLE IF NOT EXISTS bank_accounts (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    account_name VARCHAR(150) NOT NULL,
+                    bank_name VARCHAR(100),
+                    account_no VARCHAR(50),
+                    ifsc VARCHAR(20),
+                    branch VARCHAR(100),
+                    account_type VARCHAR(30) DEFAULT 'Current',
+                    opening_balance DECIMAL(14,2) DEFAULT 0.00,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_id, account_no)
+                )
+            """,
+            "bank_transactions": """
+                CREATE TABLE IF NOT EXISTS bank_transactions (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10) NOT NULL,
+                    bank_account_id INTEGER NOT NULL REFERENCES bank_accounts(id),
+                    txn_date DATE NOT NULL,
+                    value_date DATE,
+                    description TEXT,
+                    ref_no VARCHAR(100),
+                    debit DECIMAL(14,2) DEFAULT 0.00,
+                    credit DECIMAL(14,2) DEFAULT 0.00,
+                    balance DECIMAL(14,2),
+                    txn_mode VARCHAR(20),
+                    ledger_type VARCHAR(20),
+                    party_id INTEGER REFERENCES parties(id),
+                    narration TEXT,
+                    is_reconciled BOOLEAN DEFAULT FALSE,
+                    import_batch VARCHAR(50),
+                    hash_key VARCHAR(64) UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "gstr2b_records": """
+                CREATE TABLE IF NOT EXISTS gstr2b_records (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER REFERENCES companies(id),
+                    fin_year VARCHAR(10),
+                    period VARCHAR(10),
+                    supplier_gstin VARCHAR(15),
+                    supplier_name VARCHAR(200),
+                    invoice_no VARCHAR(100),
+                    invoice_date DATE,
+                    invoice_type VARCHAR(20) DEFAULT 'B2B',
+                    taxable_value DECIMAL(18,2),
+                    igst DECIMAL(18,2) DEFAULT 0.00,
+                    cgst DECIMAL(18,2) DEFAULT 0.00,
+                    sgst DECIMAL(18,2) DEFAULT 0.00,
+                    itc_available BOOLEAN DEFAULT TRUE,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "bank_import_logs": """
+                CREATE TABLE IF NOT EXISTS bank_import_logs (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    bank_account_id INTEGER REFERENCES bank_accounts(id),
+                    imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    file_name VARCHAR(200),
+                    total_rows INTEGER DEFAULT 0,
+                    imported INTEGER DEFAULT 0,
+                    duplicates INTEGER DEFAULT 0,
+                    errors INTEGER DEFAULT 0,
+                    notes TEXT
+                )
+            """,
+            "audit_trails": """
+                CREATE TABLE IF NOT EXISTS audit_trails (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER REFERENCES companies(id),
+                    user_id INTEGER REFERENCES users(id),
+                    action VARCHAR(50),
+                    model_name VARCHAR(100),
+                    record_id INTEGER,
+                    ip_address VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+            "stock_ledgers": """
+                CREATE TABLE IF NOT EXISTS stock_ledgers (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10),
+                    item_id INTEGER NOT NULL REFERENCES items(id),
+                    txn_date DATE,
+                    txn_type VARCHAR(20),
+                    in_qty DECIMAL(18,3) DEFAULT 0.00,
+                    out_qty DECIMAL(18,3) DEFAULT 0.00,
+                    rate DECIMAL(18,2) DEFAULT 0.00,
+                    bill_id INTEGER REFERENCES bills(id)
                 )
             """,
             "tds_entries": """
                 CREATE TABLE IF NOT EXISTS tds_entries (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL REFERENCES companies(id),
+                    fin_year VARCHAR(10),
                     party_id INTEGER NOT NULL REFERENCES parties(id),
-                    bill_no VARCHAR(50),
-                    bill_date DATE,
-                    tds_section VARCHAR(20),
+                    section VARCHAR(10),
+                    txn_date DATE,
+                    amount DECIMAL(18,2) DEFAULT 0.00,
                     tds_rate DECIMAL(5,2) DEFAULT 0.00,
-                    amount DECIMAL(12,2) DEFAULT 0.00,
-                    tds_amount DECIMAL(12,2) DEFAULT 0.00,
-                    quarter VARCHAR(10),
-                    financial_year VARCHAR(10),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    tds_amount DECIMAL(18,2) DEFAULT 0.00,
+                    is_paid BOOLEAN DEFAULT FALSE,
+                    challan_no VARCHAR(50)
                 )
             """,
-            "stock_ledger": """
-                CREATE TABLE IF NOT EXISTS stock_ledger (
+            "compliance_alerts": """
+                CREATE TABLE IF NOT EXISTS compliance_alerts (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL REFERENCES companies(id),
-                    item_id INTEGER NOT NULL REFERENCES items(id),
-                    transaction_type VARCHAR(20) NOT NULL,
-                    quantity DECIMAL(10,2) DEFAULT 0.00,
-                    rate DECIMAL(12,2) DEFAULT 0.00,
-                    amount DECIMAL(12,2) DEFAULT 0.00,
-                    balance_quantity DECIMAL(10,2) DEFAULT 0.00,
-                    transaction_date DATE,
-                    reference_no VARCHAR(50),
+                    alert_type VARCHAR(50),
+                    message TEXT,
+                    due_date DATE,
+                    priority VARCHAR(10) DEFAULT 'Medium',
+                    status VARCHAR(20) DEFAULT 'pending',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """,
@@ -179,27 +403,13 @@ def run_database_migration():
                 CREATE TABLE IF NOT EXISTS fixed_assets (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL REFERENCES companies(id),
-                    asset_name VARCHAR(200) NOT NULL,
-                    asset_type VARCHAR(50),
+                    asset_name VARCHAR(200),
+                    asset_category VARCHAR(100),
                     purchase_date DATE,
-                    purchase_amount DECIMAL(12,2) DEFAULT 0.00,
-                    depreciation_rate DECIMAL(5,2) DEFAULT 0.00,
-                    current_value DECIMAL(12,2) DEFAULT 0.00,
-                    location VARCHAR(200),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """,
-            "compliance_alerts": """
-                CREATE TABLE IF NOT EXISTS compliance_alerts (
-                    id SERIAL PRIMARY KEY,
-                    company_id INTEGER NOT NULL REFERENCES companies(id),
-                    alert_type VARCHAR(50) NOT NULL,
-                    title VARCHAR(200) NOT NULL,
-                    description TEXT,
-                    due_date DATE,
-                    status VARCHAR(20) DEFAULT 'pending',
-                    priority VARCHAR(10) DEFAULT 'medium',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    purchase_amount DECIMAL(18,2) DEFAULT 0.00,
+                    dep_rate DECIMAL(5,2) DEFAULT 15.00,
+                    current_value DECIMAL(18,2) DEFAULT 0.00,
+                    is_disposed BOOLEAN DEFAULT FALSE
                 )
             """
         }
@@ -211,20 +421,44 @@ def run_database_migration():
             except Exception as e:
                 print(f"⚠️  Error creating {table_name}: {e}")
         
-        # 6. Create indexes
+        # 6. Create comprehensive indexes
         indexes = [
             "CREATE INDEX IF NOT EXISTS idx_user_companies_user_id ON user_companies(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_user_companies_company_id ON user_companies(company_id)",
             "CREATE INDEX IF NOT EXISTS idx_user_companies_active ON user_companies(is_active)",
+            "CREATE INDEX IF NOT EXISTS idx_company_access_log_user_id ON company_access_log(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_company_access_log_company_id ON company_access_log(company_id)",
             "CREATE INDEX IF NOT EXISTS idx_bills_company_id ON bills(company_id)",
             "CREATE INDEX IF NOT EXISTS idx_bills_fin_year ON bills(fin_year)",
             "CREATE INDEX IF NOT EXISTS idx_bills_bill_type ON bills(bill_type)",
             "CREATE INDEX IF NOT EXISTS idx_bills_bill_date ON bills(bill_date)",
+            "CREATE INDEX IF NOT EXISTS idx_parties_company_id ON parties(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_items_company_id ON items(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_accounts_company_id ON accounts(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_journal_headers_company_id ON journal_headers(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_journal_lines_header_id ON journal_lines(journal_header_id)",
+            "CREATE INDEX IF NOT EXISTS idx_journal_lines_account_id ON journal_lines(account_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bill_items_bill_id ON bill_items(bill_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bill_items_item_id ON bill_items(item_id)",
             "CREATE INDEX IF NOT EXISTS idx_gst_returns_company_id ON gst_returns(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tds_returns_company_id ON tds_returns(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_alerts_company_id ON alerts(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_loan_applications_company_id ON loan_applications(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_milk_rate_charts_company_id ON milk_rate_charts(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_milk_transactions_company_id ON milk_transactions(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_milk_transactions_party_id ON milk_transactions(party_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_id ON purchase_invoices(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sale_invoices_company_id ON sale_invoices(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bank_accounts_company_id ON bank_accounts(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bank_transactions_company_id ON bank_transactions(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bank_transactions_account_id ON bank_transactions(bank_account_id)",
+            "CREATE INDEX IF NOT EXISTS idx_gstr2b_records_company_id ON gstr2b_records(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_bank_import_logs_company_id ON bank_import_logs(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_trails_company_id ON audit_trails(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_stock_ledgers_company_id ON stock_ledgers(company_id)",
             "CREATE INDEX IF NOT EXISTS idx_tds_entries_company_id ON tds_entries(company_id)",
-            "CREATE INDEX IF NOT EXISTS idx_stock_ledger_company_id ON stock_ledger(company_id)",
-            "CREATE INDEX IF NOT EXISTS idx_fixed_assets_company_id ON fixed_assets(company_id)",
-            "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_company_id ON compliance_alerts(company_id)"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_company_id ON compliance_alerts(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fixed_assets_company_id ON fixed_assets(company_id)"
         ]
         
         for index_sql in indexes:
