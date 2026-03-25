@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Traditional Milk Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 Traditional Milk Entry</h4>
+  <a href="{{ url_for('milk.entry_list') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="POST" id="milkForm">
+      <div class="row g-3">
+        <!-- Basic Info -->
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Date *</label>
+          <input type="date" name="txn_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Shift</label>
+          <select name="shift" class="form-select">
+            <option value="Morning">Morning</option>
+            <option value="Evening">Evening</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Type *</label>
+          <select name="txn_type" class="form-select" required>
+            <option value="Purchase">Purchase</option>
+            <option value="Sale">Sale</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-bold">Party *</label>
+          <select name="party_id" class="form-select" required>
+            <option value="">-- Select Party --</option>
+            {% for p in parties %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Traditional Milk Calculation Section -->
+      <div class="card mt-3 border-primary">
+        <div class="card-header bg-primary text-white py-2 fw-bold">
+          🧮 Milk Calculation (Traditional Method)
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <!-- Step 1: Basic Measurements -->
+            <div class="col-12">
+              <h6 class="text-muted fw-bold">Step 1: Enter Milk Details</h6>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Item Qty (Liters) *</label>
+              <input type="number" name="qty_liters" id="qty" class="form-control"
+                     step="0.01" placeholder="100.00" required onchange="calculateMilk()">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">B.F % (Butter Fat) *</label>
+              <input type="number" name="fat" id="fat" class="form-control"
+                     step="0.01" placeholder="4.0" required onchange="calculateMilk()">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">CLR % (Color) *</label>
+              <select name="clr" id="clr" class="form-select" required onchange="calculateSNF()">
+                <option value="">-- Select --</option>
+                <option value="12">12</option>
+                <option value="13">13</option>
+                <option value="14" selected>14 (Standard)</option>
+                <option value="15">15</option>
+                <option value="16">16</option>
+              </select>
+              <small class="text-muted">Standard milk color: 14</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Rate per Liter *</label>
+              <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control"
+                     step="0.01" placeholder="50.00" required onchange="calculateMilk()">
+            </div>
+
+            <!-- Step 2: Auto-calculated SNF -->
+            <div class="col-12 mt-3">
+              <h6 class="text-muted fw-bold">Step 2: SNF Calculation</h6>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">SNF % (Auto)</label>
+              <input type="number" id="snf_auto" class="form-control bg-light" 
+                     readonly placeholder="8.50">
+              <small class="text-muted">Auto-calculated from CLR</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">B.F. Rate (per kg)</label>
+              <input type="number" name="fat_rate" id="fat_rate" class="form-control"
+                     step="0.01" placeholder="200.00" onchange="calculateMilk()">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Default Ratio</label>
+              <input type="number" id="default_ratio" class="form-control bg-light" 
+                     value="8.50" readonly>
+              <small class="text-muted">Standard milk ratio</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">SNF Rate (per kg)</label>
+              <input type="number" name="snf_rate" id="snf_rate" class="form-control"
+                     step="0.01" placeholder="100.00" onchange="calculateMilk()">
+            </div>
+
+            <!-- Step 3: Component Calculations -->
+            <div class="col-12 mt-3">
+              <h6 class="text-muted fw-bold">Step 3: Component Weights (Auto-calculated)</h6>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">BF Kgs (Auto)</label>
+              <input type="number" id="bf_kgs" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">Qty × FAT% ÷ 100</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">SNF Kgs (Auto)</label>
+              <input type="number" id="snf_kgs" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">Qty × SNF% ÷ 100</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Ratio (Auto)</label>
+              <input type="number" id="ratio" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">SNF Kgs ÷ BF Kgs</small>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-bold">Rate per Liter (Calc)</label>
+              <input type="number" id="calculated_rate" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">Based on components</small>
+            </div>
+
+            <!-- Step 4: Final Amount -->
+            <div class="col-12 mt-3">
+              <h6 class="text-muted fw-bold">Step 4: Final Amount (Auto-calculated)</h6>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold text-success">Final Amount (₹)</label>
+              <input type="number" name="amount" id="amount" class="form-control bg-success bg-opacity-10 text-success fw-bold" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">(BF Kgs × BF Rate) + (SNF Kgs × SNF Rate)</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Milk Rate Chart Selection -->
+      <div class="card mt-3 border-info">
+        <div class="card-header bg-info text-white py-2 fw-bold">
+          📊 Milk Rate Chart (Optional - Auto-fills rates)
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Select Rate Chart</label>
+              <select name="chart_id" id="chart_id" class="form-select" onchange="loadRateChart()">
+                <option value="">-- Manual Entry --</option>
+                {% for c in charts %}
+                <option value="{{ c.id }}" data-fat="{{ c.fat_rate }}" data-snf="{{ c.snf_rate }}">
+                  {{ c.chart_name }} (F:{{ c.fat_rate }}/kg S:{{ c.snf_rate }}/kg)
+                </option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">Selecting a chart will auto-fill BF and SNF rates</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice Options -->
+      <div class="card mt-3 border-warning">
+        <div class="card-header bg-warning text-dark py-2 fw-bold">
+          📄 Invoice / Bill Creation
+        </div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" name="create_invoice"
+                   id="createInv" value="1" checked onchange="toggleGST()">
+            <label class="form-check-label fw-bold" for="createInv">
+              Auto-create Sale/Purchase Invoice (Bill)
+            </label>
+            <div class="text-muted small">Invoice will appear in billing register, GST reports, and ledgers</div>
+          </div>
+          <div id="gstSection" class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">GST Rate %</label>
+              <select name="gst_rate" id="gst_rate" class="form-select" onchange="calculateGST()">
+                <option value="0">0% (Exempt — Fresh Milk)</option>
+                <option value="5">5%</option>
+                <option value="12">12%</option>
+                <option value="18">18%</option>
+              </select>
+              <small class="text-muted">Fresh milk = 0% GST | Processed = 5%</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">GST Amount (₹)</label>
+              <input type="number" id="gst_amount" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Total with GST (₹)</label>
+              <input type="number" id="total_with_gst" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Narration -->
+      <div class="col-12 mt-3">
+        <label class="form-label fw-bold">Narration</label>
+        <input type="text" name="narration" class="form-control" placeholder="Optional note">
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-success px-5 fw-bold">
+          💾 Save Milk Entry
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+          🔄 Reset Form
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// SNF calculation based on CLR (traditional method)
+function calculateSNF() {
+  const clr = parseFloat(document.getElementById('clr').value) || 14;
+  let snf = 8.5; // default
+  
+  // Traditional SNF calculation based on CLR
+  if (clr == 12) snf = 8.2;
+  else if (clr == 13) snf = 8.35;
+  else if (clr == 14) snf = 8.5;
+  else if (clr == 15) snf = 8.65;
+  else if (clr == 16) snf = 8.8;
+  
+  document.getElementById('snf_auto').value = snf.toFixed(2);
+  calculateMilk();
+}
+
+// Main milk calculation
+function calculateMilk() {
+  const qty = parseFloat(document.getElementById('qty').value) || 0;
+  const fat = parseFloat(document.getElementById('fat').value) || 0;
+  const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+  const fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
+  const snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
+  
+  // Calculate component weights
+  const bfKgs = qty * fat / 100;
+  const snfKgs = qty * snf / 100;
+  const ratio = bfKgs > 0 ? snfKgs / bfKgs : 0;
+  
+  // Calculate rates
+  const componentRate = bfKgs * fatRate + snfKgs * snfRate;
+  const ratePerLiter = qty > 0 ? componentRate / qty : 0;
+  
+  // Update display
+  document.getElementById('bf_kgs').value = bfKgs.toFixed(2);
+  document.getElementById('snf_kgs').value = snfKgs.toFixed(2);
+  document.getElementById('ratio').value = ratio.toFixed(2);
+  document.getElementById('calculated_rate').value = ratePerLiter.toFixed(4);
+  document.getElementById('amount').value = componentRate.toFixed(2);
+  
+  calculateGST();
+}
+
+// Load rate chart values
+function loadRateChart() {
+  const sel = document.getElementById('chart_id');
+  const opt = sel.selectedOptions[0];
+  
+  if (opt && opt.value) {
+    const fatRate = parseFloat(opt.dataset.fat) || 0;
+    const snfRate = parseFloat(opt.dataset.snf) || 0;
+    
+    document.getElementById('fat_rate').value = fatRate.toFixed(2);
+    document.getElementById('snf_rate').value = snfRate.toFixed(2);
+    calculateMilk();
+  }
+}
+
+// Calculate GST
+function calculateGST() {
+  const amount = parseFloat(document.getElementById('amount').value) || 0;
+  const gstRate = parseFloat(document.getElementById('gst_rate')?.value || 0);
+  
+  const gstAmount = amount * gstRate / 100;
+  const totalWithGST = amount + gstAmount;
+  
+  document.getElementById('gst_amount').value = gstAmount.toFixed(2);
+  document.getElementById('total_with_gst').value = totalWithGST.toFixed(2);
+}
+
+// Toggle GST section
+function toggleGST() {
+  document.getElementById('gstSection').style.display = 
+    document.getElementById('createInv').checked ? 'flex' : 'none';
+}
+
+// Reset form
+function resetForm() {
+  document.getElementById('milkForm').reset();
+  document.getElementById('default_ratio').value = '8.50';
+  
+  // Clear auto-calculated fields
+  ['snf_auto', 'bf_kgs', 'snf_kgs', 'ratio', 'calculated_rate', 'amount', 'gst_amount', 'total_with_gst'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+  toggleGST();
+  calculateSNF(); // Set default SNF
+});
+</script>
+{% endblock %}

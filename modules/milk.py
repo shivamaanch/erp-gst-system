@@ -40,7 +40,7 @@ def add_rate():
         db.session.add(rc); db.session.commit()
         flash("Rate chart saved!", "success")
         return redirect(url_for("milk.rates"))
-    return render_template("milk/rate_form.html", chart=None, today=date.today().isoformat())
+    return render_template("milk/rate_form_traditional.html", chart=None, today=date.today().isoformat())
 
 @milk_bp.route("/milk/rates/edit/<int:cid_>", methods=["GET","POST"])
 @login_required
@@ -56,7 +56,7 @@ def edit_rate(cid_):
         chart.txn_type=request.form.get("txn_type","Both")
         db.session.commit(); flash("Updated!", "success")
         return redirect(url_for("milk.rates"))
-    return render_template("milk/rate_form.html", chart=chart, today=date.today().isoformat())
+    return render_template("milk/rate_form_traditional.html", chart=chart, today=date.today().isoformat())
 
 @milk_bp.route("/milk/entry")
 @login_required
@@ -74,10 +74,23 @@ def add_entry():
     parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
     if request.method == "POST":
-        fat=float(request.form["fat"]); snf=float(request.form["snf"])
-        qty=float(request.form["qty_liters"]); chart_id=int(request.form["chart_id"])
-        chart=MilkRateChart.query.get(chart_id)
-        rate=calc_rate(fat,snf,chart.fat_rate,chart.snf_rate); amount=round(rate*qty,2)
+        fat=float(request.form["fat"]); 
+        snf=float(request.form.get("snf", request.form.get("snf_auto", 8.5)))
+        qty=float(request.form["qty_liters"])
+        
+        # Handle rate chart selection
+        chart_id=request.form.get("chart_id")
+        if chart_id and chart_id != "":
+            chart=MilkRateChart.query.get(int(chart_id))
+            fat_rate=chart.fat_rate; snf_rate=chart.snf_rate
+        else:
+            fat_rate=float(request.form.get("fat_rate", 200))
+            snf_rate=float(request.form.get("snf_rate", 100))
+        
+        # Calculate using traditional method
+        rate=calc_rate(fat,snf,fat_rate,snf_rate)
+        amount=round(rate*qty,2)
+        
         txn_type=request.form["txn_type"]; party_id=int(request.form["party_id"])
         txn_date=datetime.strptime(request.form["txn_date"],"%Y-%m-%d").date()
         create_invoice=request.form.get("create_invoice")=="1"
@@ -107,7 +120,7 @@ def add_entry():
         if bill_no: msg+=f" | Invoice {bill_no} created"
         flash(msg,"success")
         return redirect(url_for("milk.entry_list"))
-    return render_template("milk/entry_form.html", parties=parties, charts=charts, today=date.today().isoformat())
+    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=date.today().isoformat())
 
 @milk_bp.route("/api/milk-rate")
 @login_required
