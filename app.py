@@ -43,6 +43,31 @@ def run_database_migration():
         except Exception as e:
             print(f"⚠️  is_super_admin column issue: {e}")
         
+        # 1.5. Fix companies table - add missing columns
+        companies_columns = [
+            ("business_type", "VARCHAR(50) DEFAULT 'service'"),
+            ("gstin", "VARCHAR(15)"),
+            ("pan", "VARCHAR(10)"),
+            ("state_code", "VARCHAR(2)"),
+            ("address", "TEXT"),
+            ("phone", "VARCHAR(15)"),
+            ("email", "VARCHAR(100)"),
+            ("logo_path", "VARCHAR(255)"),
+            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        ]
+        
+        for col_name, col_type in companies_columns:
+            try:
+                cursor.execute(f"""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'companies' AND column_name = '{col_name}'
+                """)
+                if not cursor.fetchone():
+                    cursor.execute(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}")
+                    print(f"✅ Added {col_name} column to companies")
+            except Exception as e:
+                print(f"⚠️  {col_name} column issue: {e}")
+        
         # 2. Fix bills table - add missing columns
         bills_columns = [
             ("tds_rate", "DECIMAL(5,2) DEFAULT 0.00"),
@@ -239,6 +264,65 @@ def run_database_migration():
             print("✅ Updated bills table defaults")
         except Exception as e:
             print(f"⚠️  Error updating bills defaults: {e}")
+        
+        # 10. Fix other common missing columns
+        common_table_fixes = {
+            "parties": [
+                ("gstin", "VARCHAR(15)"),
+                ("pan", "VARCHAR(10)"),
+                ("state_code", "VARCHAR(2)"),
+                ("address", "TEXT"),
+                ("phone", "VARCHAR(15)"),
+                ("email", "VARCHAR(100)"),
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ],
+            "items": [
+                ("hsn_code", "VARCHAR(8)"),
+                ("gst_rate", "DECIMAL(5,2) DEFAULT 0.00"),
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ],
+            "accounts": [
+                ("account_type", "VARCHAR(20)"),
+                ("opening_balance", "DECIMAL(12,2) DEFAULT 0.00"),
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ],
+            "journal_headers": [
+                ("fin_year", "VARCHAR(10)"),
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+                ("created_by", "INTEGER")
+            ],
+            "journal_lines": [
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ],
+            "financial_years": [
+                ("is_active", "BOOLEAN DEFAULT TRUE"),
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            ]
+        }
+        
+        for table_name, columns in common_table_fixes.items():
+            for col_name, col_type in columns:
+                try:
+                    cursor.execute(f"""
+                        SELECT column_name FROM information_schema.columns 
+                        WHERE table_name = '{table_name}' AND column_name = '{col_name}'
+                    """)
+                    if not cursor.fetchone():
+                        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+                        print(f"✅ Added {col_name} column to {table_name}")
+                except Exception as e:
+                    print(f"⚠️  {table_name}.{col_name} column issue: {e}")
+        
+        # 11. Update table defaults
+        try:
+            cursor.execute("UPDATE companies SET business_type = 'service' WHERE business_type IS NULL")
+            cursor.execute("UPDATE parties SET gstin = '' WHERE gstin IS NULL")
+            cursor.execute("UPDATE items SET gst_rate = 0.00 WHERE gst_rate IS NULL")
+            cursor.execute("UPDATE accounts SET opening_balance = 0.00 WHERE opening_balance IS NULL")
+            cursor.execute("UPDATE financial_years SET is_active = TRUE WHERE is_active IS NULL")
+            print("✅ Updated table defaults")
+        except Exception as e:
+            print(f"⚠️  Error updating table defaults: {e}")
         
         conn.commit()
         conn.close()
