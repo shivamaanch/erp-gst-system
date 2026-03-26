@@ -73,7 +73,7 @@ def entry_list():
     from sqlalchemy import text
     sql = """
     SELECT id, company_id, fin_year, voucher_no, party_id, txn_date, shift, 
-           txn_type, qty_liters, fat, snf, rate, amount, chart_id, narration, bill_id
+           txn_type, qty_liters, fat, snf, rate, amount, chart_id, narration
     FROM milk_transactions 
     WHERE company_id = :company_id AND fin_year = :fin_year 
     ORDER BY txn_date DESC 
@@ -101,7 +101,7 @@ def entry_list():
                 self.amount = row.amount
                 self.chart_id = row.chart_id
                 self.narration = row.narration
-                self.bill_id = row.bill_id
+                self.bill_id = None  # Default bill_id value
         
         txns.append(SimpleMilkTransaction(row))
     total_qty = sum(float(t.qty_liters) for t in txns)
