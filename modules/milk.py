@@ -69,50 +69,41 @@ def entry_list():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
-    # Use custom SQL query to avoid CLR column issues
-    try:
-        from sqlalchemy import text
-        sql = """
-        SELECT id, company_id, fin_year, voucher_no, party_id, txn_date, shift, 
-               txn_type, qty_liters, fat, snf, rate, amount, chart_id, narration, bill_id
-        FROM milk_transactions 
-        WHERE company_id = :company_id AND fin_year = :fin_year 
-        ORDER BY txn_date DESC 
-        LIMIT 200
-        """
-        result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
-        txns = []
-        for row in result:
-            # Create a simple object with the data
-            class SimpleMilkTransaction:
-                def __init__(self, row):
-                    self.id = row.id
-                    self.company_id = row.company_id
-                    self.fin_year = row.fin_year
-                    self.voucher_no = row.voucher_no
-                    self.party_id = row.party_id
-                    self.txn_date = row.txn_date
-                    self.shift = row.shift
-                    self.txn_type = row.txn_type
-                    self.qty_liters = row.qty_liters
-                    self.fat = row.fat
-                    self.snf = row.snf
-                    self.clr = 0.0  # Default CLR value
-                    self.rate = row.rate
-                    self.amount = row.amount
-                    self.chart_id = row.chart_id
-                    self.narration = row.narration
-                    self.bill_id = row.bill_id
-            
-            txns.append(SimpleMilkTransaction(row))
-    except Exception as e:
-        # Fallback to basic query if custom SQL fails
-        print(f"Warning: Custom query failed, using fallback: {e}")
-        txns = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).order_by(MilkTransaction.txn_date.desc()).limit(200).all()
-        # Add CLR attribute if missing
-        for txn in txns:
-            if not hasattr(txn, 'clr'):
-                txn.clr = 0.0
+    # Use only raw SQL query to avoid ALL SQLAlchemy ORM issues
+    from sqlalchemy import text
+    sql = """
+    SELECT id, company_id, fin_year, voucher_no, party_id, txn_date, shift, 
+           txn_type, qty_liters, fat, snf, rate, amount, chart_id, narration, bill_id
+    FROM milk_transactions 
+    WHERE company_id = :company_id AND fin_year = :fin_year 
+    ORDER BY txn_date DESC 
+    LIMIT 200
+    """
+    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    txns = []
+    for row in result:
+        # Create a simple object with the data
+        class SimpleMilkTransaction:
+            def __init__(self, row):
+                self.id = row.id
+                self.company_id = row.company_id
+                self.fin_year = row.fin_year
+                self.voucher_no = row.voucher_no
+                self.party_id = row.party_id
+                self.txn_date = row.txn_date
+                self.shift = row.shift
+                self.txn_type = row.txn_type
+                self.qty_liters = row.qty_liters
+                self.fat = row.fat
+                self.snf = row.snf
+                self.clr = 0.0  # Default CLR value
+                self.rate = row.rate
+                self.amount = row.amount
+                self.chart_id = row.chart_id
+                self.narration = row.narration
+                self.bill_id = row.bill_id
+        
+        txns.append(SimpleMilkTransaction(row))
     total_qty = sum(float(t.qty_liters) for t in txns)
     total_amt = sum(float(t.amount) for t in txns)
     # Calculate averages and totals for template
