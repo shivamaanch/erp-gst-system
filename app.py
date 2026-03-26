@@ -626,6 +626,18 @@ def create_app():
                     print(f"Error adding voucher_no to milk_transactions: {e}")
                     db.session.rollback()
             
+            # Add missing columns to gstr2b_records table
+            try:
+                db.session.execute(text('ALTER TABLE gstr2b_records ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+                db.session.commit()
+                print("Added created_at to gstr2b_records table")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    print("created_at already exists in gstr2b_records table")
+                else:
+                    print(f"Error adding created_at to gstr2b_records: {e}")
+                    db.session.rollback()
+            
             print("Database migration completed successfully!")
             
         except Exception as e:
