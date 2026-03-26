@@ -399,7 +399,7 @@ class MilkTransaction(db.Model):
     qty_liters  = db.Column(db.Numeric(10,2), nullable=False)
     fat         = db.Column(db.Numeric(5,2), nullable=False)      # FAT %
     snf         = db.Column(db.Numeric(5,2), nullable=False)      # SNF %
-    clr         = db.Column(db.Numeric(5,2), nullable=False)      # CLR value
+    clr         = db.Column(db.Numeric(5,2), nullable=True, default=0.0)      # CLR value
     rate        = db.Column(db.Numeric(10,4), nullable=False)     # Calculated rate/liter
     amount      = db.Column(db.Numeric(14,2), nullable=False)
     chart_id    = db.Column(db.Integer, db.ForeignKey("milk_rate_charts.id"))
