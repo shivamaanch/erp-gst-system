@@ -592,48 +592,45 @@ def create_app():
     # TEMPORARY: Disable login requirement for development
     app.config["DISABLE_LOGIN"] = os.getenv("DISABLE_LOGIN", "true").lower() == "true"
     
-    def run_auto_db_migration():
-        """Run automatic database migration on startup"""
+    # Initialize database immediately for migration
+    from extensions import db
+    db.init_app(app)
+    
+    # Run migration IMMEDIATELY after database init
+    with app.app_context():
         try:
-            from extensions import db
             from sqlalchemy import text
+            print("Running immediate database migration...")
             
-            with app.app_context():
-                print("Running automatic database migration...")
-                
-                # Add voucher_no to bills table
-                try:
-                    db.session.execute(text('ALTER TABLE bills ADD COLUMN voucher_no VARCHAR(50)'))
-                    db.session.commit()
-                    print("Added voucher_no to bills table")
-                except Exception as e:
-                    if "already exists" in str(e) or "duplicate column" in str(e):
-                        print("voucher_no already exists in bills table")
-                    else:
-                        print(f"Error adding voucher_no to bills: {e}")
-                        db.session.rollback()
-                
-                # Add voucher_no to milk_transactions table
-                try:
-                    db.session.execute(text('ALTER TABLE milk_transactions ADD COLUMN voucher_no VARCHAR(50)'))
-                    db.session.commit()
-                    print("Added voucher_no to milk_transactions table")
-                except Exception as e:
-                    if "already exists" in str(e) or "duplicate column" in str(e):
-                        print("voucher_no already exists in milk_transactions table")
-                    else:
-                        print(f"Error adding voucher_no to milk_transactions: {e}")
-                        db.session.rollback()
-                
-                print("Database migration completed successfully!")
-                
+            # Add voucher_no to bills table
+            try:
+                db.session.execute(text('ALTER TABLE bills ADD COLUMN voucher_no VARCHAR(50)'))
+                db.session.commit()
+                print("Added voucher_no to bills table")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    print("voucher_no already exists in bills table")
+                else:
+                    print(f"Error adding voucher_no to bills: {e}")
+                    db.session.rollback()
+            
+            # Add voucher_no to milk_transactions table
+            try:
+                db.session.execute(text('ALTER TABLE milk_transactions ADD COLUMN voucher_no VARCHAR(50)'))
+                db.session.commit()
+                print("Added voucher_no to milk_transactions table")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    print("voucher_no already exists in milk_transactions table")
+                else:
+                    print(f"Error adding voucher_no to milk_transactions: {e}")
+                    db.session.rollback()
+            
+            print("Database migration completed successfully!")
+            
         except Exception as e:
             print(f"Database migration failed: {e}")
     
-    # Run automatic migration
-    run_auto_db_migration()
-
-    db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
     
