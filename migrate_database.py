@@ -44,6 +44,18 @@ def run_migration():
                     print(f"❌ Error adding voucher_no to milk_transactions: {e}")
                     db.session.rollback()
             
+            # Add CLR column to milk_transactions table
+            try:
+                result = db.session.execute(text('ALTER TABLE milk_transactions ADD COLUMN clr DECIMAL(10,2) DEFAULT 0.0'))
+                db.session.commit()
+                print("✅ Added CLR column to milk_transactions table")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    print("✅ CLR column already exists in milk_transactions table")
+                else:
+                    print(f"❌ Error adding CLR column to milk_transactions: {e}")
+                    db.session.rollback()
+            
             # Add created_at to gstr2b_records table
             try:
                 result = db.session.execute(text('ALTER TABLE gstr2b_records ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
@@ -72,6 +84,7 @@ def main():
     print("This script fixes missing database columns:")
     print("• voucher_no column in bills table")
     print("• voucher_no column in milk_transactions table") 
+    print("• CLR column in milk_transactions table")
     print("• created_at column in gstr2b_records table")
     print()
     
