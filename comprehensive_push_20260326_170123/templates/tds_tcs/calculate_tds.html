@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Calculate TDS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🧾 Calculate TDS - {{ bill.bill_no }}</h4>
+  <a href="{{ url_for('tds_tcs.tds_index') }}" class="btn btn-sm btn-outline-secondary">← Back to TDS</a>
+</div>
+
+<div class="row">
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Bill Details</label>
+            <div class="mb-2">
+              <small class="text-muted">Bill No:</small> <strong>{{ bill.bill_no }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Date:</small> <strong>{{ bill.bill_date.strftime('%d-%b-%Y') }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Party:</small> <strong>{{ party.name }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Total Amount:</small> <strong>₹{{ "{:,.2f}".format(bill.total_amount) }}</strong>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Current TDS Information</label>
+            <div class="mb-2">
+              <small class="text-muted">Current Rate:</small> <strong>{{ "%.2f"|format(bill.tds_rate * 100) }}%</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Current Amount:</small> <strong>₹{{ "{:,.2f}".format(bill.tds_amount) }}</strong>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Net Amount:</small> <strong>₹{{ "{:,.2f"|format(bill.total_amount - bill.tds_amount) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Calculate TDS</h5>
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label fw-bold">TDS Section</label>
+            <select name="tds_section" class="form-select" required>
+              {% for section, info in tds_sections.items() %}
+              <option value="{{ section }}" {% if current_section == section %}selected{% endif %}>
+                {{ info.section }} - {{ info.rate * 100 }}% (Threshold: ₹{{ info.threshold | number_format }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="alert alert-info">
+            <h6><i class="bi bi-info-circle"></i> TDS Calculation</h6>
+            <p class="mb-0">
+              <strong>Taxable Amount:</strong> ₹{{ "{:,.2f}".format(bill.taxable_amount or 0) }}<br>
+              <strong>Threshold:</strong> ₹{{ tds_sections[current_section].threshold | number_format }}<br>
+              {% if bill.taxable_amount >= tds_sections[current_section].threshold %}
+                <strong>TDS Rate:</strong> {{ tds_sections[current_section].rate * 100 }}%<br>
+                <strong>TDS Amount:</strong> ₹{{ "{:,.2f"|format(bill.taxable_amount * tds_sections[current_section].rate) }}
+              {% else %}
+                <strong>TDS Rate:</strong> 0% (Below threshold)<br>
+                <strong>TDS Amount:</strong> ₹0.00
+              {% endif %}
+            </p>
+          </div>
+          
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-calculator"></i> Calculate TDS
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">TDS Section Reference</h5>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>Section</th><th>Description</th><th>Rate</th><th>Threshold</th><th>Applicability</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for section, info in tds_sections.items() %}
+          <tr>
+            <td><strong>{{ section }}</strong></td>
+            <td>{{ info.section }}</td>
+            <td>{{ info.rate * 100 }}%</td>
+            <td>₹{{ info.threshold | number_format }}</td>
+            <td>
+              {% if info.threshold == 0 %}
+                Always applicable
+              {% else %}
+                Above ₹{{ info.threshold | number_format }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

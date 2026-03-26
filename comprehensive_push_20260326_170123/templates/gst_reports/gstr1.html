@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}GSTR-1 Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 GSTR-1 - Outward Supplies (Sales)</h4>
+  <div class="btn-group">
+    <a href="{{ url_for('gst_reports.gstr1', period=period, export='excel') }}" class="btn btn-sm btn-success">
+      <i class="bi bi-download"></i> Export Excel
+    </a>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-2">
+      <div class="col-md-4">
+        <input type="text" name="period" class="form-control" value="{{ period }}" placeholder="MM-YYYY">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="bi bi-search"></i> Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-primary text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">B2B Invoices</h5>
+        <h3>{{ b2b_count }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-info text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">B2C Large</h5>
+        <h3>{{ b2c_large_count }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-warning text-dark">
+      <div class="card-body text-center">
+        <h5 class="card-title">Total Taxable</h5>
+        <h3>₹{{ "{:,.2f}".format(total_taxable) }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-success text-white">
+      <div class="card-body text-center">
+        <h5 class="card-title">Total Tax</h5>
+        <h3>₹{{ "{:,.2f}".format(total_cgst + total_sgst + total_igst) }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- B2B Invoices -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-primary text-white">
+    <h6 class="mb-0">📋 B2B Invoices ({{ b2b_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Bill No</th><th>Date</th><th>Customer</th><th>GSTIN</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in b2b_invoices %}
+        <tr>
+          <td>{{ inv.bill_no }}</td>
+          <td>{{ inv.bill_date.strftime('%d-%m-%Y') }}</td>
+          <td>{{ inv.party_name }}</td>
+          <td><code>{{ inv.gstin }}</code></td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.cgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.sgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.igst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.total) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-3">No B2B invoices found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- B2C Large Invoices -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-info text-white">
+    <h6 class="mb-0">🛒 B2C Large Invoices (>₹2.5L) ({{ b2c_large_count }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Bill No</th><th>Date</th><th>Customer</th><th>State</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in b2c_large %}
+        <tr>
+          <td>{{ inv.bill_no }}</td>
+          <td>{{ inv.bill_date.strftime('%d-%m-%Y') }}</td>
+          <td>{{ inv.party_name }}</td>
+          <td>{{ inv.state_code or "Unknown" }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.taxable) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.cgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.sgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.igst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(inv.total) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-3">No B2C large invoices found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- B2C Small Summary -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-warning text-dark">
+    <h6 class="mb-0">📦 B2C Small Summary (<₹2.5L)</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>State</th><th>GST Rate</th><th>Taxable Amount</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Invoice Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for summary in b2c_small %}
+        <tr>
+          <td>{{ summary.state }}</td>
+          <td>{{ "%.2f"|format(summary.rate) }}%</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(summary.taxable) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(summary.cgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(summary.sgst) }}</td>
+          <td class="text-end">₹{{ "{:,.2f}".format(summary.igst) }}</td>
+          <td class="text-center">{{ summary.count }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-3">No B2C small invoices found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-info mt-3">
+  <h6><i class="bi bi-info-circle"></i> GSTR-1 Information</h6>
+  <p class="mb-0">
+    <strong>GSTR-1</strong> is a monthly return that contains details of all outward supplies (sales).
+    <br>
+    <strong>Due Date:</strong> 11th of the following month
+    <br>
+    <strong>Sections:</strong> B2B (registered taxpayers), B2C Large (>₹2.5L), B2C Small (<₹2.5L)
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="mb-3">🛒 New Purchase Invoice</h4>
+  <form method="POST">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label>Party</label>
+        <select name="party_id" class="form-select" required>
+          {% for p in parties %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label>Date</label>
+        <input type="date" name="invoice_date" class="form-control" value="{{today}}" required>
+      </div>
+      <div class="col-md-2">
+        <label>Invoice No.</label>
+        <input type="text" name="bill_no" class="form-control" placeholder="Auto-generated if blank">
+        <small class="text-muted">Leave blank for auto-number</small>
+      </div>
+      <div class="col-md-4">
+        <label>Item Name</label>
+        <input type="text" name="item_name" class="form-control" value="Milk" required>
+      </div>
+
+      <div class="col-md-2">
+        <label>Qty (Litres)</label>
+        <input type="number" step="0.01" name="qty_liters" id="qty" class="form-control" oninput="calc()" required>
+      </div>
+      <div class="col-md-2">
+        <label>B.F. %</label>
+        <input type="number" step="0.01" name="fat_percent" id="fat" class="form-control" oninput="calc()" required>
+      </div>
+      <div class="col-md-2">
+        <label>CLR</label>
+        <input type="number" step="0.01" name="clr_percent" id="clr" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label>SNF %</label>
+        <input type="number" step="0.01" name="snf_percent" id="snf" class="form-control" oninput="calc()" required>
+      </div>
+      <div class="col-md-2">
+        <label>B.F. Rate (₹/kg)</label>
+        <input type="number" step="0.01" name="rate_per_liter" id="bf_rt" class="form-control" oninput="calc()" required placeholder="e.g. 415.38">
+      </div>
+      <div class="col-md-2">
+        <label>SNF Rate (₹/kg)</label>
+        <input type="number" step="0.01" name="snf_rate_input" id="snf_rt" class="form-control" oninput="calc()" required placeholder="e.g. 211.76">
+      </div>
+
+      <!-- LIVE CALCULATED RESULTS -->
+      <div class="col-12">
+        <div class="card border-success mt-2">
+          <div class="card-header bg-success text-white fw-bold">📊 Auto Calculated</div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-md-2 border-end">
+                <small class="text-muted">B.F. Kgs</small>
+                <div class="fs-4 fw-bold text-primary" id="r_fat_kgs">-</div>
+              </div>
+              <div class="col-md-2 border-end">
+                <small class="text-muted">SNF Kgs</small>
+                <div class="fs-4 fw-bold text-primary" id="r_snf_kgs">-</div>
+              </div>
+              <div class="col-md-2 border-end">
+                <small class="text-muted">B.F. Amt</small>
+                <div class="fs-4 fw-bold text-info" id="r_fat_amt">-</div>
+              </div>
+              <div class="col-md-2 border-end">
+                <small class="text-muted">SNF Amt</small>
+                <div class="fs-4 fw-bold text-info" id="r_snf_amt">-</div>
+              </div>
+              <div class="col-md-2 border-end">
+                <small class="text-muted">GST</small>
+                <div class="fs-4 fw-bold text-secondary" id="r_gst">₹0</div>
+              </div>
+              <div class="col-md-2">
+                <small class="text-muted">💰 TOTAL</small>
+                <div class="fs-3 fw-bold text-success" id="r_total">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label>GST %</label>
+        <select name="gst_rate" id="gst" class="form-select" onchange="calc()">
+          <option value="0">0% (Exempt - Fresh Milk)</option>
+          <option value="5">5%</option>
+          <option value="12">12%</option>
+          <option value="18">18%</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label>Narration</label>
+        <input type="text" name="narration" class="form-control">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-success btn-lg w-100">💾 Save Invoice</button>
+      </div>
+    </div>
+  </form>
+</div>
+<script>
+function calc(){
+  var qty   = parseFloat(document.getElementById("qty").value)||0;
+  var fat   = parseFloat(document.getElementById("fat").value)||0;
+  var snf   = parseFloat(document.getElementById("snf").value)||0;
+  var bf_rt = parseFloat(document.getElementById("bf_rt").value)||0;
+  var sn_rt = parseFloat(document.getElementById("snf_rt").value)||0;
+  var gst   = parseFloat(document.getElementById("gst").value)||0;
+  if(!qty||!bf_rt) return;
+  var fat_kgs = parseFloat((qty * fat / 100).toFixed(4));
+  var snf_kgs = parseFloat((qty * snf / 100).toFixed(4));
+  var fat_amt = parseFloat((fat_kgs * bf_rt).toFixed(2));
+  var snf_amt = parseFloat((snf_kgs * sn_rt).toFixed(2));
+  var taxable = parseFloat((fat_amt + snf_amt).toFixed(2));
+  var gst_amt = parseFloat((taxable * gst / 100).toFixed(2));
+  var total   = parseFloat((taxable + gst_amt).toFixed(2));
+  document.getElementById("r_fat_kgs").innerText = fat_kgs+" kg";
+  document.getElementById("r_snf_kgs").innerText = snf_kgs+" kg";
+  document.getElementById("r_fat_amt").innerText = "₹"+fat_amt;
+  document.getElementById("r_snf_amt").innerText = "₹"+snf_amt;
+  document.getElementById("r_gst").innerText     = "₹"+gst_amt;
+  document.getElementById("r_total").innerText   = "₹"+total;
+}
+</script>
+{% endblock %}

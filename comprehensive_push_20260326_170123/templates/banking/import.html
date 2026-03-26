@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Import Transactions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📤 Import Bank Transactions - {{ bank.account_name }}</h4>
+  <a href="{{ url_for('banking.accounts') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="card-title">Upload Bank Statement</h5>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label fw-bold">Select Excel File (.xlsx)</label>
+        <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+        <small class="text-muted">
+          Format: Date | Description | Ref No | Debit | Credit | Balance
+        </small>
+      </div>
+      <button type="submit" class="btn btn-success">
+        <i class="bi bi-upload"></i> Import Transactions
+      </button>
+      <a href="{{ url_for('banking.download_template') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-download"></i> Download Template
+      </a>
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-info">
+  <strong>Instructions:</strong>
+  <ul class="mb-0">
+    <li>Download the template and fill in your bank statement data</li>
+    <li>Columns: Date, Description, Ref No, Debit, Credit, Balance</li>
+    <li>Date format: YYYY-MM-DD or DD/MM/YYYY</li>
+    <li>Duplicate transactions are automatically detected and skipped</li>
+  </ul>
+</div>
+{% endblock %}

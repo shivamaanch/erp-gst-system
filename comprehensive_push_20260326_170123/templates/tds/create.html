@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}New TDS Entry{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-6">
+<div class="card shadow-sm"><div class="card-header bg-primary text-white fw-bold">New TDS Entry</div>
+<div class="card-body">
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label fw-bold small">Party</label>
+    <select name="party_id" class="form-select form-select-sm" required>
+      <option value="">-- Select Party --</option>
+      {% for p in parties %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold small">TDS Section</label>
+    <select name="section" class="form-select form-select-sm" required id="sectionSel" onchange="updateRate()">
+      <option value="">-- Select --</option>
+      {% for code, info in sections.items() %}
+      <option value="{{ code }}" data-rate="{{ info.rate }}">{{ code }} — {{ info.name }} ({{ info.rate }}%)</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold small">Transaction Date</label>
+    <input type="date" name="txn_date" class="form-control form-control-sm" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold small">Amount (₹)</label>
+    <input type="number" name="amount" class="form-control form-control-sm" step="0.01" required id="amtInput" oninput="calcTds()">
+  </div>
+  <div class="mb-3">
+    <div class="alert alert-info py-2">
+      TDS Rate: <strong id="rateDisplay">—</strong>%
+      &nbsp;|&nbsp; TDS Amount: <strong id="tdsDisplay">₹0.00</strong>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary w-100">Save TDS Entry</button>
+</form>
+</div></div>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function updateRate() {
+  const sel = document.getElementById("sectionSel");
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById("rateDisplay").textContent = opt.dataset.rate || "—";
+  calcTds();
+}
+function calcTds() {
+  const rate = parseFloat(document.getElementById("rateDisplay").textContent) || 0;
+  const amt  = parseFloat(document.getElementById("amtInput").value) || 0;
+  document.getElementById("tdsDisplay").textContent = "₹" + (amt * rate / 100).toFixed(2);
+}
+</script>
+{% endblock %}

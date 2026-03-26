@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if chart else "Add" }} Rate Chart{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 {{ "Edit" if chart else "New" }} Milk Rate Chart</h4>
+  <a href="{{ url_for('milk.rates') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm" style="max-width:600px">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label fw-bold">Chart Name *</label>
+          <input type="text" name="chart_name" class="form-control" required
+                 value="{{ chart.chart_name if chart else '' }}" placeholder="e.g. Summer 2026 Purchase Rate">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Effective From *</label>
+          <input type="date" name="effective_date" class="form-control" required
+                 value="{{ chart.effective_date.isoformat() if chart else today }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">FAT Rate (₹ per unit) *</label>
+          <input type="number" name="fat_rate" class="form-control" step="0.0001" required
+                 value="{{ chart.fat_rate if chart else '' }}" placeholder="e.g. 6.5">
+          <small class="text-muted">Rate per 1% FAT per litre</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">SNF Rate (₹ per unit) *</label>
+          <input type="number" name="snf_rate" class="form-control" step="0.0001" required
+                 value="{{ chart.snf_rate if chart else '' }}" placeholder="e.g. 4.2">
+          <small class="text-muted">Rate per 1% SNF per litre</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Type</label>
+          <select name="txn_type" class="form-select">
+            <option value="Both" {{ 'selected' if not chart or chart.txn_type=='Both' }}>Both (Purchase & Sale)</option>
+            <option value="Purchase" {{ 'selected' if chart and chart.txn_type=='Purchase' }}>Purchase Only</option>
+            <option value="Sale" {{ 'selected' if chart and chart.txn_type=='Sale' }}>Sale Only</option>
+          </select>
+        </div>
+      </div>
+      <div class="alert alert-info mt-3 small">
+        <strong>Formula:</strong> Rate/Litre = (FAT × FAT Rate) + (SNF × SNF Rate)<br>
+        <strong>Example:</strong> FAT=4.5%, SNF=8.2%, FAT Rate=₹6.50, SNF Rate=₹4.20<br>
+        → Rate = (4.5×6.50) + (8.2×4.20) = ₹29.25 + ₹34.44 = <strong>₹63.69/litre</strong>
+      </div>
+      <button type="submit" class="btn btn-success mt-2">💾 Save Rate Chart</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

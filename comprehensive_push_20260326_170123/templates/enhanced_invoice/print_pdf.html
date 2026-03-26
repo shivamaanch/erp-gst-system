@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ bill.bill_type }} Invoice - {{ bill.bill_no }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+              <i class="fas fa-file-invoice"></i> {{ bill.bill_type }} Invoice
+            </h4>
+            <div>
+              <button onclick="window.print()" class="btn btn-light btn-sm">
+                <i class="fas fa-print"></i> Print
+              </button>
+              <a href="{{ url_for('enhanced_invoice.list_invoices', type=bill.bill_type) }}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Invoice Header -->
+          <div class="row mb-4">
+            <div class="col-6">
+              <h5 class="text-primary">{{ company.name }}</h5>
+              <p class="mb-1">{{ company.address or 'Company Address' }}</p>
+              <p class="mb-1">GST: {{ company.gst_number or 'N/A' }}</p>
+              <p class="mb-0">Phone: {{ company.phone or 'N/A' }}</p>
+            </div>
+            <div class="col-6 text-end">
+              <h3 class="text-success">INVOICE</h3>
+              <h5 class="text-muted">{{ bill.bill_no }}</h5>
+              <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
+              <p class="mb-0"><strong>Financial Year:</strong> {{ bill.fin_year }}</p>
+            </div>
+          </div>
+
+          <!-- Bill To -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">Bill To:</h6>
+              <h5 class="text-primary">{{ party.name }}</h5>
+              {% if party.address %}
+                <p class="mb-1">{{ party.address }}</p>
+              {% endif %}
+              {% if party.phone %}
+                <p class="mb-1"><strong>Phone:</strong> {{ party.phone }}</p>
+              {% endif %}
+              {% if party.gstin %}
+                <p class="mb-0"><strong>GST:</strong> {{ party.gstin }}</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Invoice Items -->
+          <div class="table-responsive mb-4">
+            <table class="table table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>S.No</th>
+                  <th>Description</th>
+                  <th class="text-end">Qty</th>
+                  <th class="text-end">Rate</th>
+                  <th class="text-end">Amount</th>
+                  <th class="text-end">GST %</th>
+                  <th class="text-end">GST Amount</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ item.item.name if item.item else 'Item' }}</td>
+                  <td class="text-end">{{ item.qty }}</td>
+                  <td class="text-end">₹{{ "%.2f"|format(item.rate) }}</td>
+                  <td class="text-end">₹{{ "%.2f"|format(item.taxable_amount) }}</td>
+                  <td class="text-end">{{ item.gst_rate }}%</td>
+                  <td class="text-end">₹{{ "%.2f"|format(item.cgst + item.sgst + item.igst) }}</td>
+                  <td class="text-end fw-bold">₹{{ "%.2f"|format(item.taxable_amount + item.cgst + item.sgst + item.igst) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Calculations -->
+          <div class="row">
+            <div class="col-6">
+              <p class="text-muted">This is a computer-generated invoice</p>
+            </div>
+            <div class="col-6">
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <tr>
+                    <td class="fw-bold">Subtotal:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.taxable_amount) }}</td>
+                  </tr>
+                  {% if bill.cgst > 0 %}
+                  <tr>
+                    <td>CGST:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.cgst) }}</td>
+                  </tr>
+                  <tr>
+                    <td>SGST:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.sgst) }}</td>
+                  </tr>
+                  {% endif %}
+                  {% if bill.igst > 0 %}
+                  <tr>
+                    <td>IGST:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.igst) }}</td>
+                  </tr>
+                  {% endif %}
+                  <tr class="table-success fw-bold">
+                    <td>Total Amount:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.total_amount) }}</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signature -->
+          <div class="row mt-5">
+            <div class="col-6">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>Receiver's Signature</strong></p>
+              </div>
+            </div>
+            <div class="col-6 text-end">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>For {{ company.name }}</strong></p>
+                <p class="mb-0 mt-3">Authorized Signatory</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #000 !important; }
+}
+</style>
+{% endblock %}

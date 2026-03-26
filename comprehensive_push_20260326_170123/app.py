@@ -698,9 +698,6 @@ def create_app():
     from modules.banking        import banking_bp
     from modules.utilities      import utilities_bp
     from modules.fixed_assets   import fixed_assets_bp
-    from modules.validators     import validator_bp
-    from modules.gst_module     import gst_bp
-    from modules.tds_module     import tds_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(utilities_bp)
@@ -726,9 +723,6 @@ def create_app():
     app.register_blueprint(parties_bp, url_prefix="/parties")
     app.register_blueprint(psi_bp)
     app.register_blueprint(banking_bp)
-    app.register_blueprint(validator_bp)
-    app.register_blueprint(gst_bp)
-    app.register_blueprint(tds_bp)
     
     # Context processor to make company info available in all templates
     @app.context_processor

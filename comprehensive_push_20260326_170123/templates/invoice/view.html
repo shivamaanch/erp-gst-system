@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ bill.bill_no }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ "🧾" if bill.bill_type=="Sales" else "🛒" }} {{ bill.bill_no }}</h4>
+  <div>
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print">🖨️ Print</button>
+    <a href="{{ url_for('invoice.index', type=bill.bill_type) }}" class="btn btn-sm btn-outline-secondary ms-2 no-print">← Back</a>
+  </div>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <strong>Party:</strong> {{ bill.party.name if bill.party else "—" }}<br>
+        <strong>GSTIN:</strong> <code>{{ bill.party.gstin if bill.party else "—" }}</code>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <strong>Date:</strong> {{ bill.bill_date.strftime("%d/%m/%Y") }}<br>
+        <strong>FY:</strong> {{ bill.fin_year }}
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle">
+        <thead class="table-dark">
+          <tr><th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th>
+              <th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th class="text-end">Total</th></tr>
+        </thead>
+        <tbody>
+          {% for bi in bill.items %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ bi.item.name if bi.item else "—" }}</td>
+            <td><code>{{ bi.item.hsn_code if bi.item else "" }}</code></td>
+            <td>{{ bi.qty }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.rate) }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.taxable_amount if hasattr(bi,"taxable_amount") and bi.taxable_amount else bi.amount - bi.cgst - bi.sgst - bi.igst) }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.cgst) }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.sgst) }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.igst) }}</td>
+            <td class="text-end fw-bold">₹{{ "{:,.2f}".format(bi.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="9" class="text-end fw-bold">Grand Total</td>
+            <td class="text-end fw-bold fs-6 text-success">₹{{ "{:,.2f}".format(bill.total_amount) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% if bill.narration %}
+    <p class="text-muted small mt-2">📝 {{ bill.narration }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

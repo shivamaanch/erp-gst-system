@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Daily Milk Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📝 Daily Milk Entry</h4>
+  <a href="{{ url_for('milk.entry_list') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="POST" id="milkForm">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Date *</label>
+          <input type="date" name="txn_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Shift</label>
+          <select name="shift" class="form-select">
+            <option value="Morning">Morning</option>
+            <option value="Evening">Evening</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Type *</label>
+          <select name="txn_type" class="form-select" required>
+            <option value="Purchase">Purchase</option>
+            <option value="Sale">Sale</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-bold">Rate Chart *</label>
+          <select name="chart_id" id="chart_id" class="form-select" required onchange="recalc()">
+            <option value="">-- Select --</option>
+            {% for c in charts %}
+            <option value="{{ c.id }}" data-fat="{{ c.fat_rate }}" data-snf="{{ c.snf_rate }}">
+              {{ c.chart_name }} (F:{{ c.fat_rate }} S:{{ c.snf_rate }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Party *</label>
+          <select name="party_id" class="form-select" required>
+            <option value="">-- Select Party --</option>
+            {% for p in parties %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Qty (Litres) *</label>
+          <input type="number" name="qty_liters" id="qty" class="form-control"
+                 step="0.01" placeholder="0.00" required onchange="recalc()">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">FAT % *</label>
+          <input type="number" name="fat" id="fat" class="form-control"
+                 step="0.01" placeholder="4.5" required onchange="recalc()">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">SNF % *</label>
+          <input type="number" name="snf" id="snf" class="form-control"
+                 step="0.01" placeholder="8.2" required onchange="recalc()">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-bold">Narration</label>
+          <input type="text" name="narration" class="form-control" placeholder="Optional note">
+        </div>
+      </div>
+
+      <!-- Live Rate Calculator -->
+      <div class="card mt-3 bg-light border-0">
+        <div class="card-body py-2">
+          <div class="row text-center">
+            <div class="col-md-3">
+              <div class="text-muted small">Rate / Litre</div>
+              <div class="fw-bold fs-4 text-primary" id="showRate">₹0.00</div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-muted small">Quantity</div>
+              <div class="fw-bold fs-4" id="showQty">0.00 L</div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-muted small">Taxable Amount</div>
+              <div class="fw-bold fs-4 text-success" id="showAmt">₹0.00</div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-muted small">Total (with GST)</div>
+              <div class="fw-bold fs-4 text-danger" id="showTotal">₹0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice Options -->
+      <div class="card mt-3 border-primary">
+        <div class="card-header bg-primary text-white py-2 fw-bold">
+          📄 Invoice / Bill Creation
+        </div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" name="create_invoice"
+                   id="createInv" value="1" checked onchange="toggleGST()">
+            <label class="form-check-label fw-bold" for="createInv">
+              Auto-create Sale/Purchase Invoice (Bill)
+            </label>
+            <div class="text-muted small">Invoice will appear in billing register, GST reports, and ledgers</div>
+          </div>
+          <div id="gstSection" class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">GST Rate %</label>
+              <select name="gst_rate" id="gst_rate" class="form-select" onchange="recalc()">
+                <option value="0">0% (Exempt — Fresh Milk)</option>
+                <option value="5">5%</option>
+                <option value="12">12%</option>
+                <option value="18">18%</option>
+              </select>
+              <small class="text-muted">Fresh milk = 0% GST | Processed = 5%</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-success mt-3 px-5 fw-bold">
+        💾 Save Entry & Create Invoice
+      </button>
+    </form>
+  </div>
+</div>
+<script>
+function recalc(){
+  const sel=document.getElementById('chart_id');
+  const opt=sel.selectedOptions[0];
+  const fr=parseFloat(opt?.dataset?.fat||0);
+  const sr=parseFloat(opt?.dataset?.snf||0);
+  const fat=parseFloat(document.getElementById('fat').value||0);
+  const snf=parseFloat(document.getElementById('snf').value||0);
+  const qty=parseFloat(document.getElementById('qty').value||0);
+  const gst=parseFloat(document.getElementById('gst_rate')?.value||0);
+  const rate=Math.round((fat*fr+snf*sr)*10000)/10000;
+  const amt=Math.round(rate*qty*100)/100;
+  const gstAmt=Math.round(amt*gst/100*100)/100;
+  const total=Math.round((amt+gstAmt)*100)/100;
+  document.getElementById('showRate').textContent='₹'+rate.toFixed(4);
+  document.getElementById('showQty').textContent=qty.toFixed(2)+' L';
+  document.getElementById('showAmt').textContent='₹'+amt.toFixed(2);
+  document.getElementById('showTotal').textContent='₹'+total.toFixed(2);
+}
+function toggleGST(){
+  document.getElementById('gstSection').style.display=
+    document.getElementById('createInv').checked?'flex':'none';
+}
+</script>
+{% endblock %}

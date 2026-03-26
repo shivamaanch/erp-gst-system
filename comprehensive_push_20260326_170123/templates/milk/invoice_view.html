@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Milk Invoice - {{ bill.bill_no }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+              <i class="fas fa-file-invoice"></i> Milk Invoice
+            </h4>
+            <div>
+              <button onclick="window.print()" class="btn btn-light btn-sm">
+                <i class="fas fa-print"></i> Print
+              </button>
+              <a href="{{ url_for('milk.entry_list') }}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Invoice Header -->
+          <div class="row mb-4">
+            <div class="col-6">
+              <h5 class="text-primary">{{ company.name }}</h5>
+              <p class="mb-1">{{ company.address or 'Company Address' }}</p>
+              <p class="mb-1">GST: {{ company.gst_number or 'N/A' }}</p>
+              <p class="mb-0">Phone: {{ company.phone or 'N/A' }}</p>
+            </div>
+            <div class="col-6 text-end">
+              <h3 class="text-success">INVOICE</h3>
+              <h5 class="text-muted">{{ bill.bill_no }}</h5>
+              <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
+              <p class="mb-0"><strong>Financial Year:</strong> {{ fy }}</p>
+            </div>
+          </div>
+
+          <!-- Bill To -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">Bill To:</h6>
+              <h5 class="text-primary">{{ bill.party.name }}</h5>
+              {% if bill.party.address %}
+                <p class="mb-1">{{ bill.party.address }}</p>
+              {% endif %}
+              {% if bill.party.phone %}
+                <p class="mb-1"><strong>Phone:</strong> {{ bill.party.phone }}</p>
+              {% endif %}
+              {% if bill.party.gst_number %}
+                <p class="mb-0"><strong>GST:</strong> {{ bill.party.gst_number }}</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Invoice Items -->
+          <div class="table-responsive mb-4">
+            <table class="table table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Description</th>
+                  <th class="text-end">Qty (L)</th>
+                  <th class="text-end">Fat %</th>
+                  <th class="text-end">SNF %</th>
+                  <th class="text-end">Rate/L</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{{ milk_transaction.txn_date.strftime('%d-%b-%Y') }}</td>
+                  <td><span class="badge bg-info">{{ milk_transaction.shift }}</span></td>
+                  <td>
+                    Milk {{ milk_transaction.txn_type.lower() }}<br>
+                    <small class="text-muted">CLR: {{ milk_transaction.clr }}</small>
+                  </td>
+                  <td class="text-end">{{ milk_transaction.qty_liters }}</td>
+                  <td class="text-end">{{ milk_transaction.fat }}%</td>
+                  <td class="text-end">{{ milk_transaction.snf }}%</td>
+                  <td class="text-end">₹{{ "%.4f"|format(milk_transaction.rate) }}</td>
+                  <td class="text-end fw-bold">₹{{ "%.2f"|format(milk_transaction.amount) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Calculations -->
+          <div class="row">
+            <div class="col-6">
+              <h6 class="border-bottom pb-2">Calculation Details:</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td>BF ({{ float(milk_transaction.qty_liters) * float(milk_transaction.fat) / 100 | round(3) }} kg) × ₹{{ (float(milk_transaction.rate) * 100 * 0.60 / 6.5) | round(2) if milk_transaction.rate else 0 }}</td>
+                  <td class="text-end">₹{{ (float(milk_transaction.qty_liters) * float(milk_transaction.fat) / 100) * (float(milk_transaction.rate) * 100 * 0.60 / 6.5) | round(2) if milk_transaction.rate else 0 }}</td>
+                </tr>
+                <tr>
+                  <td>SNF ({{ float(milk_transaction.qty_liters) * float(milk_transaction.snf) / 100 | round(3) }} kg) × ₹{{ (float(milk_transaction.rate) * 100 * 0.40 / 8.5) | round(2) if milk_transaction.rate else 0 }}</td>
+                  <td class="text-end">₹{{ (float(milk_transaction.qty_liters) * float(milk_transaction.snf) / 100) * (float(milk_transaction.rate) * 100 * 0.40 / 8.5) | round(2) if milk_transaction.rate else 0 }}</td>
+                </tr>
+              </table>
+            </div>
+            <div class="col-6">
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <tr>
+                    <td class="fw-bold">Subtotal:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.taxable_amount) }}</td>
+                  </tr>
+                  {% if bill.cgst > 0 %}
+                  <tr>
+                    <td>CGST @{{ (bill.cgst / bill.taxable_amount * 100)|round(1) }}%:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.cgst) }}</td>
+                  </tr>
+                  <tr>
+                    <td>SGST @{{ (bill.sgst / bill.taxable_amount * 100)|round(1) }}%:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.sgst) }}</td>
+                  </tr>
+                  {% endif %}
+                  <tr class="table-success fw-bold">
+                    <td>Total Amount:</td>
+                    <td class="text-end">₹{{ "%.2f"|format(bill.total_amount) }}</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Terms & Conditions -->
+          <div class="row mt-4">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">Terms & Conditions:</h6>
+              <ul class="small text-muted">
+                <li>Payment due within 30 days from invoice date</li>
+                <li>Interest @ 18% per annum will be charged on overdue payments</li>
+                <li>Subject to jurisdiction of {{ company.city or 'your city' }}</li>
+                <li>This is a computer-generated invoice</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Signature -->
+          <div class="row mt-5">
+            <div class="col-6">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>Receiver's Signature</strong></p>
+              </div>
+            </div>
+            <div class="col-6 text-end">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>For {{ company.name }}</strong></p>
+                <p class="mb-0 mt-3">Authorized Signatory</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #000 !important; }
+}
+</style>
+{% endblock %}

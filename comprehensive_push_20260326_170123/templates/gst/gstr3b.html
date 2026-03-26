@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}GSTR-3B{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 GSTR-3B Return</h4>
+  <a href="{{ url_for('gst.gstr1') }}" class="btn btn-sm btn-outline-secondary">← GSTR-1</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-success text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <span>Financial Year: {{ fy }}</span>
+      <span class="fs-6">{{ period }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">Total Sales</div>
+          <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(total_sales) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">Total Purchases</div>
+          <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(total_purchases) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">Tax on Sales (Output)</div>
+          <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(tax_on_sales) }}</div>
+          <div class="text-muted small">Tax on Purchases (Input)</div>
+          <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(tax_on_purchases) }}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mt-4">
+      <div class="card border-0">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">Net Tax Liability</h5>
+        </div>
+        <div class="card-body text-center">
+          {% if net_tax > 0 %}
+          <div class="display-4 text-danger">₹{{ "{:,.2f}".format(net_tax) }}</div>
+          <div class="text-muted">Payable to Government</div>
+          {% elif net_tax < 0 %}
+          <div class="display-4 text-success">₹{{ "{:,.2f}".format(net_tax | abs) }}</div>
+          <div class="text-muted">Excess Credit Available</div>
+          {% else %}
+          <div class="display-4 text-secondary">₹0.00</div>
+          <div class="text-muted">Nil Liability</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

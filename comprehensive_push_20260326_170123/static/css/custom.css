@@ -1,0 +1,9 @@
+.btn-xs { padding: .15rem .4rem; font-size: .75rem; }
+.table-sm td, .table-sm th { vertical-align: middle; }
+.card { border-radius: 10px; }
+.badge { font-size: .75rem; }
+@media print {
+  .no-print, .topbar, #sidebar { display: none !important; }
+  #main { margin-left: 0 !important; }
+  .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+}

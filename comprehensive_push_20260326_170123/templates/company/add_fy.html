@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Add Financial Year{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📅 Add Financial Year</h4>
+  <a href="{{ url_for('company.index') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+<div class="card border-0 shadow-sm" style="max-width:500px">
+  <div class="card-body">
+    <form method="POST">
+      <label class="form-label fw-bold">Financial Year *</label>
+      <input type="text" name="year_name" class="form-control mb-2" placeholder="2026-27" required
+             pattern="^\d{4}-\d{2}$" title="Format: YYYY-YY e.g. 2026-27">
+      {% if suggestions %}
+      <div class="mt-2 mb-3">
+        <small class="text-muted">Quick select:</small><br>
+        {% for s in suggestions %}
+        <button type="button" class="btn btn-sm btn-outline-primary me-1 mt-1"
+                onclick="document.querySelector('[name=year_name]').value='{{ s }}'">{{ s }}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="alert alert-info small py-2 mt-2">
+        <i class="bi bi-info-circle"></i>
+        Format: <strong>YYYY-YY</strong> (e.g. <code>2026-27</code>)<br>
+        Start: 1 April YYYY | End: 31 March YYYY+1
+      </div>
+      <button type="submit" class="btn btn-primary w-100 mt-2">✅ Add Financial Year</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

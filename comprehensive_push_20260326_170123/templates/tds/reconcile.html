@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}TDS Reconcile{% endblock %}
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-arrows-collapse text-primary"></i> TDS Reconciliation — 26AS vs Books</h5>
+<div class="alert alert-info py-2">
+  <i class="bi bi-info-circle"></i> Compare TDS deducted in books with 26AS downloaded from TRACES portal.
+</div>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header fw-bold bg-primary text-white">Books TDS Summary</div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead class="table-dark"><tr><th>Section</th><th class="text-end">Amount</th><th class="text-end">TDS</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td colspan="4" class="text-center text-muted">Import 26AS to reconcile</td></tr>
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header fw-bold bg-success text-white">Upload 26AS</div>
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label class="form-label small fw-bold">26AS Text / Excel File</label>
+          <input type="file" name="file" class="form-control form-control-sm" accept=".txt,.xlsx,.xls">
+        </div>
+        <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-upload"></i> Upload & Reconcile</button>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

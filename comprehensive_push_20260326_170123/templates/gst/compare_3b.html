@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Compare 3B{% endblock %}
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-bar-chart text-primary"></i> GSTR-3B vs Books Comparison — {{ fy }}</h5>
+<div class="alert alert-info">Compare filed GSTR-3B with your books of accounts to identify discrepancies.</div>
+<div class="card shadow-sm"><div class="card-body">
+  <p class="text-muted">Enter your filed 3B values below to compare with system-computed values.</p>
+  <table class="table table-bordered">
+    <thead class="table-dark"><tr><th>Head</th><th>As per Books</th><th>As per 3B Filed</th><th>Difference</th></tr></thead>
+    <tbody>
+      <tr><td>CGST Liability</td><td class="text-end">—</td><td><input type="number" class="form-control form-control-sm" id="filed_cgst"></td><td class="text-end" id="diff_cgst">—</td></tr>
+      <tr><td>SGST Liability</td><td class="text-end">—</td><td><input type="number" class="form-control form-control-sm" id="filed_sgst"></td><td class="text-end" id="diff_sgst">—</td></tr>
+      <tr><td>IGST Liability</td><td class="text-end">—</td><td><input type="number" class="form-control form-control-sm" id="filed_igst"></td><td class="text-end" id="diff_igst">—</td></tr>
+      <tr><td>ITC Claimed</td><td class="text-end">—</td><td><input type="number" class="form-control form-control-sm" id="filed_itc"></td><td class="text-end" id="diff_itc">—</td></tr>
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

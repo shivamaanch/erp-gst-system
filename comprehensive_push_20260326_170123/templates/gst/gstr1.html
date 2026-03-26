@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}GSTR-1{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📄 GSTR-1 Return</h4>
+  <a href="{{ url_for('gst.gstr3b') }}" class="btn btn-sm btn-outline-secondary">→ GSTR-3B</a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-info text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <span>Financial Year: {{ fy }}</span>
+      <span class="fs-6">{{ period }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">B2B Invoices</div>
+          <div class="fw-bold fs-5">{{ b2b|length }}</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">B2CL Invoices</div>
+          <div class="fw-bold fs-5">{{ b2cl|length }}</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">B2CS Invoices</div>
+          <div class="fw-bold fs-5">{{ b2cs|length }}</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-0 text-center p-3">
+          <div class="text-muted">Exports</div>
+          <div class="fw-bold fs-5">{{ exp|length }}</div>
+        </div>
+      </div>
+    </div>
+    
+    {% if b2b %}
+    <div class="mb-4">
+      <h6 class="fw-bold">B2B Invoices</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>#</th><th>Invoice No</th><th>Date</th><th>Customer GSTIN</th>
+              <th>Place of Supply</th><th>Invoice Value</th><th>Taxable Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in b2b %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ inv.inv }}</td>
+              <td>{{ inv.idt }}</td>
+              <td><code>{{ inv.ctin }}</code></td>
+              <td>{{ inv.pos }}</td>
+              <td>₹{{ "{:,.2f}".format(inv.val) }}</td>
+              <td>₹{{ "{:,.2f}".format(inv.net) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if b2cl %}
+    <div class="mb-4">
+      <h6 class="fw-bold">B2CL Invoices</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr><th>#</th><th>Invoice No</th><th>Date</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            {% for inv in b2cl %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ inv.inv }}</td>
+              <td>{{ inv.idt }}</td>
+              <td>₹{{ "{:,.2f}".format(inv.val) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if b2cs %}
+    <div class="mb-4">
+      <h6 class="fw-bold">B2CS Invoices</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr><th>#</th><th>Invoice No</th><th>Date</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            {% for inv in b2cs %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ inv.inv }}</td>
+              <td>{{ inv.idt }}</td>
+              <td>₹{{ "{:,.2f}".format(inv.val) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if exp %}
+    <div class="mb-4">
+      <h6 class="fw-bold">Exports</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr><th>#</th><th>Invoice No</th><th>Date</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            {% for inv in exp %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ inv.inv }}</td>
+              <td>{{ inv.idt }}</td>
+              <td>₹{{ "{:,.2f}".format(inv.val) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

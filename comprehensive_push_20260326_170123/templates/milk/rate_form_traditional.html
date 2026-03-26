@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if chart else "Add" }} Milk Rate Chart{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 {{ "Edit" if chart else "New" }} Milk Rate Chart</h4>
+  <a href="{{ url_for('milk.rates') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:800px">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label fw-bold">Chart Name *</label>
+          <input type="text" name="chart_name" class="form-control" required
+                 value="{{ chart.chart_name if chart else '' }}" placeholder="e.g. Summer 2026 Purchase Rate">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Effective From *</label>
+          <input type="date" name="effective_date" class="form-control" required
+                 value="{{ chart.effective_date.isoformat() if chart else today }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Transaction Type</label>
+          <select name="txn_type" class="form-select">
+            <option value="Both" {{ 'selected' if not chart or chart.txn_type=='Both' }}>Both (Purchase & Sale)</option>
+            <option value="Purchase" {{ 'selected' if chart and chart.txn_type=='Purchase' }}>Purchase Only</option>
+            <option value="Sale" {{ 'selected' if chart and chart.txn_type=='Sale' }}>Sale Only</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Traditional Rate Entry -->
+      <div class="card mt-3 border-primary">
+        <div class="card-header bg-primary text-white py-2 fw-bold">
+          🧮 Traditional Milk Rates (Per KG)
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Butter Fat Rate (₹ per KG) *</label>
+              <input type="number" name="fat_rate" class="form-control" step="0.01" required
+                     value="{{ chart.fat_rate if chart else '200.00' }}" placeholder="200.00">
+              <small class="text-muted">Standard rate: ₹200-250 per kg of butter fat</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">SNF Rate (₹ per KG) *</label>
+              <input type="number" name="snf_rate" class="form-control" step="0.01" required
+                     value="{{ chart.snf_rate if chart else '100.00' }}" placeholder="100.00">
+              <small class="text-muted">Standard rate: ₹80-120 per kg of SNF</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Calculation Preview -->
+      <div class="card mt-3 border-info">
+        <div class="card-header bg-info text-white py-2 fw-bold">
+          📊 Rate Calculation Preview
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Sample FAT %</label>
+              <input type="number" id="sample_fat" class="form-control" 
+                     value="4.0" step="0.1" onchange="previewRate()">
+              <small class="text-muted">Typical range: 3.5-4.5%</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Sample SNF %</label>
+              <input type="number" id="sample_snf" class="form-control" 
+                     value="8.5" step="0.1" onchange="previewRate()">
+              <small class="text-muted">Typical range: 8.0-9.0%</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Calculated Rate/Litre</label>
+              <input type="number" id="calculated_rate" class="form-control bg-light" 
+                     readonly placeholder="0.00">
+              <small class="text-muted">Auto-calculated</small>
+            </div>
+          </div>
+          
+          <div class="row mt-3">
+            <div class="col-md-12">
+              <div class="alert alert-success small">
+                <strong>Calculation Formula:</strong><br>
+                Rate per Litre = (FAT% × ₹200/kg) + (SNF% × ₹100/kg)<br>
+                <strong>Example:</strong> (4.0% × ₹200) + (8.5% × ₹100) = ₹8.00 + ₹8.50 = <strong id="example_rate">₹16.50/litre</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Base Values (Optional) -->
+      <div class="card mt-3 border-secondary">
+        <div class="card-header bg-secondary text-white py-2 fw-bold">
+          ⚙️ Base Values (Optional)
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Base FAT %</label>
+              <input type="number" name="base_fat" class="form-control" step="0.01"
+                     value="{{ chart.base_fat if chart else '0.00' }}" placeholder="0.00">
+              <small class="text-muted">Reference FAT value (usually 0)</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Base SNF %</label>
+              <input type="number" name="base_snf" class="form-control" step="0.01"
+                     value="{{ chart.base_snf if chart else '0.00' }}" placeholder="0.00">
+              <small class="text-muted">Reference SNF value (usually 0)</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-success px-5 fw-bold">
+          💾 Save Rate Chart
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+          🔄 Reset
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function previewRate() {
+  const fat = parseFloat(document.getElementById('sample_fat').value) || 0;
+  const snf = parseFloat(document.getElementById('sample_snf').value) || 0;
+  const fatRate = parseFloat(document.querySelector('input[name="fat_rate"]').value) || 200;
+  const snfRate = parseFloat(document.querySelector('input[name="snf_rate"]').value) || 100;
+  
+  const rate = (fat * fatRate + snf * snfRate) / 100; // Divide by 100 because fat/snf are percentages
+  document.getElementById('calculated_rate').value = rate.toFixed(2);
+  
+  // Update example
+  const exampleFat = 4.0;
+  const exampleSnf = 8.5;
+  const exampleRate = (exampleFat * fatRate + exampleSnf * snfRate) / 100;
+  document.getElementById('example_rate').textContent = `₹${exampleRate.toFixed(2)}/litre`;
+}
+
+function resetForm() {
+  document.querySelector('input[name="fat_rate"]').value = '200.00';
+  document.querySelector('input[name="snf_rate"]').value = '100.00';
+  document.getElementById('sample_fat').value = '4.0';
+  document.getElementById('sample_snf').value = '8.5';
+  previewRate();
+}
+
+// Initialize on load and on rate change
+document.addEventListener('DOMContentLoaded', function() {
+  previewRate();
+  
+  // Add event listeners to rate inputs
+  document.querySelector('input[name="fat_rate"]').addEventListener('input', previewRate);
+  document.querySelector('input[name="snf_rate"]').addEventListener('input', previewRate);
+});
+</script>
+{% endblock %}

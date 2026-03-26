@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Bank Transactions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold">💳 {{ bank.account_name }}</h4>
+    <small class="text-muted">{{ bank.bank_name }} - {{ bank.account_no }}</small>
+  </div>
+  <div class="btn-group">
+    <a href="{{ url_for('banking.manual_entry', bank_id=bank.id) }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Entry
+    </a>
+    <a href="{{ url_for('banking.import_txns', bank_id=bank.id) }}" class="btn btn-sm btn-success">
+      <i class="bi bi-upload"></i> Import
+    </a>
+    <a href="{{ url_for('banking.accounts') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-success text-white">
+      <div class="card-body">
+        <small>Total Credits</small>
+        <h5 class="mb-0">₹{{ "%.2f"|format(total_cr) }}</h5>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-danger text-white">
+      <div class="card-body">
+        <small>Total Debits</small>
+        <h5 class="mb-0">₹{{ "%.2f"|format(total_dr) }}</h5>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-warning text-dark">
+      <div class="card-body">
+        <small>Suspense Entries</small>
+        <h5 class="mb-0">{{ suspense_count }}</h5>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm bg-info text-white">
+      <div class="card-body">
+        <small>Cash Entries</small>
+        <h5 class="mb-0">{{ cash_count }}</h5>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Ref No</th>
+          <th>Mode</th>
+          <th>Debit</th>
+          <th>Credit</th>
+          <th>Balance</th>
+          <th>Type</th>
+          <th>Party</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in txns %}
+        <tr>
+          <td>{{ t.txn_date.strftime('%d-%b-%Y') }}</td>
+          <td>{{ t.description[:50] }}</td>
+          <td><small class="text-muted">{{ t.ref_no or '-' }}</small></td>
+          <td><span class="badge bg-secondary">{{ t.txn_mode or '-' }}</span></td>
+          <td class="text-danger">{{ "%.2f"|format(t.debit) if t.debit > 0 else '-' }}</td>
+          <td class="text-success">{{ "%.2f"|format(t.credit) if t.credit > 0 else '-' }}</td>
+          <td>{{ "%.2f"|format(t.balance) if t.balance else '-' }}</td>
+          <td>
+            {% if t.ledger_type == 'SUSPENSE' %}
+            <span class="badge bg-warning">Suspense</span>
+            {% elif t.ledger_type == 'CASH' %}
+            <span class="badge bg-info">Cash</span>
+            {% elif t.ledger_type == 'PARTY' %}
+            <span class="badge bg-primary">Party</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ t.ledger_type or '-' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.party_id %}
+            <small>{{ t.party_id }}</small>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">
+            No transactions found. Import or add entries manually.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Invoice {{ bill.bill_no }}</title>
+    <style>
+        @page { margin: 20mm; size: A4; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+        .invoice { max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; }
+        .company-name { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+        .company-address { color: #7f8c8d; margin-bottom: 3px; }
+        .company-gstin { color: #34495e; font-size: 12px; }
+        .invoice-details { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .invoice-info { flex: 1; }
+        .party-info { flex: 1; text-align: right; }
+        .section-title { font-weight: bold; color: #2c3e50; border-bottom: 1px solid #ecf0f1; padding-bottom: 5px; margin-bottom: 10px; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .items-table th { background: #3498db; color: white; padding: 12px; text-align: left; font-size: 12px; }
+        .items-table td { padding: 10px; border-bottom: 1px solid #ecf0f1; font-size: 12px; }
+        .items-table tr:hover { background: #f8f9fa; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .totals { background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 30px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .total-row.final { font-weight: bold; font-size: 16px; border-top: 2px solid #3498db; padding-top: 10px; }
+        .bank-details { background: #ecf0f1; padding: 20px; border-radius: 5px; margin-top: 30px; }
+        .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .bank-item { margin-bottom: 10px; }
+        .bank-label { font-weight: bold; color: #2c3e50; }
+        .footer { text-align: center; margin-top: 50px; color: #7f8c8d; font-size: 12px; }
+        .milk-formula { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .formula-title { font-weight: bold; color: #27ae60; margin-bottom: 10px; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="invoice">
+        <!-- Company Header -->
+        <div class="header">
+            <div class="company-name">{{ company.name }}</div>
+            <div class="company-address">{{ company.address or "Company Address" }}</div>
+            <div class="company-gstin">GSTIN: {{ company.gstin or "Not Available" }} | PAN: {{ company.pan or "Not Available" }}</div>
+        </div>
+
+        <!-- Invoice and Party Details -->
+        <div class="invoice-details">
+            <div class="invoice-info">
+                <div class="section-title">Invoice Details</div>
+                <div><strong>Invoice No:</strong> {{ bill.bill_no }}</div>
+                <div><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</div>
+                <div><strong>Type:</strong> {{ bill.bill_type }} Invoice</div>
+                <div><strong>Financial Year:</strong> {{ bill.fin_year }}</div>
+            </div>
+            <div class="party-info">
+                <div class="section-title">Party Details</div>
+                <div><strong>{{ party.name }}</strong></div>
+                <div>GSTIN: {{ party.gstin or "Not Available" }}</div>
+                <div>PAN: {{ party.pan or "Not Available" }}</div>
+                <div>{{ party.address or "Party Address" }}</div>
+            </div>
+        </div>
+
+        <!-- Milk Formula (if applicable) -->
+        {% if bill.template_type == "Milk" %}
+        <div class="milk-formula">
+            <div class="formula-title">🥛 Milk SMF Calculation Formula</div>
+            <div>SMF Rate = (Fat% × ₹400 + SNF% × ₹65) × 10 ÷ 100 per litre</div>
+            <div>Example: 3.5% Fat, 8.5% SNF = (3.5×400 + 8.5×65) × 10 ÷ 100 = ₹{{ "%.2f"|format((3.5*400 + 8.5*65) * 10 / 100) }}/ltr</div>
+        </div>
+        {% endif %}
+
+        <!-- Items Table -->
+        <div class="section-title">Item Details</div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    {% for col in template.columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% if bill.template_type == "Milk" %}
+                <!-- Milk Collection Template -->
+                <tr>
+                    <td>{{ party.name }}</td>
+                    <td>{{ bill.bill_date.strftime('%d-%m-%Y') }}</td>
+                    <td>3.5</td>
+                    <td>8.5</td>
+                    <td>100.00</td>
+                    <td>₹{{ "%.2f"|format((3.5*400 + 8.5*65) * 10 / 100) }}</td>
+                    <td>₹{{ "%.2f"|format(100 * (3.5*400 + 8.5*65) * 10 / 100) }}</td>
+                    <td>₹{{ "%.2f"|format(100 * 3.5 * 4) }}</td>
+                    <td>₹{{ "%.2f"|format(100 * 8.5 * 0.65) }}</td>
+                    <td>₹{{ "%.2f"|format(100 * (3.5*400 + 8.5*65) * 10 / 100) }}</td>
+                    <td>₹0.00</td>
+                    <td class="text-right">₹{{ "%.2f"|format(100 * (3.5*400 + 8.5*65) * 10 / 100) }}</td>
+                </tr>
+                {% else %}
+                <!-- Standard Invoice Template -->
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.item.name if item.item else "Item" }}</td>
+                    <td>{{ item.qty or 0 }}</td>
+                    <td>₹{{ "%.2f"|format(item.rate or 0) }}</td>
+                    <td>₹{{ "%.2f"|format(item.taxable_amount or 0) }}</td>
+                    <td>{{ "%.2f"|format(item.gst_rate or 18) }}%</td>
+                    <td>₹{{ "%.2f"|format((item.taxable_amount or 0) * (item.gst_rate or 18) / 100) }}</td>
+                    <td class="text-right">₹{{ "%.2f"|format((item.taxable_amount or 0) * (1 + (item.gst_rate or 18) / 100)) }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div class="totals">
+            <div class="total-row">
+                <span>Taxable Amount:</span>
+                <span>₹{{ "%.2f"|format(bill.taxable_amount or 0) }}</span>
+            </div>
+            {% if bill.cgst > 0 %}
+            <div class="total-row">
+                <span>CGST @{{ "%.2f"|format((bill.cgst / (bill.taxable_amount or 1)) * 100) }}%:</span>
+                <span>₹{{ "%.2f"|format(bill.cgst) }}</span>
+            </div>
+            {% endif %}
+            {% if bill.sgst > 0 %}
+            <div class="total-row">
+                <span>SGST @{{ "%.2f"|format((bill.sgst / (bill.taxable_amount or 1)) * 100) }}%:</span>
+                <span>₹{{ "%.2f"|format(bill.sgst) }}</span>
+            </div>
+            {% endif %}
+            {% if bill.igst > 0 %}
+            <div class="total-row">
+                <span>IGST @{{ "%.2f"|format((bill.igst / (bill.taxable_amount or 1)) * 100) }}%:</span>
+                <span>₹{{ "%.2f"|format(bill.igst) }}</span>
+            </div>
+            {% endif %}
+            {% if bill.tds_amount > 0 %}
+            <div class="total-row">
+                <span>TDS Deducted @{{ "%.2f"|format(bill.tds_rate * 100) }}%:</span>
+                <span>-₹{{ "%.2f"|format(bill.tds_amount) }}</span>
+            </div>
+            {% endif %}
+            {% if bill.tcs_amount > 0 %}
+            <div class="total-row">
+                <span>TCS Added @{{ "%.2f"|format(bill.tcs_rate * 100) }}%:</span>
+                <span>+₹{{ "%.2f"|format(bill.tcs_amount) }}</span>
+            </div>
+            {% endif %}
+            <div class="total-row final">
+                <span>Total Amount:</span>
+                <span>₹{{ "%.2f"|format(bill.total_amount) }}</span>
+            </div>
+        </div>
+
+        <!-- Bank Details -->
+        <div class="bank-details">
+            <div class="section-title">Bank Details</div>
+            <div class="bank-grid">
+                <div>
+                    <div class="bank-item">
+                        <div class="bank-label">Account Name:</div>
+                        <div>{{ company.name }} (GST Business)</div>
+                    </div>
+                    <div class="bank-item">
+                        <div class="bank-label">Account Number:</div>
+                        <div>123456789012345</div>
+                    </div>
+                    <div class="bank-item">
+                        <div class="bank-label">Bank Name:</div>
+                        <div>State Bank of India</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="bank-item">
+                        <div class="bank-label">IFSC Code:</div>
+                        <div>SBIN0001234</div>
+                    </div>
+                    <div class="bank-item">
+                        <div class="bank-label">Branch:</div>
+                        <div>Main Branch, New Delhi</div>
+                    </div>
+                    <div class="bank-item">
+                        <div class="bank-label">UPI ID:</div>
+                        <div>{{ company.name.lower().replace(' ', '') }}@paytm</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div>This is a computer-generated invoice and does not require signature</div>
+            <div>Generated on {{ datetime.now().strftime('%d-%b-%Y %H:%M:%S') }} | GSTIN: {{ company.gstin or "Not Available" }}</div>
+        </div>
+    </div>
+</body>
+</html>

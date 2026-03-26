@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Bank Accounts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🏦 Bank Accounts</h4>
+  <a href="{{ url_for('banking.add_account') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> Add Bank Account
+  </a>
+</div>
+
+<div class="row">
+  {% for bank in banks %}
+  <div class="col-md-4 mb-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">{{ bank.account_name }}</h5>
+        <p class="text-muted small mb-2">{{ bank.bank_name }}</p>
+        <div class="mb-2">
+          <small class="text-muted">Account No:</small>
+          <strong>{{ bank.account_no }}</strong>
+        </div>
+        <div class="mb-2">
+          <small class="text-muted">IFSC:</small>
+          <strong>{{ bank.ifsc }}</strong>
+        </div>
+        <div class="mb-3">
+          <small class="text-muted">Type:</small>
+          <span class="badge bg-info">{{ bank.account_type }}</span>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('banking.transactions', bank_id=bank.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-list-ul"></i> Transactions
+          </a>
+          <a href="{{ url_for('banking.import_txns', bank_id=bank.id) }}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-upload"></i> Import
+          </a>
+          <a href="{{ url_for('banking.manual_entry', bank_id=bank.id) }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Entry
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i> No bank accounts found. Click "Add Bank Account" to create one.
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="mt-4">
+  <a href="{{ url_for('banking.download_template') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-download"></i> Download Import Template
+  </a>
+</div>
+{% endblock %}

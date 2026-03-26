@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}Create {{ btype }} Invoice{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📝 Create {{ btype }} Invoice</h4>
+  <a href="{{ url_for('enhanced_invoice.list_invoices') }}?type={{ btype }}" class="btn btn-sm btn-outline-secondary">
+    ← Back to {{ btype }} Invoices
+  </a>
+</div>
+
+<form method="POST" class="row g-3">
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h6 class="mb-0">Invoice Details</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Invoice No</label>
+            <input type="text" name="bill_no" class="form-control" value="{{ bill_no }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Invoice Date</label>
+            <input type="date" name="bill_date" class="form-control" value="{{ bill_date }}" required>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-bold">{{ 'Customer' if btype == 'Sales' else 'Supplier' }}</label>
+            <select name="party_id" class="form-select" required>
+              <option value="">Select {{ 'Customer' if btype == 'Sales' else 'Supplier' }}</option>
+              {% for party in parties %}
+                {% if btype == 'Sales' and party.party_type == 'Debtor' %}
+                <option value="{{ party.id }}">{{ party.name }} ({{ party.gstin or 'No GSTIN' }})</option>
+                {% elif btype == 'Purchase' and party.party_type == 'Creditor' %}
+                <option value="{{ party.id }}">{{ party.name }} ({{ party.gstin or 'No GSTIN' }})</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-bold">Remarks</label>
+            <textarea name="remarks" class="form-control" rows="2" placeholder="Enter invoice remarks"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-info text-white">
+        <h6 class="mb-0">Quick Summary</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <small class="text-muted">Invoice Type</small>
+          <h5 class="fw-bold text-primary">{{ btype }}</h5>
+        </div>
+        <div class="mb-3">
+          <small class="text-muted">Template Type</small>
+          <h5 class="fw-bold">{{ company.business_type or 'Trading' }}</h5>
+        </div>
+        <div class="mb-3">
+          <small class="text-muted">Financial Year</small>
+          <h5 class="fw-bold">{{ fy }}</h5>
+        </div>
+        <div class="alert alert-info mb-0">
+          <small class="d-block">
+            <strong>Dynamic Template:</strong> Template will be selected based on business type
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-success text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Invoice Items</h6>
+      <button type="button" class="btn btn-sm btn-light" onclick="addInvoiceItem()">
+        <i class="bi bi-plus-circle"></i> Add Item
+      </button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="items-container">
+      <!-- Dynamic items will be added here -->
+      <div class="row g-2 mb-2" id="item-template" style="display: none;">
+        <div class="col-md-3">
+          <select name="item_id[]" class="form-select item-select" required>
+            <option value="">Select Item</option>
+            {% for item in items %}
+            <option value="{{ item.id }}">{{ item.name }} ({{ item.hsn_sac or 'No HSN' }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <input type="number" name="quantity[]" class="form-control quantity-input" placeholder="Qty" min="0" step="0.01" required>
+        </div>
+        <div class="col-md-2">
+          <input type="number" name="rate[]" class="form-control rate-input" placeholder="Rate" min="0" step="0.01" required>
+        </div>
+        <div class="col-md-2">
+          <input type="number" name="taxable_amount[]" class="form-control taxable-input" placeholder="Taxable" readonly>
+        </div>
+        <div class="col-md-2">
+          <input type="number" name="gst_rate[]" class="form-select gst-rate" placeholder="GST Rate">
+        </div>
+        <div class="col-md-1">
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Add first item -->
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <select name="item_id[]" class="form-select item-select" required>
+          <option value="">Select Item</option>
+          {% for item in items %}
+          <option value="{{ item.id }}">{{ item.name }} ({{ item.hsn_sac or 'No HSN' }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="quantity[]" class="form-control quantity-input" placeholder="Qty" min="0" step="0.01" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="rate[]" class="form-control rate-input" placeholder="Rate" min="0" step="0.01" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="taxable_amount[]" class="form-control taxable-input" placeholder="Taxable" readonly>
+      </div>
+      <div class="col-md-2">
+        <select name="gst_rate[]" class="form-select gst-rate">
+          <option value="0">0%</option>
+          <option value="5">5%</option>
+          <option value="12">12%</option>
+          <option value="18">18%</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-dark text-white">
+    <h6 class="mb-0">Invoice Summary</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Total Taxable:</span>
+          <span class="fw-bold text-primary" id="total-taxable">₹0.00</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-bold">CGST:</span>
+          <span class="fw-bold text-success" id="total-cgst">₹0.00</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-bold">SGST:</span>
+          <span class="fw-bold text-success" id="total-sgst">₹0.00</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Total Amount:</span>
+          <span class="fw-bold text-danger" id="total-amount">₹0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-warning text-dark">
+    <h6 class="mb-0">TDS/TCS Information</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-bold">TDS Rate (%)</label>
+        <input type="number" name="tds_rate" class="form-control" placeholder="0.00" min="0" max="100" step="0.01">
+        <small class="text-muted">For purchase invoices only</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold">TCS Rate (%)</label>
+        <input type="number" name="tcs_rate" class="form-control" placeholder="0.00" min="0" max="100" step="0.01">
+        <small class="text-muted">For sales invoices only</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold">Template Type</label>
+        <input type="text" name="template_type" class="form-control" value="{{ company.business_type or 'Trading' }}" readonly>
+        <small class="text-muted">Auto-selected based on business type</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mt-4">
+  <button type="submit" class="btn btn-primary">
+    <i class="bi bi-save"></i> Create Invoice
+  </button>
+  <a href="{{ url_for('enhanced_invoice.list_invoices') }}?type={{ btype }}" class="btn btn-outline-secondary">
+    <i class="bi bi-x-circle"></i> Cancel
+  </a>
+</div>
+</form>
+
+<script>
+function addInvoiceItem() {
+    const container = document.getElementById('items-container');
+    const template = document.getElementById('item-template');
+    const clone = template.cloneNode(true);
+    clone.style.display = 'block';
+    clone.removeAttribute('id');
+    container.appendChild(clone);
+    
+    // Add event listeners to new inputs
+    clone.querySelectorAll('.quantity-input, .rate-input').forEach(input => {
+        input.addEventListener('input', calculateTotals);
+    });
+}
+
+function removeItem(button) {
+    button.closest('.row').remove();
+    calculateTotals();
+}
+
+function calculateTotals() {
+    let totalTaxable = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    
+    document.querySelectorAll('.quantity-input').forEach((input, index) => {
+        const quantity = parseFloat(input.value) || 0;
+        const rate = parseFloat(document.querySelectorAll('.rate-input')[index].value) || 0;
+        const taxable = quantity * rate;
+        const gstRate = parseFloat(document.querySelectorAll('.gst-rate')[index].value) || 0;
+        const cgst = taxable * (gstRate / 2) / 100;
+        const sgst = taxable * (gstRate / 2) / 100;
+        
+        document.querySelectorAll('.taxable-input')[index].value = taxable.toFixed(2);
+        
+        totalTaxable += taxable;
+        totalCGST += cgst;
+        totalSGST += sgst;
+    });
+    
+    document.getElementById('total-taxable').textContent = '₹' + totalTaxable.toFixed(2);
+    document.getElementById('total-cgst').textContent = '₹' + totalCGST.toFixed(2);
+    document.getElementById('total-sgst').textContent = '₹' + totalSGST.toFixed(2);
+    document.getElementById('total-amount').textContent = '₹' + (totalTaxable + totalCGST + totalSGST).toFixed(2);
+}
+
+// Add event listeners to existing inputs
+document.querySelectorAll('.quantity-input, .rate-input').forEach(input => {
+    input.addEventListener('input', calculateTotals);
+});
+
+// Initialize totals on page load
+calculateTotals();
+</script>
+
+<div class="alert alert-info mt-3">
+  <h6><i class="bi bi-info-circle"></i> Enhanced Invoice Features</h6>
+  <p class="mb-0">
+    <strong>Dynamic Templates:</strong> Templates are automatically selected based on your business type (Trading, Manufacturing, Service, Milk)<br>
+    <strong>GST Calculations:</strong> Automatic GST calculations with proper CGST/SGST/IGST based on party location<br>
+    <strong>TDS/TCS Support:</strong> Automatic tax deduction/collection for compliance<br>
+    <strong>Professional Printing:</strong> Beautiful layouts with bank details and company information
+  </p>
+</div>
+
+<div class="alert alert-warning">
+  <h6><i class="bi bi-exclamation-triangle"></i> Important Notes</h6>
+  <p class="mb-0">
+    <strong>GSTIN Required:</strong> Ensure parties have valid GSTIN for proper GST calculations<br>
+    <strong>HSN/SAC:</strong> Items should have HSN/SAC codes for GST compliance<br>
+    <strong>Business Type:</strong> Template selection is based on company business type settings
+  </p>
+</div>
+{% endblock %}

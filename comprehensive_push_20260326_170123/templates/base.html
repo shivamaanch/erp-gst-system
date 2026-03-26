@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>{% block title %}ERP GST{% endblock %} — ERP</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --sw: 240px; }
+    #sidebar { width:var(--sw); height:100vh; position:fixed; top:0; left:0; overflow-y:auto;
+               background:linear-gradient(180deg,#1a237e,#283593); color:#fff; z-index:100; }
+    #sidebar .nav-link { color:rgba(255,255,255,.8); font-size:.85rem; padding:.4rem 1rem; border-radius:6px; margin:1px 8px; }
+    #sidebar .nav-link:hover, #sidebar .nav-link.active { background:rgba(255,255,255,.18); color:#fff; }
+    #sidebar .nav-link i { width:18px; }
+    #sidebar .sidebar-section { font-size:.7rem; color:rgba(255,255,255,.45); text-transform:uppercase;
+                                 letter-spacing:.08em; padding:.6rem 1rem .2rem; margin-top:.4rem; }
+    #main { margin-left:var(--sw); }
+    .topbar { background:#fff; border-bottom:1px solid #e0e0e0; padding:.5rem 1.2rem; position:sticky; top:0; z-index:99; }
+    @media print { #sidebar,.topbar,.no-print{ display:none!important } #main{ margin-left:0!important } }
+    @media (max-width:768px){ #sidebar{ display:none } #main{ margin-left:0 } }
+  </style>
+  {% block styles %}{% endblock %}
+</head>
+<body>
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="p-3 border-bottom border-white border-opacity-25">
+    <div class="fw-bold fs-5">🏢 ERP Suite</div>
+    <div class="small fw-bold text-warning">{{ current_company_name }}</div>
+    <small class="opacity-75">FY: {{ session.get("fin_year","N/A") }}</small>
+  </div>
+  <nav class="mt-2 pb-4">
+    <div class="sidebar-section">Overview</div>
+    <a href="{{ url_for('reports.hub') }}" class="nav-link {{ 'active' if request.endpoint=='reports.hub' }}">
+      <i class="bi bi-speedometer2"></i> Dashboard</a>
+
+    <div class="sidebar-section">Company</div>
+    {% if current_user.is_authenticated and current_user.accessible_companies.count() > 1 %}
+    <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
+      <i class="bi bi-building"></i> Switch Company
+    </a>
+    {% for company in current_user.accessible_companies %}
+    <a href="{{ url_for('auth.switch_company', company_id=company.id) }}" class="nav-link {{ 'active' if company.id == session.get('company_id') }}">
+      <i class="bi bi-{{ 'check-circle-fill' if company.id == session.get('company_id') else 'circle' }}"></i> {{ company.name }}
+    </a>
+    {% endfor %}
+    {% else %}
+    <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
+      <i class="bi bi-building"></i> Company
+    </a>
+    {% endif %}
+
+    <div class="sidebar-section">Transactions</div>
+    <a href="{{ url_for('clients.index') }}" class="nav-link {{ 'active' if 'clients' in (request.endpoint or '') }}">
+      <i class="bi bi-people"></i> Parties / Clients</a>
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Sales') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type','Sales')=='Sales' }}">
+      <i class="bi bi-receipt"></i> Sales Invoice</a>
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Purchase') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type')=='Purchase' }}">
+      <i class="bi bi-cart3"></i> Purchase</a>
+    <a href="{{ url_for('milk.entry_list') }}" class="nav-link {{ 'active' if 'milk' in (request.endpoint or '') }}">
+      <i class="bi bi-droplet"></i> Milk Entry</a>
+    <a href="{{ url_for('milk.add_entry') }}" class="nav-link {{ 'active' if request.endpoint=='milk.add_entry' }}">
+      <i class="bi bi-plus-circle"></i> Add Milk Entry</a>
+    <a href="{{ url_for('journal.index') }}" class="nav-link {{ 'active' if 'journal' in (request.endpoint or '') }}">
+      <i class="bi bi-journal-text"></i> Journal Entries</a>
+    <a href="{{ url_for('banking.accounts') }}" class="nav-link {{ 'active' if 'banking' in (request.endpoint or '') }}">
+      <i class="bi bi-bank"></i> Banking</a>
+
+    <div class="sidebar-section">GST & Tax</div>
+    <a href="{{ url_for('gst_reports.gstr1') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr1' }}">
+      <i class="bi bi-file-earmark-text"></i> GSTR-1 (Sales)</a>
+    <a href="{{ url_for('gst_reports.gstr2b') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr2b' }}">
+      <i class="bi bi-file-earmark-arrow-down"></i> GSTR-2B (Purchases)</a>
+    <a href="{{ url_for('gst_reports.gstr3b') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.gstr3b' }}">
+      <i class="bi bi-file-earmark-check"></i> GSTR-3B (Summary)</a>
+    <a href="{{ url_for('gst_reports.reconcile') }}" class="nav-link {{ 'active' if request.endpoint=='gst_reports.reconcile' }}">
+      <i class="bi bi-arrow-left-right"></i> GST Reconciliation</a>
+    <a href="{{ url_for('tds_tcs.tds_index') }}" class="nav-link {{ 'active' if request.endpoint=='tds_tcs.tds_index' }}">
+      <i class="bi bi-percent"></i> TDS</a>
+    <a href="{{ url_for('tds_tcs.tcs_index') }}" class="nav-link {{ 'active' if request.endpoint=='tds_tcs.tcs_index' }}">
+      <i class="bi bi-cash-stack"></i> TCS</a>
+    <a href="{{ url_for('alerts.index') }}" class="nav-link {{ 'active' if 'alerts' in (request.endpoint or '') }}">
+      <i class="bi bi-bell"></i> Compliance Alerts</a>
+
+    <div class="sidebar-section">Books</div>
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Purchase') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type')=='Purchase' }}">
+      <i class="bi bi-book"></i> Purchase Book</a>
+    <a href="{{ url_for('enhanced_invoice.list_invoices', type='Sales') }}" class="nav-link {{ 'active' if request.endpoint=='enhanced_invoice.list_invoices' and request.args.get('type')=='Sales' }}">
+      <i class="bi bi-book-fill"></i> Sale Book</a>
+
+    <div class="sidebar-section">Reports</div>
+    <a href="{{ url_for('reports.hub') }}" class="nav-link">
+      <i class="bi bi-bar-chart"></i> All Reports</a>
+    <a href="{{ url_for('reports.profit_loss') }}" class="nav-link">
+      <i class="bi bi-graph-up"></i> P&amp;L</a>
+    <a href="{{ url_for('reports.balance_sheet') }}" class="nav-link">
+      <i class="bi bi-layout-text-window"></i> Balance Sheet</a>
+    <a href="{{ url_for('reports.trial_balance') }}" class="nav-link">
+      <i class="bi bi-list-columns"></i> Trial Balance</a>
+    <a href="{{ url_for('reports.ledger') }}" class="nav-link">
+      <i class="bi bi-book"></i> Ledger</a>
+
+    <div class="sidebar-section">Finance</div>
+    <a href="{{ url_for('smf.index') }}" class="nav-link {{ 'active' if 'smf' in (request.endpoint or '') }}">
+      <i class="bi bi-bank"></i> Loans / CMA</a>
+    <a href="{{ url_for('reports.outstanding') }}" class="nav-link">
+      <i class="bi bi-exclamation-circle"></i> Outstanding</a>
+
+    <div class="sidebar-section">Utilities</div>
+    <a href="{{ url_for('utilities.index') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.index' }}">
+      <i class="bi bi-tools"></i> Utilities Dashboard</a>
+    <a href="{{ url_for('utilities.backup_database') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.backup_database' }}">
+      <i class="bi bi-download"></i> Backup Database</a>
+    <a href="{{ url_for('utilities.restore_database') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.restore_database' }}">
+      <i class="bi bi-upload"></i> Restore Database</a>
+    <a href="{{ url_for('utilities.reindex_vouchers') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.reindex_vouchers' }}">
+      <i class="bi bi-arrow-repeat"></i> Reindex Vouchers</a>
+    <a href="{{ url_for('utilities.renumber_vouchers') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.renumber_vouchers' }}">
+      <i class="bi bi-123"></i> Renumber Vouchers</a>
+    <a href="{{ url_for('utilities.fix_data') }}" class="nav-link {{ 'active' if request.endpoint=='utilities.fix_data' }}">
+      <i class="bi bi-wrench"></i> Fix Data Issues</a>
+
+    <div class="sidebar-section">Masters</div>
+    <a href="{{ url_for('accounts.index') }}" class="nav-link {{ 'active' if 'accounts' in (request.endpoint or '') }}">
+      <i class="bi bi-journal-text"></i> Chart of Accounts</a>
+    <a href="{{ url_for('accounts.groups') }}" class="nav-link {{ 'active' if request.endpoint=='accounts.groups' }}">
+      <i class="bi bi-diagram-3"></i> Account Groups</a>
+    <a href="{{ url_for('items.index') }}" class="nav-link {{ 'active' if 'items' in (request.endpoint or '') }}">
+      <i class="bi bi-box-seam"></i> Items Master</a>
+    <a href="{{ url_for('clients.index') }}" class="nav-link {{ 'active' if 'clients' in (request.endpoint or '') }}">
+      <i class="bi bi-people"></i> Parties Master</a>
+
+    <div class="sidebar-section">Settings</div>
+    <a href="{{ url_for('users.index') }}" class="nav-link {{ 'active' if 'users' in (request.endpoint or '') }}">
+      <i class="bi bi-people-fill"></i> Users</a>
+  </nav>
+</div>
+
+<!-- TOPBAR -->
+<div id="main">
+  <div class="topbar d-flex justify-content-between align-items-center no-print">
+    <div class="d-flex align-items-center gap-2">
+      <span class="fw-bold text-primary">{% block page_title %}{% endblock %}</span>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      <!-- Financial Year Switcher -->
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="bi bi-calendar3"></i> FY: {{ session.get("fin_year","Select Year") }}
+        </button>
+        <ul class="dropdown-menu">
+          {% set company_id = session.get("company_id") %}
+          {% if company_id %}
+            {% set fys = get_financial_years_for_company(company_id) %}
+            {% for fy in fys %}
+            <li><a class="dropdown-item {{ 'active' if fy.year_name == session.get('fin_year') }}" href="{{ url_for('auth.switch_financial_year', fin_year=fy.year_name) }}">
+              {{ fy.year_name }}
+              {% if fy.year_name == session.get('fin_year') %}
+              <span class="badge bg-success ms-2">Current</span>
+              {% endif %}
+              {% if fy.is_active %}
+              <span class="badge bg-info ms-2">Active</span>
+              {% endif %}
+            </a></li>
+            {% endfor %}
+          {% else %}
+            <li><a class="dropdown-item" href="{{ url_for('company.index') }}">Select Company First</a></li>
+          {% endif %}
+        </ul>
+      </div>
+      
+      {% if current_user.is_authenticated %}
+      <!-- Company Switcher -->
+      <div class="dropdown">
+        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="bi bi-building"></i> {{ session.get('company_name', 'Select Company') }}
+        </button>
+        <ul class="dropdown-menu">
+          {% for company in current_user.accessible_companies %}
+          <li><a class="dropdown-item {{ 'active' if company.id == session.get('company_id') }}" href="{{ url_for('auth.switch_company', company_id=company.id) }}">
+            {{ company.name }}
+            {% if company.id == session.get('company_id') %}
+            <span class="badge bg-success ms-2">Current</span>
+            {% endif %}
+          </a></li>
+          {% endfor %}
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="{{ url_for('company.index') }}">
+            <i class="bi bi-gear"></i> Company Settings
+          </a></li>
+        </ul>
+      </div>
+      <span class="text-muted small"><i class="bi bi-person-circle"></i> {{ current_user.username }}</span>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger py-0">Logout</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- FLASH MESSAGES -->
+  <div class="px-3 pt-2">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show py-2 small" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <div class="p-3">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

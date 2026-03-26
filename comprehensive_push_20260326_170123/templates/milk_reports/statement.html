@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Milk Statement Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 Milk Statement Report</h4>
+  <div class="d-flex gap-2">
+    <form method="GET" class="d-flex gap-2">
+      <select name="farmer_name" class="form-select" style="width: 200px;">
+        <option value="">All Farmers</option>
+        {% for farmer in farmers %}
+        <option value="{{ farmer.name }}" {% if farmer.name == farmer_name %}selected{% endif %}>
+          {{ farmer.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <select name="period" class="form-select" onchange="this.form.submit()">
+        {% set current_period = request.args.get('period', current_date.strftime('%m-%Y')) %}
+        <option value="">Select Period</option>
+        {% for value, label, selected in month_options %}
+        <option value="{{ value }}" {% if selected %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-search"></i> Filter
+      </button>
+    </form>
+    <a href="{{ url_for('milk_reports.farmer_summary') }}?period={{ request.args.get('period', current_date.strftime('%m-%Y')) }}" class="btn btn-sm btn-outline-info">
+      Farmer Summary
+    </a>
+    <a href="{{ url_for('milk_reports.quality_report') }}?period={{ request.args.get('period', current_date.strftime('%m-%Y')) }}" class="btn btn-sm btn-outline-warning">
+      Quality Report
+    </a>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-primary text-white">
+      <div class="card-body text-center">
+        <h6 class="card-title">Total Quantity</h6>
+        <h3>{{ "{:,.2f}".format(total_quantity) }}</h3>
+        <small>Liters</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-success text-white">
+      <div class="card-body text-center">
+        <h6 class="card-title">Total Amount</h6>
+        <h3>₹{{ "{:,.2f}".format(total_amount) }}</h3>
+        <small>Basic + Fat + SNF</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-info text-white">
+      <div class="card-body text-center">
+        <h6 class="card-title">Fat Value</h6>
+        <h3>₹{{ "{:,.2f}".format(total_fat_value) }}</h3>
+        <small>{{ "{:.2f}".format(average_fat) }}% avg</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-warning text-dark">
+      <div class="card-body text-center">
+        <h6 class="card-title">SNF Value</h6>
+        <h3>₹{{ "{:,.2f}".format(total_snf_value) }}</h3>
+        <small>{{ "{:.2f}".format(average_snf) }}% avg</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-secondary text-white">
+      <div class="card-body text-center">
+        <h6 class="card-title">Collection Days</h6>
+        <h3>{{ collection_days }}</h3>
+        <small>Days in period</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-0 shadow-sm bg-dark text-white">
+      <div class="card-body text-center">
+        <h6 class="card-title">Avg Daily</h6>
+        <h3>₹{{ "{:,.2f}".format(average_daily) }}</h3>
+        <small>Per day</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Milk Collection Details -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-success text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Milk Collection Details</h6>
+      <small>
+        Period: {{ start_date.strftime('%d-%m-%Y') }} to {{ end_date.strftime('%d-%m-%Y') }}
+        {% if farmer_name %} | Farmer: {{ farmer_name }}{% endif %}
+      </small>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if milk_entries %}
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Farmer</th>
+            <th>Quantity (Ltrs)</th>
+            <th>Fat %</th>
+            <th>SNF %</th>
+            <th>Rate/Ltr</th>
+            <th>Basic Amount</th>
+            <th>Fat Value</th>
+            <th>SNF Value</th>
+            <th>Total Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in milk_entries %}
+            {% for item in entry.items %}
+            <tr>
+              <td>{{ item.date.strftime('%d-%m-%Y') }}</td>
+              <td>
+                <strong>{{ entry.party.name }}</strong>
+                {% if entry.party.phone %}
+                <br><small class="text-muted">{{ entry.party.phone }}</small>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ "{:.2f}".format(item.quantity) }}</td>
+              <td class="text-end fw-bold text-info">{{ "{:.2f}".format(item.fat_percentage) }}%</td>
+              <td class="text-end fw-bold text-warning">{{ "{:.2f}".format(item.snf_percentage) }}%</td>
+              <td class="text-end">₹{{ "{:.2f}".format(item.rate_per_liter) }}</td>
+              <td class="text-end">₹{{ "{:.2f}".format(item.basic_amount) }}</td>
+              <td class="text-end">₹{{ "{:.2f}".format(item.fat_value) }}</td>
+              <td class="text-end">₹{{ "{:.2f}".format(item.snf_value) }}</td>
+              <td class="text-end fw-bold">₹{{ "{:.2f}".format(item.total_amount) }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=entry.bill.id) }}" class="btn btn-outline-info">
+                    <i class="bi bi-printer"></i>
+                  </a>
+                  <a href="{{ url_for('enhanced_invoice.export_invoice', bill_id=entry.bill.id, format='excel') }}" class="btn btn-outline-success">
+                    <i class="bi bi-download"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+      <i class="bi bi-cup display-4 text-muted"></i>
+      <h5 class="mt-3">No milk collection data found</h5>
+      <p class="text-muted">
+        {% if farmer_name %}
+          No milk collection data found for farmer: {{ farmer_name }}
+        {% else %}
+          No milk collection data found for the selected period
+        {% endif %}
+      </p>
+      <p class="text-muted">
+        Try adjusting the date range or farmer filter
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Calculation Details -->
+<div class="card border-0 shadow-sm mt-3">
+  <div class="card-header bg-info text-white">
+    <h6 class="mb-0">Calculation Details</h6>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6">
+        <h6 class="fw-bold">Milk Calculation Formula:</h6>
+        <div class="alert alert-light">
+          <p class="mb-1"><strong>Basic Amount:</strong> Quantity (Ltrs) × Rate/Liter</p>
+          <p class="mb-1"><strong>Fat Value:</strong> Basic Amount × (Fat% ÷ 100) × Fat Rate</p>
+          <p class="mb-1"><strong>SNF Value:</strong> Basic Amount × (SNF% ÷ 100) × SNF Rate</p>
+          <p class="mb-0"><strong>Total Amount:</strong> Basic + Fat Value + SNF Value</p>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h6 class="fw-bold">Quality Parameters:</h6>
+        <div class="alert alert-light">
+          <p class="mb-1"><strong>Average Fat %:</strong> {{ "{:.2f}".format(average_fat) }}%</p>
+          <p class="mb-1"><strong>Average SNF %:</strong> {{ "{:.2f}".format(average_snf) }}%</p>
+          <p class="mb-1"><strong>Total Collections:</strong> {{ collection_days }} days</p>
+          <p class="mb-0"><strong>Average Daily Collection:</strong> ₹{{ "{:.2f}".format(average_daily) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Options -->
+<div class="d-flex gap-2 mt-3">
+  <button type="button" class="btn btn-success" onclick="exportToExcel()">
+    <i class="bi bi-file-earmark-excel"></i> Export to Excel
+  </button>
+  <button type="button" class="btn btn-danger" onclick="window.print()">
+    <i class="bi bi-printer"></i> Print Report
+  </button>
+</div>
+
+<script>
+function exportToExcel() {
+  // Excel export functionality
+  const data = [];
+  const headers = ['Date', 'Farmer', 'Quantity (Ltrs)', 'Fat %', 'SNF %', 'Rate/Ltr', 'Basic Amount', 'Fat Value', 'SNF Value', 'Total Amount'];
+  
+  // Add header row
+  data.push(headers.join(','));
+  
+  // Add data rows
+  {% for entry in milk_entries %}
+    {% for item in entry.items %}
+    data.push([
+      '{{ item.date.strftime('%d-%m-%Y') }}',
+      '{{ entry.party.name }}',
+      '{{ item.quantity | round(2) }}',
+      '{{ item.fat_percentage | round(2) }}',
+      '{{ item.snf_percentage | round(2) }}',
+      '{{ item.rate_per_liter | round(2) }}',
+      '{{ item.basic_amount | round(2) }}',
+      '{{ item.fat_value | round(2) }}',
+      '{{ item.snf_value | round(2) }}',
+      '{{ item.total_amount | round(2) }}'
+    ].join(','));
+    {% endfor %}
+  {% endfor %}
+  
+  // Create CSV content
+  const csvContent = data.join('\n');
+  
+  // Create blob and download
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'milk_statement_{{ request.args.get('period', current_date.strftime('%m-%Y')) }}.csv';
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+@media print {
+  .btn, .d-flex.gap-2, .card-header .small {
+    display: none !important;
+  }
+  .table {
+    font-size: 12px;
+  }
+}
+</style>
+{% endblock %}
