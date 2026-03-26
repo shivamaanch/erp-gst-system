@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Fixed Assets Schedule - Income Tax Act Format{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-building"></i> Fixed Assets Schedule (As per Income Tax Act) - FY {{ fy }}</h4>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('fixed_assets.add_asset') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Fixed Asset
+      </a>
+      <a href="{{ url_for('reports.balance_sheet') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Balance Sheet
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Depreciation Schedule as per Income Tax Act, 1961</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover mb-0 it-act-table">
+          <thead class="table-dark">
+            <tr>
+              <th rowspan="2">Asset Description</th>
+              <th rowspan="2">Category</th>
+              <th rowspan="2">Rate (%)</th>
+              <th rowspan="2">Opening WDV (₹)</th>
+              <th rowspan="2">Additions (₹)</th>
+              <th rowspan="2">Sales/Disposal (₹)</th>
+              <th rowspan="2">Depreciation (₹)</th>
+              <th rowspan="2">Closing WDV (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asset in assets %}
+            <tr>
+              <td><strong>{{ asset.name }}</strong></td>
+              <td><span class="badge bg-info">{{ asset.category }}</span></td>
+              <td class="text-center">
+                <input type="number" class="form-control form-control-sm text-center dep-rate" 
+                       data-asset-id="{{ asset.id }}" 
+                       value="{{ asset.depreciation_rate }}" 
+                       min="0" max="100" step="0.1"
+                       onchange="recalculateITActDepreciation(this)">
+              </td>
+              <td class="text-end opening-wdv">{{ "{:,.2f}".format(asset.opening_wdv) }}</td>
+              <td class="text-end">
+                <input type="number" class="form-control form-control-sm text-end additions" 
+                       data-asset-id="{{ asset.id }}" 
+                       value="{{ asset.additions }}" 
+                       min="0" step="0.01"
+                       onchange="recalculateITActDepreciation(this)">
+              </td>
+              <td class="text-end">
+                <input type="number" class="form-control form-control-sm text-end sales" 
+                       data-asset-id="{{ asset.id }}" 
+                       value="{{ asset.sales }}" 
+                       min="0" step="0.01"
+                       onchange="recalculateITActDepreciation(this)">
+              </td>
+              <td class="text-end dep-amount">{{ "{:,.2f}".format(asset.annual_depreciation) }}</td>
+              <td class="text-end closing-wdv">{{ "{:,.2f}".format(asset.closing_wdv) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-secondary fw-bold">
+            <tr>
+              <td colspan="3">TOTAL</td>
+              <td class="text-end" id="totalOpeningWDV">{{ "{:,.2f}".format(total_opening_wdv) }}</td>
+              <td class="text-end" id="totalAdditions">{{ "{:,.2f}".format(total_additions) }}</td>
+              <td class="text-end" id="totalSales">{{ "{:,.2f}".format(total_sales) }}</td>
+              <td class="text-end" id="totalDepreciation">{{ "{:,.2f}".format(total_depreciation) }}</td>
+              <td class="text-end" id="totalClosingWDV">{{ "{:,.2f}".format(total_closing_wdv) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h5>Post Depreciation Entry (As per IT Act)</h5>
+          <p class="mb-0 text-muted">Click the button to post depreciation journal entry as calculated per Income Tax Act provisions. This will create a journal voucher and update the accounts automatically.</p>
+        </div>
+        <div class="col-md-4 text-end">
+          <button onclick="postITActDepreciation()" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle"></i> Post IT Act Depreciation
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info mt-3">
+    <h6><i class="bi bi-info-circle"></i> Income Tax Act Depreciation Rates:</h6>
+    <div class="row">
+      <div class="col-md-6">
+        <ul class="mb-0">
+          <li><strong>Building:</strong> 10% (WDV Method)</li>
+          <li><strong>Plant & Machinery:</strong> 15% (WDV Method)</li>
+          <li><strong>Motor Vehicles:</strong> 15% (WDV Method)</li>
+          <li><strong>Furniture & Fittings:</strong> 10% (WDV Method)</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <ul class="mb-0">
+          <li><strong>Computers & Software:</strong> 40% (WDV Method)</li>
+          <li><strong>Intangible Assets:</strong> 25% (WDV Method)</li>
+          <li><strong>Other Assets:</strong> 15% (WDV Method)</li>
+          <li><strong>Note:</strong> Half rate for assets purchased after 180 days from year end</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-warning mt-3">
+    <h6><i class="bi bi-exclamation-triangle"></i> Important Notes:</h6>
+    <ul class="mb-0">
+      <li>Depreciation is calculated on <strong>Written Down Value (WDV)</strong> method as per IT Act</li>
+      <li>For new assets purchased after 180 days from year end, <strong>half rate</strong> applies</li>
+      <li>Block of assets concept applies - similar assets are grouped together</li>
+      <li>Sale proceeds are deducted from the block before calculating depreciation</li>
+      <li>If sale proceeds exceed WDV of block, <strong>short term capital gain</strong> arises</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+.it-act-table {
+  border: 3px solid #000 !important;
+  font-size: 0.9rem;
+}
+.it-act-table thead th {
+  border: 2px solid #000 !important;
+  background-color: #343a40 !important;
+  color: white !important;
+  text-align: center;
+  vertical-align: middle;
+}
+.it-act-table tbody td {
+  border: 1px solid #666 !important;
+  vertical-align: middle;
+}
+.it-act-table tfoot td {
+  border: 2px solid #000 !important;
+}
+.dep-rate, .additions, .sales {
+  width: 100px;
+  display: inline-block;
+}
+</style>
+
+<script>
+function recalculateITActDepreciation(input) {
+  const row = input.closest('tr');
+  const openingWDV = parseFloat(row.querySelector('.opening-wdv').textContent.replace(/,/g, ''));
+  const additions = parseFloat(row.querySelector('.additions').value || 0);
+  const sales = parseFloat(row.querySelector('.sales').value || 0);
+  const rate = parseFloat(row.querySelector('.dep-rate').value || 0);
+  
+  // Calculate depreciation as per IT Act (WDV method)
+  const depreciationBase = openingWDV + additions - sales;
+  const annualDep = depreciationBase * (rate / 100);
+  const closingWDV = depreciationBase - annualDep;
+  
+  // Update row
+  row.querySelector('.dep-amount').textContent = annualDep.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  row.querySelector('.closing-wdv').textContent = closingWDV.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  
+  // Recalculate totals
+  updateITActTotals();
+}
+
+function updateITActTotals() {
+  let totalOpeningWDV = 0;
+  let totalAdditions = 0;
+  let totalSales = 0;
+  let totalDep = 0;
+  let totalClosingWDV = 0;
+  
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const openingWDV = parseFloat(row.querySelector('.opening-wdv').textContent.replace(/,/g, ''));
+    const additions = parseFloat(row.querySelector('.additions').value || 0);
+    const sales = parseFloat(row.querySelector('.sales').value || 0);
+    const dep = parseFloat(row.querySelector('.dep-amount').textContent.replace(/,/g, ''));
+    const closingWDV = parseFloat(row.querySelector('.closing-wdv').textContent.replace(/,/g, ''));
+    
+    totalOpeningWDV += openingWDV;
+    totalAdditions += additions;
+    totalSales += sales;
+    totalDep += dep;
+    totalClosingWDV += closingWDV;
+  });
+  
+  document.getElementById('totalOpeningWDV').textContent = totalOpeningWDV.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('totalAdditions').textContent = totalAdditions.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('totalSales').textContent = totalSales.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('totalDepreciation').textContent = totalDep.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('totalClosingWDV').textContent = totalClosingWDV.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function postITActDepreciation() {
+  const totalDep = parseFloat(document.getElementById('totalDepreciation').textContent.replace(/,/g, ''));
+  
+  if (totalDep <= 0) {
+    alert('No depreciation to post!');
+    return;
+  }
+  
+  if (!confirm(`Post IT Act depreciation of ₹${totalDep.toLocaleString('en-IN', {minimumFractionDigits: 2})}?\n\nThis will create a journal entry as per Income Tax Act provisions and update all accounts.`)) {
+    return;
+  }
+  
+  // Post depreciation
+  const formData = new FormData();
+  formData.append('total_depreciation', totalDep);
+  
+  fetch('{{ url_for("fixed_assets.post_depreciation") }}', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('✅ IT Act Depreciation posted successfully!\n\nVoucher Number: ' + data.voucher_no + '\n\nThe entry has been posted as per Income Tax Act provisions.');
+      window.location.reload();
+    } else {
+      alert('❌ Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    alert('❌ Error posting depreciation: ' + error);
+  });
+}
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 # modules/enhanced_invoice.py
-from flask import Blueprint, render_template, request, session, flash, redirect, url_for, send_file
+from flask import Blueprint, render_template, request, session, flash, redirect, url_for, send_file, jsonify
 from flask_login import login_required
 from extensions import db
 from models import Bill, Party, Item, Company, BillItem
@@ -134,6 +134,33 @@ def create_invoice():
                          company=company,
                          templates=INVOICE_TEMPLATES)
 
+@enhanced_invoice_bp.route("/enhanced-invoice/delete/<int:bill_id>", methods=["POST"])
+@login_required
+def delete_invoice(bill_id):
+    """Delete an invoice"""
+    try:
+        cid = session.get("company_id")
+        bill = Bill.query.filter_by(id=bill_id, company_id=cid).first()
+        
+        if not bill:
+            return jsonify({"success": False, "message": "Invoice not found"})
+        
+        if bill.is_cancelled:
+            return jsonify({"success": False, "message": "Invoice is already cancelled"})
+        
+        # Delete bill items first
+        BillItem.query.filter_by(bill_id=bill_id).delete()
+        
+        # Delete the bill
+        db.session.delete(bill)
+        db.session.commit()
+        
+        return jsonify({"success": True, "message": "Invoice deleted successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)})
+
 @enhanced_invoice_bp.route("/enhanced-invoice/list")
 @login_required
 def list_invoices():
@@ -141,9 +168,8 @@ def list_invoices():
     fy = session.get("fin_year")
     btype = request.args.get("type", "Sales")
     
-    bills = db.session.query(Bill, Party).join(Party, Bill.party_id==Party.id).filter(
-        Bill.company_id==cid, Bill.fin_year==fy,
-        Bill.bill_type==btype, Bill.is_cancelled==False
+    bills = Bill.query.filter_by(
+        company_id=cid, fin_year=fy, bill_type=btype, is_cancelled=False
     ).order_by(Bill.bill_date.desc()).all()
     
     return render_template("enhanced_invoice/list.html", bills=bills, btype=btype)
@@ -157,17 +183,11 @@ def print_invoice(bill_id):
     company = Company.query.get(cid)
     
     # Get bill items
-    if hasattr(bill, 'items') and bill.items:
-        items = bill.items
-    else:
-        # For backward compatibility
-        items = []
+    items = BillItem.query.filter_by(bill_id=bill_id).all()
     
-    template = INVOICE_TEMPLATES.get(bill.template_type, INVOICE_TEMPLATES["Trading"])
-    
-    return render_template("enhanced_invoice/print.html",
+    return render_template("enhanced_invoice/print_pdf.html",
                          bill=bill, party=party, company=company,
-                         items=items, template=template)
+                         items=items)
 
 @enhanced_invoice_bp.route("/enhanced-invoice/export/<int:bill_id>/<format>")
 @login_required

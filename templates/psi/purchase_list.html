@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-  <div class="d-flex justify-content-between mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
     <h4>🛒 Purchase Invoices</h4>
-    <a href="/invoice/purchase" class="btn btn-success">+ New Purchase</a>
+    <div class="d-flex gap-2">
+      <div class="input-group" style="width: 300px;">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search by Bill No or Amount...">
+        <button class="btn btn-outline-secondary" onclick="clearSearch()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <a href="/invoice/purchase" class="btn btn-success">+ New Purchase</a>
+    </div>
   </div>
   <table class="table table-bordered table-hover table-sm">
     <thead class="table-dark"><tr>
+      <th>Actions</th>
       <th>Invoice No</th><th>Date</th><th>Party</th><th>Item</th>
       <th>Qty(L)</th><th>FAT%</th><th>SNF%</th><th>Rate</th>
       <th>B.F.Rt</th><th>SNF.Rt</th><th>B.F.Kgs</th><th>SNF.Kgs</th>
@@ -15,8 +24,18 @@
     <tbody>
     {% for inv in invoices %}
     <tr>
-      <td>{{inv.invoice_no}}</td>
-      <td>{{inv.invoice_date.strftime("%d/%m/%Y")}}</td>
+      <td>
+        <div class="btn-group btn-group-sm">
+          <a href="/psi/purchase/{{inv.id}}/edit" class="btn btn-outline-primary btn-sm" title="Edit">
+            <i class="fas fa-edit"></i>
+          </a>
+          <a href="/psi/purchase/{{inv.id}}/delete" class="btn btn-outline-danger btn-sm" title="Delete" onclick="return confirm('Are you sure you want to delete this invoice?')">
+            <i class="fas fa-trash"></i>
+          </a>
+        </div>
+      </td>
+      <td>{{inv.bill_no}}</td>
+      <td>{{inv.bill_date.strftime("%d/%m/%Y")}}</td>
       <td>{{inv.party.name}}</td>
       <td>{{inv.item_name}}</td>
       <td>{{inv.qty_liters}}</td>
@@ -37,4 +56,40 @@
       <td class="text-success fw-bold">₹{{total}}</td></tr></tfoot>
   </table>
 </div>
+
+<script>
+function searchInvoices() {
+  const input = document.getElementById('searchInput');
+  const filter = input.value.toUpperCase();
+  const table = document.querySelector('tbody');
+  const rows = table.getElementsByTagName('tr');
+
+  for (let i = 0; i < rows.length; i++) {
+    const billNoCell = rows[i].getElementsByTagName('td')[1]; // Bill No column
+    const amountCell = rows[i].getElementsByTagName('td')[14]; // Total amount column
+    
+    if (billNoCell && amountCell) {
+      const billNoText = billNoCell.textContent || billNoCell.innerText;
+      const amountText = amountCell.textContent || amountCell.innerText;
+      
+      if (billNoText.toUpperCase().indexOf(filter) > -1 || 
+          amountText.toUpperCase().indexOf(filter) > -1) {
+        rows[i].style.display = '';
+      } else {
+        rows[i].style.display = 'none';
+      }
+    }
+  }
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  searchInvoices();
+}
+
+// Add event listener for search
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('searchInput').addEventListener('keyup', searchInvoices);
+});
+</script>
 {% endblock %}

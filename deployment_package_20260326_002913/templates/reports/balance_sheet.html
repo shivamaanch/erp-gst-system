@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Balance Sheet{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📋 Balance Sheet</h4>
+  <div class="d-flex gap-2">
+    <form method="GET" class="d-flex gap-2">
+      <select name="period" class="form-select" onchange="this.form.submit()">
+        {% set current_period = request.args.get('period', current_date.strftime('%m-%Y')) %}
+        <option value="">Select Period</option>
+        {% for value, label, selected in month_options %}
+        <option value="{{ value }}" {% if selected %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
+  </div>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-success text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <span>Financial Year: {{ fy }}</span>
+      <span class="fs-6">As on {{ fiscal_year_end }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h6 class="mb-3">I. EQUITY AND LIABILITIES</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless">
+            <thead>
+              <tr><th class="text-start">Particulars</th><th class="text-end">Amount (₹)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="fw-bold">Shareholders' Funds</td></tr>
+              <tr><td>  Share Capital</td><td class="text-end">₹1,00,000.00</td></tr>
+              <tr><td>  Reserves & Surplus</td><td class="text-end">₹{{ "{:,.2f}".format(retained_earnings) }}</td></tr>
+              <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+              <tr><td class="fw-bold">Non-Current Liabilities</td></tr>
+              <tr><td>  Long-term Borrowings</td><td class="text-end">₹0.00</td></tr>
+              <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+              <tr><td class="fw-bold">Current Liabilities</td></tr>
+              <tr><td>  Sundry Creditors</td><td class="text-end">₹{{ "{:,.2f}".format(creditors) }}</td></tr>
+              <tr><td>  Other Current Liabilities</td><td class="text-end">₹0.00</td></tr>
+              <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+              <tr><td class="fw-bold text-uppercase">TOTAL EQUITY & LIABILITIES</td><td class="text-end fw-bold">₹{{ "{:,.2f}".format(total_liabilities) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h6 class="mb-3">II. ASSETS</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-borderless">
+            <thead>
+              <tr><th class="text-start">Particulars</th><th class="text-end">Amount (₹)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="fw-bold">Non-Current Assets</td></tr>
+              <tr><td>  Fixed Assets</td><td class="text-end">₹0.00</td></tr>
+              <tr><td>  Non-Current Investments</td><td class="text-end">₹0.00</td></tr>
+              <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+              <tr><td class="fw-bold">Current Assets</td></tr>
+              <tr><td>  Sundry Debtors</td><td class="text-end">₹{{ "{:,.2f}".format(debtors) }}</td></tr>
+              <tr><td>  Cash & Bank Balances</td><td class="text-end">₹50,000.00</td></tr>
+              <tr><td>  Short-term Loans & Advances</td><td class="text-end">₹0.00</td></tr>
+              <tr><td>  Other Current Assets</td><td class="text-end">₹0.00</td></tr>
+              <tr><td class="dropdown"><hr></td><td class="dropdown"><hr></td></tr>
+              <tr><td class="fw-bold text-uppercase">TOTAL ASSETS</td><td class="text-end fw-bold">₹{{ "{:,.2f}".format(total_assets) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mt-4 text-center">
+      {% if total_assets == total_liabilities %}
+      <div class="alert alert-success">
+        <strong>Balance Sheet Tallies!</strong> Assets = Liabilities
+      </div>
+      {% else %}
+      <div class="alert alert-danger">
+        <strong>Imbalance Detected!</strong> Difference: ₹{{ "{:,.2f}".format(total_assets - total_liabilities) }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

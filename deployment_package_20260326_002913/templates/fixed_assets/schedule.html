@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Fixed Assets Schedule{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-building"></i> Fixed Assets Schedule - FY {{ fy }}</h4>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('fixed_assets.add_asset') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Fixed Asset
+      </a>
+      <a href="{{ url_for('reports.balance_sheet') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Balance Sheet
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Fixed Assets with Depreciation</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover mb-0 fixed-assets-table">
+          <thead class="table-dark">
+            <tr>
+              <th>Asset Name</th>
+              <th class="text-end">Opening Value (₹)</th>
+              <th class="text-center">Depreciation Rate (%)</th>
+              <th class="text-end">Annual Depreciation (₹)</th>
+              <th class="text-end">Accumulated Depreciation (₹)</th>
+              <th class="text-end">Written Down Value (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asset in assets %}
+            <tr>
+              <td><strong>{{ asset.name }}</strong></td>
+              <td class="text-end">{{ "{:,.2f}".format(asset.opening_value) }}</td>
+              <td class="text-center">
+                <input type="number" class="form-control form-control-sm text-center dep-rate" 
+                       data-asset-id="{{ asset.id }}" 
+                       value="{{ asset.depreciation_rate }}" 
+                       min="0" max="100" step="0.1"
+                       onchange="recalculateDepreciation(this)">
+              </td>
+              <td class="text-end dep-amount">{{ "{:,.2f}".format(asset.annual_depreciation) }}</td>
+              <td class="text-end acc-dep">{{ "{:,.2f}".format(asset.accumulated_depreciation) }}</td>
+              <td class="text-end wdv">{{ "{:,.2f}".format(asset.wdv) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-secondary fw-bold">
+            <tr>
+              <td>TOTAL</td>
+              <td class="text-end">{{ "{:,.2f}".format(total_opening) }}</td>
+              <td></td>
+              <td class="text-end" id="totalDepreciation">{{ "{:,.2f}".format(total_depreciation) }}</td>
+              <td class="text-end">{{ "{:,.2f}".format(total_depreciation) }}</td>
+              <td class="text-end" id="totalWDV">{{ "{:,.2f}".format(total_wdv) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h5>Post Depreciation Entry</h5>
+          <p class="mb-0 text-muted">Click the button to post depreciation journal entry for all fixed assets. This will create a journal voucher and update the accounts automatically.</p>
+        </div>
+        <div class="col-md-4 text-end">
+          <button onclick="postDepreciation()" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle"></i> Post Depreciation Live
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info mt-3">
+    <h6><i class="bi bi-info-circle"></i> How it works:</h6>
+    <ul class="mb-0">
+      <li><strong>Depreciation Rate:</strong> Change the rate for any asset and depreciation will recalculate automatically</li>
+      <li><strong>Post Live:</strong> Click "Post Depreciation Live" to create journal entry instantly</li>
+      <li><strong>Auto-Update:</strong> Once posted, depreciation will reflect in P&L and Balance Sheet immediately</li>
+      <li><strong>Voucher Created:</strong> A journal voucher will be created for audit trail</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+.fixed-assets-table {
+  border: 3px solid #000 !important;
+}
+.fixed-assets-table thead th {
+  border: 2px solid #000 !important;
+}
+.fixed-assets-table tbody td {
+  border: 1px solid #666 !important;
+}
+.fixed-assets-table tfoot td {
+  border: 2px solid #000 !important;
+}
+.dep-rate {
+  width: 80px;
+  display: inline-block;
+}
+</style>
+
+<script>
+function recalculateDepreciation(input) {
+  const row = input.closest('tr');
+  const openingValue = parseFloat(row.cells[1].textContent.replace(/,/g, ''));
+  const rate = parseFloat(input.value);
+  
+  // Calculate depreciation
+  const annualDep = openingValue * (rate / 100);
+  const wdv = openingValue - annualDep;
+  
+  // Update row
+  row.querySelector('.dep-amount').textContent = annualDep.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  row.querySelector('.acc-dep').textContent = annualDep.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  row.querySelector('.wdv').textContent = wdv.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  
+  // Recalculate totals
+  updateTotals();
+}
+
+function updateTotals() {
+  let totalDep = 0;
+  let totalWDV = 0;
+  
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const dep = parseFloat(row.querySelector('.dep-amount').textContent.replace(/,/g, ''));
+    const wdv = parseFloat(row.querySelector('.wdv').textContent.replace(/,/g, ''));
+    totalDep += dep;
+    totalWDV += wdv;
+  });
+  
+  document.getElementById('totalDepreciation').textContent = totalDep.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('totalWDV').textContent = totalWDV.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function postDepreciation() {
+  const totalDep = parseFloat(document.getElementById('totalDepreciation').textContent.replace(/,/g, ''));
+  
+  if (totalDep <= 0) {
+    alert('No depreciation to post!');
+    return;
+  }
+  
+  if (!confirm(`Post depreciation of ₹${totalDep.toLocaleString('en-IN', {minimumFractionDigits: 2})}?\n\nThis will create a journal entry and update all accounts.`)) {
+    return;
+  }
+  
+  // Post depreciation
+  const formData = new FormData();
+  formData.append('total_depreciation', totalDep);
+  
+  fetch('{{ url_for("fixed_assets.post_depreciation") }}', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('✅ Depreciation posted successfully!\n\nVoucher Number: ' + data.voucher_no + '\n\nThe entry has been posted to all accounts.');
+      window.location.reload();
+    } else {
+      alert('❌ Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    alert('❌ Error posting depreciation: ' + error);
+  });
+}
+</script>
+{% endblock %}

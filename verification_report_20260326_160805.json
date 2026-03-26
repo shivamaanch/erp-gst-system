@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-03-26T16:08:05.799350",
+  "files": {
+    "total_critical": 24,
+    "existing": 24,
+    "missing": 0,
+    "missing_list": []
+  },
+  "database": {
+    "tables_ok": true,
+    "voucher_columns_ok": true,
+    "accounts_ok": true,
+    "companies": 2,
+    "total_accounts": 119
+  },
+  "features": {
+    "all_ok": true,
+    "details": {
+      "Utilities Module": true,
+      "Fixed Assets Module": true,
+      "Accounts Module": true,
+      "Default Accounts Script": true,
+      "Voucher Helper": true,
+      "Horizontal Balance Sheet": true,
+      "Horizontal P&L": true,
+      "Fixed Assets Schedule": true,
+      "Backup Template": true,
+      "Restore Template": true
+    }
+  },
+  "overall_status": true
+}

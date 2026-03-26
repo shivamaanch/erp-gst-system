@@ -14,7 +14,7 @@ def require_role(*roles):
             if not current_user.is_authenticated:
                 flash("Please log in to access this page.", "warning")
                 return redirect(url_for("auth.login"))
-            if current_user.role not in roles:
+            if current_user.current_role not in roles:
                 flash("Access denied. Insufficient permissions.", "danger")
                 return redirect(url_for("reports.hub"))
             return f(*args, **kwargs)

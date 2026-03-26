@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ title }}</h4>
+  <a href="{{ url_for('accounts.index') }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Account Name *</label>
+          <input type="text" name="name" class="form-control" required value="{{ account.name if account else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Account Group *</label>
+          <select name="group_name" class="form-select" required>
+            <option value="">-- Select Group --</option>
+            {% set current_group = account.group_name if account else '' %}
+            {% for grp in groups %}
+            <option value="{{ grp }}" {% if current_group == grp %}selected{% endif %}>{{ grp }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Account Type</label>
+          <select name="account_type" class="form-select">
+            {% set current_type = account.account_type if account else 'General' %}
+            {% for t in ['General', 'Bank', 'Cash', 'Party'] %}
+            <option value="{{ t }}" {% if current_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Opening Debit</label>
+          <input type="number" name="opening_dr" class="form-control" step="0.01" value="{{ account.opening_dr if account else 0 }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Opening Credit</label>
+          <input type="number" name="opening_cr" class="form-control" step="0.01" value="{{ account.opening_cr if account else 0 }}">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-success px-4">
+            <i class="bi bi-check-circle"></i> {{ 'Update Account' if account else 'Save Account' }}
+          </button>
+          <a href="{{ url_for('accounts.index') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-info mt-3">
+  <strong>Account Groups Guide:</strong>
+  <ul class="mb-0 small">
+    <li><strong>Assets:</strong> Fixed Assets, Current Assets, Bank, Cash, Sundry Debtors, Stock</li>
+    <li><strong>Liabilities:</strong> Capital, Loans, Creditors, Duties & Taxes</li>
+    <li><strong>Income:</strong> Sales, Direct Income, Indirect Income</li>
+    <li><strong>Expenses:</strong> Purchase, Direct Expense, Indirect Expense, Depreciation</li>
+  </ul>
+</div>
+{% endblock %}

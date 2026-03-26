@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Balance Sheet - Horizontal Format{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <h4 class="fw-bold">📊 Balance Sheet (Horizontal Format)</h4>
+    <div class="d-flex gap-2">
+      <button onclick="window.print()" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-printer"></i> Print
+      </button>
+      <a href="{{ url_for('reports.balance_sheet_pdf') }}" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-file-pdf"></i> Download PDF
+      </a>
+      <a href="{{ url_for('reports.balance_sheet_excel') }}" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-file-excel"></i> Download Excel
+      </a>
+      <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white text-center">
+      <h5 class="mb-0">{{ company.name if company else 'Company Name' }}</h5>
+      <p class="mb-0">Balance Sheet as on {{ fiscal_year_end }}</p>
+      <p class="mb-0 small">Financial Year: {{ fy }}</p>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-bordered mb-0 balance-sheet-table">
+        <thead class="table-light">
+          <tr>
+            <th colspan="2" class="text-center">LIABILITIES</th>
+            <th class="text-end">Amount (₹)</th>
+            <th colspan="2" class="text-center">ASSETS</th>
+            <th class="text-end">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Capital & Reserves -->
+          <tr class="table-secondary">
+            <td colspan="2"><strong>CAPITAL & RESERVES</strong></td>
+            <td></td>
+            <td colspan="2">
+              <strong>FIXED ASSETS</strong>
+              <a href="{{ url_for('fixed_assets.schedule') }}" class="btn btn-xs btn-sm btn-outline-primary float-end no-print">
+                <i class="bi bi-calculator"></i> Schedule
+              </a>
+            </td>
+            <td></td>
+          </tr>
+          <tr>
+            <td width="3%"></td>
+            <td><a href="#" class="ledger-link" data-ledger="Share Capital">Share Capital</a></td>
+            <td class="text-end">{{ "{:,.2f}".format(capital) }}</td>
+            <td width="3%"></td>
+            <td>Land & Building</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td><a href="#" class="ledger-link" data-ledger="Reserves & Surplus">Reserves & Surplus</a></td>
+            <td class="text-end">{{ "{:,.2f}".format(retained_earnings) }}</td>
+            <td></td>
+            <td>Plant & Machinery</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Profit & Loss A/c</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Furniture & Fixtures</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Vehicles</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Office Equipment</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Computers</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          
+          <!-- Secured Loans -->
+          <tr class="table-secondary">
+            <td colspan="2"><strong>SECURED LOANS</strong></td>
+            <td></td>
+            <td colspan="2"><strong>INVESTMENTS</strong></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Bank Loans</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Long Term Investments</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Term Loans</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Short Term Investments</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          
+          <!-- Unsecured Loans -->
+          <tr class="table-secondary">
+            <td colspan="2"><strong>UNSECURED LOANS</strong></td>
+            <td></td>
+            <td colspan="2"><strong>CURRENT ASSETS</strong></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td><a href="#" class="ledger-link" data-ledger="Directors Loan">Directors Loan</a></td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td><a href="#" class="ledger-link" data-ledger="Sundry Debtors">Sundry Debtors</a></td>
+            <td class="text-end">{{ "{:,.2f}".format(debtors) }}</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Other Loans</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Stock in Hand</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Cash in Hand</td>
+            <td class="text-end">25000.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Bank Balance</td>
+            <td class="text-end">25000.00</td>
+          </tr>
+          
+          <!-- Current Liabilities -->
+          <tr class="table-secondary">
+            <td colspan="2"><strong>CURRENT LIABILITIES</strong></td>
+            <td></td>
+            <td colspan="2"><strong>LOANS & ADVANCES</strong></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td><a href="#" class="ledger-link" data-ledger="Sundry Creditors">Sundry Creditors</a></td>
+            <td class="text-end">{{ "{:,.2f}".format(creditors) }}</td>
+            <td></td>
+            <td>Advances to Suppliers</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Outstanding Expenses</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Prepaid Expenses</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>TDS Payable</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td>Deposits</td>
+            <td class="text-end">0.00</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>GST Payable</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Other Liabilities</td>
+            <td class="text-end">0.00</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          
+          <!-- Totals -->
+          <tr class="table-dark fw-bold">
+            <td colspan="2" class="text-end">TOTAL LIABILITIES</td>
+            <td class="text-end">{{ "{:,.2f}".format(total_liabilities) }}</td>
+            <td colspan="2" class="text-end">TOTAL ASSETS</td>
+            <td class="text-end">{{ "{:,.2f}".format(total_assets) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3 text-center no-print">
+    {% if total_assets == total_liabilities %}
+    <div class="alert alert-success">
+      <i class="bi bi-check-circle"></i> <strong>Balance Sheet Tallies!</strong> Assets = Liabilities
+    </div>
+    {% else %}
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle"></i> <strong>Imbalance Detected!</strong> Difference: ₹{{ "{:,.2f}".format(total_assets - total_liabilities) }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+/* Beautiful borders for Balance Sheet */
+.balance-sheet-table {
+  border: 3px solid #000 !important;
+}
+.balance-sheet-table thead th {
+  border: 2px solid #000 !important;
+  background-color: #f8f9fa !important;
+  font-weight: bold;
+}
+.balance-sheet-table tbody td {
+  border: 1px solid #666 !important;
+}
+.balance-sheet-table .table-secondary td {
+  border: 2px solid #000 !important;
+  background-color: #e9ecef !important;
+}
+.balance-sheet-table .table-dark td {
+  border: 3px solid #000 !important;
+}
+
+/* Clickable ledger links */
+.ledger-link {
+  color: #0d6efd;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ledger-link:hover {
+  text-decoration: underline;
+  color: #0a58ca;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .card { box-shadow: none !important; border: 3px solid #000 !important; }
+  table { page-break-inside: avoid; }
+  .balance-sheet-table { border: 3px solid #000 !important; }
+  .ledger-link { color: #000 !important; text-decoration: none !important; }
+  @page { margin: 0.5in; }
+  body { margin: 0; padding: 0; }
+}
+</style>
+
+<script>
+// Handle ledger link clicks
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.ledger-link').forEach(link => {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      const ledgerName = this.dataset.ledger;
+      alert('Opening ledger: ' + ledgerName + '\n\nThis will show all vouchers for this account.');
+      // TODO: Implement ledger view with vouchers
+      // window.location.href = '/reports/ledger?account=' + encodeURIComponent(ledgerName);
+    });
+  });
+});
+</script>
+{% endblock %}

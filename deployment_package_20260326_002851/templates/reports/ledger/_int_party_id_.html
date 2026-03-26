@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Ledger: {{ party.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📒 Party Ledger</h4>
+  <div>
+    <a href="{{ url_for('clients.view', pid=party.id) }}" class="btn btn-sm btn-outline-info">← View Party</a>
+    <a href="{{ url_for('reports.hub') }}" class="btn btn-sm btn-outline-secondary">← Dashboard</a>
+  </div>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-secondary text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <span><strong>{{ party.name }}</strong></span>
+      <span class="fs-6">{{ party.party_type }} • GSTIN: {{ party.gstin or '—' }}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if ledger_entries|length > 0 %}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>#</th><th>Date</th><th>Particulars</th>
+            <th class="text-end">Debit (₹)</th>
+            <th class="text-end">Credit (₹)</th>
+            <th class="text-end">Balance (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in ledger_entries %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ entry.date.strftime('%d-%m-%Y') }}</td>
+            <td>{{ entry.particulars }}</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(entry.debit) }}</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(entry.credit) }}</td>
+            <td class="text-end fw-bold text-{{ 'success' if entry.balance>=0 else 'danger' }}">
+              ₹{{ "{:,.2f}".format(entry.balance) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4">
+      <i class="bi bi-info-circle display-4 text-muted"></i>
+      <p class="text-muted">No transactions found for this party in FY {{ fy }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

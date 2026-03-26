@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260326_160410",
+  "database_backup": "erp.db",
+  "version": "1.0",
+  "features": [
+    "Utilities System (Backup/Restore/Reindex/Renumber)",
+    "Fixed Assets Schedule (Income Tax Act)",
+    "Horizontal Financial Reports",
+    "Default Chart of Accounts (119 accounts)",
+    "Company Switching",
+    "Beautiful UI with borders"
+  ]
+}

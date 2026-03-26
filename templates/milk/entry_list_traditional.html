@@ -2,9 +2,24 @@
 {% block title %}Milk Entries{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold">🥛 Milk Transaction Register (Traditional)</h4>
+  <h4 class="fw-bold">🥛 Traditional Milk Entry List</h4>
   <div>
-    <a href="{{ url_for('milk.add_entry') }}" class="btn btn-sm btn-success">+ New Entry</a>
+    <div class="input-group" style="width: 300px;">
+      <select id="party_filter" class="form-select form-select-sm" onchange="filterByParty()">
+        <option value="">All Parties</option>
+        {% for party in parties %}
+        <option value="{{ party.id }}">{{ party.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearFilter()">
+        <i class="fas fa-times"></i> Clear
+      </button>
+    </div>
+  </div>
+  <div>
+    <a href="{{ url_for('milk.add_entry') }}" class="btn btn-primary">
+      <i class="fas fa-plus"></i> Add Milk Entry
+    </a>
     <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">📊 Summary</a>
   </div>
 </div>
@@ -20,25 +35,25 @@
   <div class="col-md-2">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Avg FAT%</div>
-      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_qty / (total_qty / (sum(t.fat for t in txns) / len(txns) if txns else 0)) if txns else 0) }}</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(avg_fat) }}</div>
     </div>
   </div>
   <div class="col-md-2">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Avg SNF%</div>
-      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.snf for t in txns) / len(txns) if txns else 0) }}</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(avg_snf) }}</div>
     </div>
   </div>
   <div class="col-md-2">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Total BF Kgs</div>
-      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.qty_liters * t.fat / 100 for t in txns)) }}</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_bf_kgs) }}</div>
     </div>
   </div>
   <div class="col-md-2">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Total SNF Kgs</div>
-      <div class="fw-bold fs-5">{{ "{:,.2f}".format(sum(t.qty_liters * t.snf / 100 for t in txns)) }}</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_snf_kgs) }}</div>
     </div>
   </div>
   <div class="col-md-2">
@@ -54,6 +69,8 @@
     <table class="table table-hover table-sm align-middle mb-0">
       <thead class="table-dark">
         <tr>
+          <th>Actions</th>
+          <th>Bill No.</th>
           <th>Date</th>
           <th>Shift</th>
           <th>Type</th>
@@ -70,22 +87,58 @@
       </thead>
       <tbody>
         {% for t in txns %}
-        <tr>
+        <tr class="clickable-row" data-txn-id="{{ t.id }}" style="cursor: pointer;">
+          <td onclick="event.stopPropagation();">
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('milk.edit_entry', txn_id=t.id) }}" class="btn btn-outline-primary btn-sm" title="Edit Entry">
+                <i class="fas fa-edit"></i>
+              </a>
+              {% if t.bill_id %}
+              <a href="{{ url_for('milk.view_invoice', bill_id=t.bill_id) }}" class="btn btn-outline-success btn-sm" title="View Invoice">
+                <i class="fas fa-file-invoice"></i>
+              </a>
+              {% endif %}
+              <button onclick="event.preventDefault(); event.stopPropagation(); deleteEntry({{ t.id }})" class="btn btn-outline-danger btn-sm" title="Delete Entry">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+          <td>
+            {% if t.bill_id %}
+            <a href="#" class="text-decoration-none">
+              <span class="badge bg-success">{{ t.bill.bill_no }}</span>
+            </a>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
           <td>{{ t.txn_date.strftime('%d-%b-%Y') }}</td>
           <td><span class="badge {{ 'bg-warning text-dark' if t.shift=='Evening' else 'bg-info' }}">{{ t.shift }}</span></td>
           <td><span class="badge {{ 'bg-success' if t.txn_type=='Sale' else 'bg-primary' }}">{{ t.txn_type }}</span></td>
           <td>{{ t.party.name if t.party else '—' }}</td>
-          <td class="text-end">{{ t.qty_liters }}</td>
-          <td class="text-center">{{ t.fat }}%</td>
-          <td class="text-center">{{ t.snf }}%</td>
-          <td class="text-end">{{ "{:,.3f}".format(t.qty_liters * t.fat / 100) }}</td>
-          <td class="text-end">{{ "{:,.3f}".format(t.qty_liters * t.snf / 100) }}</td>
-          <td class="text-center">{{ "{:,.2f}".format((t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0) }}</td>
-          <td class="text-end">₹{{ "{:,.4f}".format(t.rate) }}</td>
-          <td class="text-end fw-bold">₹{{ "{:,.2f}".format(t.amount) }}</td>
+          <td class="text-end editable-cell" data-field="qty_liters" data-id="{{ t.id }}">
+            <span class="display-value">{{ t.qty_liters }}</span>
+            <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.qty_liters }}" style="display: none;">
+          </td>
+          <td class="text-center editable-cell" data-field="fat" data-id="{{ t.id }}">
+            <span class="display-value">{{ t.fat }}%</span>
+            <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.fat }}" style="display: none;">
+          </td>
+          <td class="text-center editable-cell" data-field="snf" data-id="{{ t.id }}">
+            <span class="display-value">{{ t.snf }}%</span>
+            <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.snf }}" style="display: none;">
+          </td>
+          <td class="text-end" data-bf-kgs="{{ t.qty_liters * t.fat / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.fat / 100) }}</td>
+          <td class="text-end" data-snf-kgs="{{ t.qty_liters * t.snf / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.snf / 100) }}</td>
+          <td class="text-center" data-ratio="{{ (t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0 }}">{{ "{:,.2f}".format((t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0) }}</td>
+          <td class="text-end editable-cell" data-field="rate" data-id="{{ t.id }}">
+            <span class="display-value">₹{{ "{:,.4f}".format(t.rate) }}</span>
+            <input type="number" class="form-control form-control-sm edit-input" step="0.0001" value="{{ t.rate }}" style="display: none;">
+          </td>
+          <td class="text-end fw-bold" data-amount="{{ t.amount }}">₹{{ "{:,.2f}".format(t.amount) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="12" class="text-center text-muted py-4">
+        <tr><td colspan="13" class="text-center text-muted py-4">
           No entries yet. <a href="{{ url_for('milk.add_entry') }}">Add first entry!</a>
         </td></tr>
         {% endfor %}
@@ -93,4 +146,241 @@
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterByParty() {
+  const partyId = document.getElementById('party_filter').value;
+  const rows = document.querySelectorAll('tbody tr');
+  
+  rows.forEach(row => {
+    if (partyId === '') {
+      row.style.display = '';
+    } else {
+      // Check if this row belongs to the selected party
+      const partyCell = row.querySelector('td:nth-child(6)'); // Party column
+      if (partyCell) {
+        const partyName = partyCell.textContent.trim();
+        // Get the selected party name from the dropdown
+        const selectedOption = document.querySelector(`#party_filter option[value="${partyId}"]`);
+        const selectedPartyName = selectedOption ? selectedOption.textContent.trim() : '';
+        
+        if (partyName === selectedPartyName) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      }
+    }
+  });
+}
+
+function clearFilter() {
+  document.getElementById('party_filter').value = '';
+  filterByParty();
+}
+
+// Add party data attributes to rows for easier filtering
+document.addEventListener('DOMContentLoaded', function() {
+  const rows = document.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const partyCell = row.querySelector('td:nth-child(6)'); // Party column
+    if (partyCell) {
+      const partyName = partyCell.textContent.trim();
+      // Find the corresponding party ID
+      const partyOption = Array.from(document.querySelectorAll('#party_filter option'))
+        .find(option => option.textContent.trim() === partyName);
+      if (partyOption) {
+        row.setAttribute('data-party-id', partyOption.value);
+      }
+    }
+  });
+});
+
+// Improved filtering function
+function filterByParty() {
+  const partyId = document.getElementById('party_filter').value;
+  const rows = document.querySelectorAll('tbody tr[data-party-id]');
+  
+  rows.forEach(row => {
+    if (partyId === '' || row.getAttribute('data-party-id') === partyId) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+// Inline editing functionality
+document.addEventListener('DOMContentLoaded', function() {
+  // Add click event to editable cells
+  document.querySelectorAll('.editable-cell').forEach(cell => {
+    cell.addEventListener('click', function() {
+      makeEditable(this);
+    });
+  });
+  
+  // Add click event to clickable rows
+  document.querySelectorAll('.clickable-row').forEach(row => {
+    row.addEventListener('click', function() {
+      const txnId = this.dataset.txnId;
+      editMilkEntry(txnId);
+    });
+  });
+});
+
+function makeEditable(cell) {
+  // If already editing, don't do anything
+  if (cell.classList.contains('editing')) return;
+  
+  const displayValue = cell.querySelector('.display-value');
+  const editInput = cell.querySelector('.edit-input');
+  
+  // Hide display, show input
+  displayValue.style.display = 'none';
+  editInput.style.display = 'block';
+  editInput.focus();
+  editInput.select();
+  
+  cell.classList.add('editing');
+  
+  // Add event listeners for save/cancel
+  editInput.addEventListener('blur', function() {
+    saveEdit(cell);
+  });
+  
+  editInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      saveEdit(cell);
+    } else if (e.key === 'Escape') {
+      cancelEdit(cell);
+    }
+  });
+}
+
+function saveEdit(cell) {
+  const displayValue = cell.querySelector('.display-value');
+  const editInput = cell.querySelector('.edit-input');
+  const field = cell.dataset.field;
+  const id = cell.dataset.id;
+  const newValue = editInput.value;
+  
+  // Update display
+  if (field === 'rate') {
+    displayValue.textContent = '₹' + parseFloat(newValue).toFixed(4);
+  } else if (field === 'fat' || field === 'snf') {
+    displayValue.textContent = parseFloat(newValue).toFixed(2) + '%';
+  } else {
+    displayValue.textContent = newValue;
+  }
+  
+  // Show display, hide input
+  displayValue.style.display = 'block';
+  editInput.style.display = 'none';
+  cell.classList.remove('editing');
+  
+  // Save to backend
+  updateMilkEntry(id, field, newValue);
+  
+  // Recalculate dependent values
+  recalculateRow(cell.closest('tr'));
+}
+
+function cancelEdit(cell) {
+  const displayValue = cell.querySelector('.display-value');
+  const editInput = cell.querySelector('.edit-input');
+  
+  // Reset to original value
+  editInput.value = displayValue.textContent.replace('₹', '').replace('%', '');
+  
+  // Show display, hide input
+  displayValue.style.display = 'block';
+  editInput.style.display = 'none';
+  cell.classList.remove('editing');
+}
+
+function updateMilkEntry(id, field, value) {
+  fetch(`/milk/entry/${id}/update-field`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      field: field,
+      value: value
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      console.log('Updated successfully');
+    } else {
+      console.error('Update failed:', data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+function editMilkEntry(txnId) {
+  window.location.href = `/milk/entry/${txnId}/edit`;
+}
+
+function recalculateRow(row) {
+  // Get the values
+  const qty = parseFloat(row.querySelector('[data-field="qty_liters"] .edit-input').value) || 0;
+  const fat = parseFloat(row.querySelector('[data-field="fat"] .edit-input').value) || 0;
+  const snf = parseFloat(row.querySelector('[data-field="snf"] .edit-input').value) || 0;
+  const rate = parseFloat(row.querySelector('[data-field="rate"] .edit-input').value) || 0;
+  
+  // Recalculate BF Kgs
+  const bfKgs = qty * fat / 100;
+  const bfKgsCell = row.querySelector('[data-bf-kgs]');
+  bfKgsCell.textContent = bfKgs.toFixed(3);
+  bfKgsCell.dataset.bfKgs = bfKgs;
+  
+  // Recalculate SNF Kgs
+  const snfKgs = qty * snf / 100;
+  const snfKgsCell = row.querySelector('[data-snf-kgs]');
+  snfKgsCell.textContent = snfKgs.toFixed(3);
+  snfKgsCell.dataset.snfKgs = snfKgs;
+  
+  // Recalculate Ratio
+  const ratio = fat > 0 ? snfKgs / bfKgs : 0;
+  const ratioCell = row.querySelector('[data-ratio]');
+  ratioCell.textContent = ratio.toFixed(2);
+  ratioCell.dataset.ratio = ratio;
+  
+  // Recalculate Amount
+  const amount = qty * rate;
+  const amountCell = row.querySelector('[data-amount]');
+  amountCell.textContent = '₹' + amount.toFixed(2);
+  amountCell.dataset.amount = amount;
+}
+
+// Delete milk entry
+function deleteEntry(txnId) {
+  if (confirm('Are you sure you want to delete this milk entry? This action cannot be undone.')) {
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/milk/entry/${txnId}/delete`;
+    
+    // Add CSRF token if available
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (csrfToken) {
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrf_token';
+      csrfInput.value = csrfToken.getAttribute('content');
+      form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
 {% endblock %}

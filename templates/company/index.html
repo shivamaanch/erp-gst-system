@@ -5,6 +5,44 @@
   <h4 class="fw-bold">🏢 Company Settings</h4>
   <a href="{{ url_for('company.edit') }}" class="btn btn-sm btn-warning">✏️ Edit Profile</a>
 </div>
+
+<!-- Company Switcher -->
+{% if all_companies and all_companies|length > 1 %}
+<div class="card border-primary shadow-sm mb-3">
+  <div class="card-header bg-primary text-white fw-bold">
+    <i class="bi bi-building"></i> Switch Company
+  </div>
+  <div class="card-body">
+    <p class="mb-2">Select a company to load its data:</p>
+    <div class="row g-2">
+      {% for comp in all_companies %}
+      <div class="col-md-4">
+        {% if comp.id == company.id %}
+        <div class="card border-success">
+          <div class="card-body p-2 text-center">
+            <h6 class="mb-1">{{ comp.name }}</h6>
+            <span class="badge bg-success">Current</span>
+            <div class="small text-muted">{{ comp.business_type }}</div>
+          </div>
+        </div>
+        {% else %}
+        <a href="{{ url_for('company.switch_company', company_id=comp.id) }}" class="text-decoration-none">
+          <div class="card border-secondary h-100">
+            <div class="card-body p-2 text-center">
+              <h6 class="mb-1 text-dark">{{ comp.name }}</h6>
+              <span class="badge bg-secondary">Load</span>
+              <div class="small text-muted">{{ comp.business_type }}</div>
+            </div>
+          </div>
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
   <div class="col-md-5">
     <div class="card border-0 shadow-sm h-100">

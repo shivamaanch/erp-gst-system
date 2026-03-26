@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Backup Database{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h4 class="mb-4"><i class="bi bi-download text-primary"></i> Backup Database</h4>
+  
+  <div class="alert alert-info">
+    <h6><i class="bi bi-info-circle"></i> Database Backup</h6>
+    <p class="mb-0">Create a complete backup of your ERP database. The backup file will be downloaded to your computer and also saved in the backups folder on the server.</p>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5>What will be backed up:</h5>
+      <ul>
+        <li>All companies and financial years</li>
+        <li>All transactions (Sales, Purchase, Milk, Journal)</li>
+        <li>All masters (Parties, Items, Accounts)</li>
+        <li>All settings and configurations</li>
+        <li>Complete database structure</li>
+      </ul>
+
+      <div class="alert alert-success">
+        <h6><i class="bi bi-check-circle"></i> Backup Details</h6>
+        <ul class="mb-0">
+          <li><strong>Format:</strong> SQLite database file (.db)</li>
+          <li><strong>Filename:</strong> erp_backup_YYYYMMDD_HHMMSS.db</li>
+          <li><strong>Location:</strong> Downloaded to your computer + saved in /backups folder</li>
+          <li><strong>Size:</strong> Varies based on data (typically 1-50 MB)</li>
+        </ul>
+      </div>
+
+      <form method="POST">
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-download"></i> Create & Download Backup
+          </button>
+          <a href="{{ url_for('utilities.index') }}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-warning text-dark">
+      <h5 class="mb-0">Best Practices</h5>
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li><strong>Regular Backups:</strong> Create backups daily or before major operations</li>
+        <li><strong>Safe Storage:</strong> Store backups in multiple locations (computer, cloud, external drive)</li>
+        <li><strong>Test Restores:</strong> Periodically test restoring backups to ensure they work</li>
+        <li><strong>Before Updates:</strong> Always backup before running utilities or updates</li>
+        <li><strong>Keep Multiple:</strong> Maintain at least 3-5 recent backups</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Manage User Companies{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h4 class="mb-4">
+    <i class="bi bi-building"></i> Manage Companies for {{ user.username }}
+  </h4>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Assigned Companies</h5>
+    </div>
+    <div class="card-body">
+      {% if user_companies %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Company Name</th>
+              <th>Business Type</th>
+              <th>GSTIN</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for uc in user_companies %}
+            <tr>
+              <td>{{ uc.company.name }}</td>
+              <td><span class="badge bg-info">{{ uc.company.business_type }}</span></td>
+              <td>{{ uc.company.gstin or 'N/A' }}</td>
+              <td><span class="badge bg-success">Active</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted">No companies assigned to this user.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0">Add Company Access</h5>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('users.update_companies', uid=user.id) }}">
+        <div class="row">
+          <div class="col-md-8">
+            <label class="form-label fw-bold">Select Company</label>
+            <select name="company_ids" class="form-select" multiple size="5" required>
+              {% for company in all_companies %}
+              {% set is_assigned = namespace(value=false) %}
+              {% for uc in user_companies %}
+                {% if uc.company_id == company.id %}
+                  {% set is_assigned.value = true %}
+                {% endif %}
+              {% endfor %}
+              <option value="{{ company.id }}" {% if is_assigned.value %}selected{% endif %}>
+                {{ company.name }} ({{ company.business_type }})
+              </option>
+              {% endfor %}
+            </select>
+            <small class="text-muted">Hold Ctrl/Cmd to select multiple companies</small>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-success w-100">
+              <i class="bi bi-save"></i> Update Access
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <a href="{{ url_for('users.index') }}" class="btn btn-secondary">
+      <i class="bi bi-arrow-left"></i> Back to Users
+    </a>
+  </div>
+</div>
+{% endblock %}

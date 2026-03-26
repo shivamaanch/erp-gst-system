@@ -45,7 +45,7 @@
           <td><strong>{{ item.name }}</strong></td>
           <td><span class="badge bg-secondary">{{ item.hsn_code or '-' }}</span></td>
           <td>{{ item.unit or 'Nos' }}</td>
-          <td>{{ item.gst_rate or 18 }}%</td>
+          <td>{{ item.gst_rate or 0 }}%</td>
           <td>₹{{ "%.2f"|format(item.purchase_rate or 0) }}</td>
           <td>₹{{ "%.2f"|format(item.sale_rate or 0) }}</td>
           <td>

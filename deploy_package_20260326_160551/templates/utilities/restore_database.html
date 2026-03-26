@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Restore Database{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h4 class="mb-4"><i class="bi bi-upload text-danger"></i> Restore Database</h4>
+  
+  <div class="alert alert-danger">
+    <h6><i class="bi bi-exclamation-triangle"></i> Critical Warning</h6>
+    <p class="mb-0"><strong>This will replace your entire database!</strong> All current data will be lost and replaced with the backup file. Make sure you have a recent backup before proceeding.</p>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5>Restore Process:</h5>
+      <ol>
+        <li>Your current database will be automatically backed up before restore</li>
+        <li>The uploaded backup file will replace the current database</li>
+        <li>The application will use the restored data immediately</li>
+        <li>You may need to log in again after restore</li>
+      </ol>
+
+      <form method="POST" enctype="multipart/form-data" onsubmit="return confirm('⚠️ WARNING: This will replace ALL current data with the backup file. Are you absolutely sure you want to continue?');">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Select Backup File (.db)</label>
+          <input type="file" name="backup_file" class="form-control" accept=".db" required>
+          <small class="text-muted">Only .db files are accepted. File should be a valid ERP database backup.</small>
+        </div>
+
+        <div class="alert alert-info">
+          <h6><i class="bi bi-shield-check"></i> Safety Features</h6>
+          <ul class="mb-0">
+            <li>Current database will be backed up before restore</li>
+            <li>Backup saved as: erp_before_restore_YYYYMMDD_HHMMSS.db</li>
+            <li>You can restore the previous version if needed</li>
+            <li>File validation ensures only .db files are accepted</li>
+          </ul>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-danger btn-lg">
+            <i class="bi bi-upload"></i> Restore Database
+          </button>
+          <a href="{{ url_for('utilities.index') }}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-warning text-dark">
+      <h5 class="mb-0">Important Notes</h5>
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li><strong>Backup First:</strong> Always create a backup before restoring</li>
+        <li><strong>Valid File:</strong> Ensure the backup file is a valid ERP database</li>
+        <li><strong>File Size:</strong> Large files may take time to upload</li>
+        <li><strong>Re-login:</strong> You may need to log in again after restore</li>
+        <li><strong>Test Environment:</strong> Test restores in a test environment first if possible</li>
+        <li><strong>Data Loss:</strong> All current data will be replaced - this cannot be undone</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-info text-white">
+      <h5 class="mb-0">When to Restore</h5>
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li>After accidental data deletion</li>
+        <li>To recover from data corruption</li>
+        <li>To revert changes made by utilities</li>
+        <li>To restore to a previous state</li>
+        <li>To migrate data from another system</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

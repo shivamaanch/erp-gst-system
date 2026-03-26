@@ -10,9 +10,14 @@
           {% for p in parties %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-2">
         <label>Date</label>
         <input type="date" name="invoice_date" class="form-control" value="{{today}}" required>
+      </div>
+      <div class="col-md-2">
+        <label>Invoice No.</label>
+        <input type="text" name="bill_no" class="form-control" placeholder="Auto-generated if blank">
+        <small class="text-muted">Leave blank for auto-number</small>
       </div>
       <div class="col-md-4">
         <label>Item Name</label>

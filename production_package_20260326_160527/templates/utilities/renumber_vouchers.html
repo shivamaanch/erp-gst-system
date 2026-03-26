@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Renumber Vouchers{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h4 class="mb-4"><i class="bi bi-123 text-success"></i> Renumber Vouchers</h4>
+  
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="POST">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Voucher Type</label>
+            <select name="voucher_type" class="form-select" required>
+              <option value="">-- Select Voucher Type --</option>
+              <option value="Sales">Sales Invoices (SV)</option>
+              <option value="Purchase">Purchase Invoices (PV)</option>
+              <option value="Milk">Milk Entries (MV)</option>
+              <option value="Journal">Journal Entries (JV)</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Starting Number</label>
+            <input type="number" name="start_number" class="form-control" value="1" min="1" required>
+            <small class="text-muted">Vouchers will be numbered starting from this number</small>
+          </div>
+        </div>
+
+        <div class="alert alert-info">
+          <h6><i class="bi bi-info-circle"></i> How it works:</h6>
+          <ul class="mb-0">
+            <li>Select the voucher type you want to renumber</li>
+            <li>Set the starting number (default is 1)</li>
+            <li>All vouchers of that type will be renumbered sequentially</li>
+            <li>Numbering is based on transaction date (oldest first)</li>
+          </ul>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-123"></i> Renumber Vouchers
+          </button>
+          <a href="{{ url_for('utilities.index') }}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-light">
+      <h5 class="mb-0">Examples</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Start Number</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Sales</td>
+            <td>1</td>
+            <td>SV/{{ session.get('fin_year') }}/0001, 0002, 0003...</td>
+          </tr>
+          <tr>
+            <td>Purchase</td>
+            <td>100</td>
+            <td>PV/{{ session.get('fin_year') }}/0100, 0101, 0102...</td>
+          </tr>
+          <tr>
+            <td>Milk</td>
+            <td>1</td>
+            <td>MV/{{ session.get('fin_year') }}/0001, 0002, 0003...</td>
+          </tr>
+          <tr>
+            <td>Journal</td>
+            <td>1</td>
+            <td>JV/{{ session.get('fin_year') }}/0001, 0002, 0003...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

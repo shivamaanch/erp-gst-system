@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Utilities Dashboard{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h4 class="mb-4"><i class="bi bi-tools text-primary"></i> Utilities Dashboard</h4>
+  
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card border-primary">
+        <div class="card-body text-center">
+          <h5 class="card-title">Total Bills</h5>
+          <h2 class="text-primary">{{ stats.bills }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-success">
+        <div class="card-body text-center">
+          <h5 class="card-title">Milk Entries</h5>
+          <h2 class="text-success">{{ stats.milk_entries }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-info">
+        <div class="card-body text-center">
+          <h5 class="card-title">Journal Entries</h5>
+          <h2 class="text-info">{{ stats.journals }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-warning">
+        <div class="card-body text-center">
+          <h5 class="card-title">Missing Vouchers</h5>
+          <h2 class="text-warning">{{ stats.bills_no_voucher + stats.milk_no_voucher }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="bi bi-download"></i> Backup Database</h5>
+        </div>
+        <div class="card-body">
+          <p>Create a complete backup of your database for safekeeping.</p>
+          <ul class="small">
+            <li>Full database backup</li>
+            <li>Download to your computer</li>
+            <li>Saved in backups folder</li>
+            <li>Timestamped filename</li>
+          </ul>
+          <a href="{{ url_for('utilities.backup_database') }}" class="btn btn-success w-100">
+            <i class="bi bi-download"></i> Backup Database
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-danger text-white">
+          <h5 class="mb-0"><i class="bi bi-upload"></i> Restore Database</h5>
+        </div>
+        <div class="card-body">
+          <p>Restore database from a previous backup file.</p>
+          <ul class="small">
+            <li>Upload backup file</li>
+            <li>Auto-backup current data</li>
+            <li>Complete restoration</li>
+            <li>Safety features included</li>
+          </ul>
+          <a href="{{ url_for('utilities.restore_database') }}" class="btn btn-danger w-100">
+            <i class="bi bi-upload"></i> Restore Database
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Reindex Vouchers</h5>
+        </div>
+        <div class="card-body">
+          <p>Regenerate all voucher numbers in sequential order based on date.</p>
+          <ul class="small">
+            <li>Sales: SV/2025-26/0001, 0002...</li>
+            <li>Purchase: PV/2025-26/0001, 0002...</li>
+            <li>Milk: MV/2025-26/0001, 0002...</li>
+            <li>Journal: JV/2025-26/0001, 0002...</li>
+          </ul>
+          <a href="{{ url_for('utilities.reindex_vouchers') }}" class="btn btn-primary w-100">
+            <i class="bi bi-arrow-repeat"></i> Reindex All Vouchers
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="bi bi-123"></i> Renumber Vouchers</h5>
+        </div>
+        <div class="card-body">
+          <p>Renumber specific voucher type starting from a custom number.</p>
+          <ul class="small">
+            <li>Choose voucher type</li>
+            <li>Set starting number</li>
+            <li>Sequential renumbering</li>
+          </ul>
+          <a href="{{ url_for('utilities.renumber_vouchers') }}" class="btn btn-success w-100">
+            <i class="bi bi-123"></i> Renumber Vouchers
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0"><i class="bi bi-wrench"></i> Fix Data Issues</h5>
+        </div>
+        <div class="card-body">
+          <p>Fix common data problems and inconsistencies.</p>
+          <ul class="small">
+            <li>Add missing voucher numbers</li>
+            <li>Fix duplicate vouchers</li>
+            <li>Validate data integrity</li>
+          </ul>
+          <a href="{{ url_for('utilities.fix_data') }}" class="btn btn-warning w-100">
+            <i class="bi bi-wrench"></i> Fix Data Issues
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info mt-4">
+    <h6><i class="bi bi-info-circle"></i> Important Notes</h6>
+    <ul class="mb-0">
+      <li><strong>Backup First:</strong> Always backup your data before running utilities</li>
+      <li><strong>Reindexing:</strong> Will regenerate ALL voucher numbers - use carefully</li>
+      <li><strong>Renumbering:</strong> Allows custom starting number for specific voucher types</li>
+      <li><strong>Data Fixes:</strong> Automatically fixes common issues like missing vouchers</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

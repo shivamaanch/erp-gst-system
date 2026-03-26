@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Chart of Accounts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 Chart of Accounts</h4>
+  <a href="{{ url_for('accounts.add') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> Add Account
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-2">
+      <div class="col-md-4">
+        <select name="group" class="form-select" onchange="this.form.submit()">
+          <option value="">All Groups</option>
+          {% for grp in account_groups %}
+          <option value="{{ grp }}" {% if group_filter == grp %}selected{% endif %}>{{ grp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <input type="text" name="q" class="form-control" placeholder="Search accounts..." value="{{ search }}">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="bi bi-search"></i> Search
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% for group_name, accounts in grouped_accounts.items() %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-primary text-white">
+    <h6 class="mb-0"><i class="bi bi-folder"></i> {{ group_name }} ({{ accounts|length }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Account Name</th>
+          <th>Type</th>
+          <th>Opening Dr</th>
+          <th>Opening Cr</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acc in accounts %}
+        <tr>
+          <td><strong>{{ acc.name }}</strong></td>
+          <td><span class="badge bg-secondary">{{ acc.account_type or 'General' }}</span></td>
+          <td>₹{{ "%.2f"|format(acc.opening_dr or 0) }}</td>
+          <td>₹{{ "%.2f"|format(acc.opening_cr or 0) }}</td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('accounts.edit', acc_id=acc.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="POST" action="{{ url_for('accounts.delete', acc_id=acc.id) }}" style="display:inline;"
+                    onsubmit="return confirm('Deactivate this account?')">
+                <button type="submit" class="btn btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> No accounts found. Click "Add Account" to create one.
+</div>
+{% endfor %}
+{% endblock %}
