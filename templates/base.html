@@ -35,6 +35,22 @@
     <a href="{{ url_for('reports.hub') }}" class="nav-link {{ 'active' if request.endpoint=='reports.hub' }}">
       <i class="bi bi-speedometer2"></i> Dashboard</a>
 
+    <div class="sidebar-section">Company</div>
+    {% if current_user.is_authenticated and current_user.accessible_companies.count() > 1 %}
+    <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
+      <i class="bi bi-building"></i> Switch Company
+    </a>
+    {% for company in current_user.accessible_companies %}
+    <a href="{{ url_for('auth.switch_company', company_id=company.id) }}" class="nav-link {{ 'active' if company.id == session.get('company_id') }}">
+      <i class="bi bi-{{ 'check-circle-fill' if company.id == session.get('company_id') else 'circle' }}"></i> {{ company.name }}
+    </a>
+    {% endfor %}
+    {% else %}
+    <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
+      <i class="bi bi-building"></i> Company
+    </a>
+    {% endif %}
+
     <div class="sidebar-section">Transactions</div>
     <a href="{{ url_for('clients.index') }}" class="nav-link {{ 'active' if 'clients' in (request.endpoint or '') }}">
       <i class="bi bi-people"></i> Parties / Clients</a>
