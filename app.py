@@ -592,56 +592,9 @@ def create_app():
     # TEMPORARY: Disable login requirement for development
     app.config["DISABLE_LOGIN"] = os.getenv("DISABLE_LOGIN", "true").lower() == "true"
     
-    # Initialize database immediately for migration
+    # Initialize database
     from extensions import db
     db.init_app(app)
-    
-    # Run migration IMMEDIATELY after database init
-    with app.app_context():
-        try:
-            from sqlalchemy import text
-            print("Running immediate database migration...")
-            
-            # Add voucher_no to bills table
-            try:
-                db.session.execute(text('ALTER TABLE bills ADD COLUMN voucher_no VARCHAR(50)'))
-                db.session.commit()
-                print("Added voucher_no to bills table")
-            except Exception as e:
-                if "already exists" in str(e) or "duplicate column" in str(e):
-                    print("voucher_no already exists in bills table")
-                else:
-                    print(f"Error adding voucher_no to bills: {e}")
-                    db.session.rollback()
-            
-            # Add voucher_no to milk_transactions table
-            try:
-                db.session.execute(text('ALTER TABLE milk_transactions ADD COLUMN voucher_no VARCHAR(50)'))
-                db.session.commit()
-                print("Added voucher_no to milk_transactions table")
-            except Exception as e:
-                if "already exists" in str(e) or "duplicate column" in str(e):
-                    print("voucher_no already exists in milk_transactions table")
-                else:
-                    print(f"Error adding voucher_no to milk_transactions: {e}")
-                    db.session.rollback()
-            
-            # Add missing columns to gstr2b_records table
-            try:
-                db.session.execute(text('ALTER TABLE gstr2b_records ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
-                db.session.commit()
-                print("Added created_at to gstr2b_records table")
-            except Exception as e:
-                if "already exists" in str(e) or "duplicate column" in str(e):
-                    print("created_at already exists in gstr2b_records table")
-                else:
-                    print(f"Error adding created_at to gstr2b_records: {e}")
-                    db.session.rollback()
-            
-            print("Database migration completed successfully!")
-            
-        except Exception as e:
-            print(f"Database migration failed: {e}")
     
     login_manager.init_app(app)
     migrate.init_app(app, db)
