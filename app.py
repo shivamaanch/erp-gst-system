@@ -715,14 +715,24 @@ def create_app():
     # Context processor to make company info available in all templates
     @app.context_processor
     def inject_company_info():
-        from models import Company
+        from models import Company, FinancialYear
         company_id = session.get("company_id")
         company_name = "No Company"
         if company_id:
             company = Company.query.get(company_id)
             if company:
                 company_name = company.name
-        return dict(current_company_name=company_name)
+        
+        # Helper function to get financial years for company
+        def get_financial_years_for_company(cid):
+            if cid:
+                return FinancialYear.query.filter_by(company_id=cid).order_by(FinancialYear.year_name.desc()).all()
+            return []
+        
+        return dict(
+            current_company_name=company_name,
+            get_financial_years_for_company=get_financial_years_for_company
+        )
 
     with app.app_context():
         try:

@@ -123,6 +123,29 @@ def switch_company(company_id):
     flash(f"Switched to {company.name}", "success")
     return redirect(url_for("reports.hub"))
 
+@auth_bp.route("/switch-financial-year/<string:fin_year>")
+@login_required
+def switch_financial_year(fin_year):
+    user = current_user
+    company_id = session.get("company_id")
+    
+    if not company_id:
+        flash("Please select a company first!", "warning")
+        return redirect(url_for("reports.hub"))
+    
+    # Check if financial year exists for this company
+    fy = FinancialYear.query.filter_by(company_id=company_id, year_name=fin_year).first()
+    if not fy:
+        flash(f"Financial year {fin_year} not found!", "danger")
+        return redirect(url_for("reports.hub"))
+    
+    # Update session
+    old_fin_year = session.get("fin_year")
+    session["fin_year"] = fin_year
+    
+    flash(f"Switched to Financial Year: {fin_year}", "success")
+    return redirect(url_for("reports.hub"))
+
 from extensions import login_manager
 @login_manager.user_loader
 def load_user(user_id):
