@@ -3,6 +3,7 @@ from flask_login import login_required
 from extensions import db
 from models import MilkRateChart, MilkTransaction, Party, Bill, BillItem
 from datetime import date, datetime
+from sqlalchemy import text
 
 milk_bp = Blueprint("milk", __name__)
 
@@ -69,19 +70,33 @@ def entry_list():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
-    # Use only raw SQL query to avoid ALL SQLAlchemy ORM issues
-    from sqlalchemy import text
-    sql = """
-    SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
-           t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-           t.bill_id, p.name as party_name, b.bill_no
-    FROM milk_transactions t
-    LEFT JOIN parties p ON t.party_id = p.id
-    LEFT JOIN bills b ON t.bill_id = b.id
-    WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
-    ORDER BY t.txn_date DESC 
-    LIMIT 200
-    """
+    # Check if bill_id column exists in milk_transactions
+    try:
+        db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
+        # If bill_id exists, use the full query
+        sql = """
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.bill_id, p.name as party_name, b.bill_no
+        FROM milk_transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN bills b ON t.bill_id = b.id
+        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        ORDER BY t.txn_date DESC 
+        LIMIT 200
+        """
+    except Exception:
+        # If bill_id doesn't exist, use query without it
+        sql = """
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               NULL as bill_id, p.name as party_name, NULL as bill_no
+        FROM milk_transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        ORDER BY t.txn_date DESC 
+        LIMIT 200
+        """
     result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
     txns = []
     for row in result:
@@ -295,7 +310,10 @@ def add_entry():
             print(f"DEBUG: Creating bill item...")
             db.session.add(item)
             print(f"DEBUG: Setting txn.bill_id = {bill.id}")
-            txn.bill_id = bill.id
+            try:
+                txn.bill_id = bill.id
+            except Exception as e:
+                print(f"WARNING: Could not set bill_id (column may not exist): {e}")
             print(f"DEBUG: Invoice creation completed")
             db.session.commit()
             msg=f"Saved {qty}L @ Rs{rate}/L = Rs{amount}"
