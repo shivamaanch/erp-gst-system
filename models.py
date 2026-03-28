@@ -16,6 +16,7 @@ class Company(db.Model):
     phone = db.Column(db.String(15))
     email = db.Column(db.String(100))
     logo_path = db.Column(db.String(300))
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Multi-company relationships
