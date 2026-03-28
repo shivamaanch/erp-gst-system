@@ -655,6 +655,7 @@ def create_app():
     from modules.gst_module     import gst_bp
     from modules.tds_module     import tds_bp
     from modules.cash_book      import cash_book_bp
+    from modules.day_book       import day_book_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(utilities_bp)
@@ -678,16 +679,17 @@ def create_app():
     app.register_blueprint(milk_bp, url_prefix="/milk")
     app.register_blueprint(milk_reports_bp, url_prefix="/milk")
     app.register_blueprint(parties_bp, url_prefix="/parties")
-    app.register_blueprint(psi_bp)
-    app.register_blueprint(banking_bp)
     app.register_blueprint(validator_bp)
+    app.register_blueprint(gst_bp)
+    app.register_blueprint(tds_bp)
     app.register_blueprint(cash_book_bp, url_prefix="/cash-book")
+    app.register_blueprint(day_book_bp, url_prefix="/day-book")
     
     # Context processor to make company info available in all templates
     @app.context_processor
     def inject_company_info():
         from models import Company, FinancialYear
-        company_id = session.get("company_id")
+# ... (rest of the code remains the same)
         company_name = "No Company"
         if company_id:
             company = db.session.get(Company, company_id)

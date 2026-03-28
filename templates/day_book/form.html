@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if entry else 'Add' }} Day Book Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ 'Edit' if entry else 'Add' }} Day Book Entry</h4>
+  <a href="{{ url_for('day_book.index') }}" class="btn btn-outline-secondary">
+    ← Back to Day Book
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Voucher No</label>
+          <input type="text" class="form-control" value="{{ next_voucher }}" readonly>
+          <small class="text-muted">Auto-generated voucher number</small>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Transaction Date *</label>
+          <input type="date" name="transaction_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Account *</label>
+          <select name="account_id" class="form-select" required>
+            <option value="">-- Select Account --</option>
+            {% for acc in accounts %}
+            <option value="{{ acc.id }}" {{ 'selected' if entry and entry.account_id == acc.id }}>{{ acc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Debit Amount</label>
+          <input type="number" name="debit_amount" class="form-control" step="0.01" min="0" value="{{ entry.debit_amount if entry else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Credit Amount</label>
+          <input type="number" name="credit_amount" class="form-control" step="0.01" min="0" value="{{ entry.credit_amount if entry else '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Narration *</label>
+          <textarea name="narration" class="form-control" rows="3" required>{{ entry.narration if entry else '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-{{ 'pencil' if entry else 'plus-circle' }}"></i> 
+              {{ 'Update' if entry else 'Save' }} Entry
+            </button>
+            <a href="{{ url_for('day_book.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="reset" class="btn btn-outline-warning">Reset</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -424,10 +424,30 @@ class CashBook(db.Model):
     party_name = db.Column(db.String(100))
     payment_mode = db.Column(db.String(20), default="Cash")  # Cash/Bank/Online
     reference_no = db.Column(db.String(50))
+    account_id = db.Column(db.Integer, db.ForeignKey("accounts.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     company = db.relationship("Company", backref="cash_book_entries")
+    account = db.relationship("Account", backref="cash_book_entries")
+
+
+class DayBook(db.Model):
+    __tablename__ = "day_book"
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    fin_year = db.Column(db.String(10), nullable=False)
+    voucher_no = db.Column(db.String(50), nullable=False, unique=True)
+    transaction_date = db.Column(db.Date, nullable=False)
+    account_id = db.Column(db.Integer, db.ForeignKey("accounts.id"), nullable=False)
+    debit_amount = db.Column(db.Numeric(14,2), default=0)
+    credit_amount = db.Column(db.Numeric(14,2), default=0)
+    narration = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    company = db.relationship("Company", backref="day_book_entries")
+    account = db.relationship("Account", backref="day_book_entries")
 
 
 class PurchaseInvoice(db.Model):

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Day Book Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .company-info { margin-bottom: 20px; }
+        .filters { margin-bottom: 20px; font-size: 12px; color: #666; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .debit { color: #28a745; }
+        .credit { color: #dc3545; }
+        .totals { font-weight: bold; background-color: #f8f9fa; }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company.name if company else 'Company Name' }}</h1>
+        <h2>Day Book Report</h2>
+        <p>Financial Year: {{ session.get('fin_year', 'N/A') }}</p>
+    </div>
+
+    {% if search or from_date or to_date or account_filter %}
+    <div class="filters">
+        <strong>Filters Applied:</strong>
+        {% if search %} Search: "{{ search }}"{% endif %}
+        {% if from_date %} From: {{ from_date }}{% endif %}
+        {% if to_date %} To: {{ to_date }}{% endif %}
+        {% if account_filter %}
+            {% for acc in accounts %}
+                {% if acc.id == account_filter|int %} Account: {{ acc.name }}{% endif %}
+            {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Voucher No</th>
+                <th>Date</th>
+                <th>Account</th>
+                <th class="text-right">Debit</th>
+                <th class="text-right">Credit</th>
+                <th>Narration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in transactions %}
+            <tr>
+                <td>{{ entry.voucher_no }}</td>
+                <td>{{ entry.transaction_date.strftime('%d-%m-%Y') }}</td>
+                <td>{{ entry.account.name if entry.account else '-' }}</td>
+                <td class="text-right debit">₹{{ "{:,.2f}".format(entry.debit_amount) if entry.debit_amount > 0 else '' }}</td>
+                <td class="text-right credit">₹{{ "{:,.2f}".format(entry.credit_amount) if entry.credit_amount > 0 else '' }}</td>
+                <td>{{ entry.narration }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="totals">
+                <td colspan="3">TOTALS:</td>
+                <td class="text-right debit">₹{{ "{:,.2f}".format(total_debit) }}</td>
+                <td class="text-right credit">₹{{ "{:,.2f}".format(total_credit) }}</td>
+                <td>Balance: ₹{{ "{:,.2f}".format(balance) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="no-print">
+        <p style="text-align: center; margin-top: 30px; color: #666;">
+            Generated on {{ date.today().strftime('%d-%m-%Y %H:%M:%S') }}
+        </p>
+    </div>
+</body>
+</html>

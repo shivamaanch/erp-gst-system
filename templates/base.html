@@ -68,6 +68,8 @@
       <i class="bi bi-plus-circle"></i> Add Milk Entry</a>
     <a href="{{ url_for('journal.index') }}" class="nav-link {{ 'active' if 'journal' in (request.endpoint or '') }}">
       <i class="bi bi-journal-text"></i> Journal Entries</a>
+    <a href="{{ url_for('day_book.index') }}" class="nav-link {{ 'active' if 'day_book' in (request.endpoint or '') }}">
+      <i class="bi bi-journal"></i> Day Book</a>
     <a href="{{ url_for('cash_book.index') }}" class="nav-link {{ 'active' if 'cash_book' in (request.endpoint or '') }}">
       <i class="bi bi-book"></i> Cash Book</a>
     <a href="{{ url_for('banking.accounts') }}" class="nav-link {{ 'active' if 'banking' in (request.endpoint or '') }}">

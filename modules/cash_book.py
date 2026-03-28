@@ -61,6 +61,7 @@ def index():
 def add():
     cid = session.get("company_id")
     fy = session.get("fin_year")
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     if request.method == "POST":
         transaction_type = request.form["transaction_type"]
@@ -70,6 +71,7 @@ def add():
         party_name = request.form.get("party_name", "").strip()
         payment_mode = request.form.get("payment_mode", "Cash")
         reference_no = request.form.get("reference_no", "").strip()
+        account_id = request.form["account_id"]
         
         # Generate voucher number
         voucher_no = next_voucher_no(cid, fy)
@@ -98,13 +100,15 @@ def add():
     return render_template("cash_book/form.html", 
                          entry=None,
                          next_voucher=next_voucher,
-                         today=date.today().isoformat())
+                         today=date.today().isoformat(),
+                         accounts=accounts)
 
 @cash_book_bp.route("/cash-book/edit/<int:entry_id>", methods=["GET", "POST"])
 @login_required
 def edit(entry_id):
     cid = session.get("company_id")
     fy = session.get("fin_year")
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     entry = CashBook.query.filter_by(id=entry_id, company_id=cid, fin_year=fy).first_or_404()
     
@@ -116,6 +120,7 @@ def edit(entry_id):
         entry.party_name = request.form.get("party_name", "").strip()
         entry.payment_mode = request.form.get("payment_mode", "Cash")
         entry.reference_no = request.form.get("reference_no", "").strip()
+        entry.account_id = request.form["account_id"]
         
         db.session.commit()
         flash(f"Cash book entry {entry.voucher_no} updated successfully!", "success")
@@ -124,7 +129,8 @@ def edit(entry_id):
     return render_template("cash_book/form.html", 
                          entry=entry,
                          next_voucher=entry.voucher_no,
-                         today=entry.transaction_date.isoformat())
+                         today=entry.transaction_date.isoformat(),
+                         accounts=accounts)
 
 @cash_book_bp.route("/cash-book/delete/<int:entry_id>", methods=["POST"])
 @login_required
