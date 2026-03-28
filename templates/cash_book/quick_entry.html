@@ -43,32 +43,7 @@
             </tr>
           </thead>
           <tbody id="entriesBody">
-            <tr>
-              <td>
-                <select name="account_id[]" class="form-select account-select" required>
-                  <option value="">-- Select Account --</option>
-                  {% for acc in accounts %}
-                  <option value="{{ acc.id }}">{{ acc.name }}</option>
-                  {% endfor %}
-                </select>
-              </td>
-              <td>
-                <select name="transaction_type[]" class="form-select type-select" required>
-                  <option value="">Select</option>
-                  <option value="Receipt">Receipt</option>
-                  <option value="Payment">Payment</option>
-                </select>
-              </td>
-              <td>
-                <input type="number" name="amount[]" class="form-control amount-input" step="0.01" min="0" required>
-              </td>
-              <td>
-                <input type="text" name="narration[]" class="form-control narration-input" required>
-              </td>
-              <td>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
-              </td>
-            </tr>
+            <!-- 20 default rows will be added by JavaScript -->
           </tbody>
           <tfoot>
             <tr class="table-info fw-bold">
@@ -93,8 +68,7 @@
 </div>
 
 <script>
-function addRow() {
-  const tbody = document.getElementById('entriesBody');
+function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
     <td>
@@ -122,6 +96,12 @@ function addRow() {
       <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
     </td>
   `;
+  return newRow;
+}
+
+function addRow() {
+  const tbody = document.getElementById('entriesBody');
+  const newRow = createRow();
   tbody.appendChild(newRow);
   attachEventListeners();
 }
@@ -150,11 +130,55 @@ function attachEventListeners() {
   document.querySelectorAll('.amount-input').forEach(input => {
     input.addEventListener('input', calculateTotal);
   });
+  
+  // Add Enter key navigation
+  document.querySelectorAll('.account-select, .type-select, .amount-input, .narration-input').forEach(input => {
+    input.addEventListener('keydown', handleEnterKey);
+  });
 }
 
-// Initialize
+function handleEnterKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const currentRow = e.target.closest('tr');
+    const inputs = currentRow.querySelectorAll('input, select');
+    const currentIndex = Array.from(inputs).indexOf(e.target);
+    
+    // If last input in current row, move to first input of next row
+    if (currentIndex === inputs.length - 1) {
+      const nextRow = currentRow.nextElementSibling;
+      if (nextRow) {
+        const nextInputs = nextRow.querySelectorAll('input, select');
+        if (nextInputs.length > 0) {
+          nextInputs[0].focus();
+        }
+      } else {
+        // Create new row if no next row exists
+        addRow();
+        setTimeout(() => {
+          const newRows = document.querySelectorAll('#entriesBody tr');
+          const lastRow = newRows[newRows.length - 1];
+          const firstInput = lastRow.querySelector('input, select');
+          if (firstInput) firstInput.focus();
+        }, 100);
+      }
+    } else {
+      // Move to next input in current row
+      if (inputs[currentIndex + 1]) {
+        inputs[currentIndex + 1].focus();
+      }
+    }
+  }
+}
+
+// Initialize with 20 rows
 document.addEventListener('DOMContentLoaded', function() {
+  const tbody = document.getElementById('entriesBody');
+  for (let i = 0; i < 20; i++) {
+    tbody.appendChild(createRow());
+  }
   attachEventListeners();
+  calculateTotal();
 });
 </script>
 {% endblock %}
