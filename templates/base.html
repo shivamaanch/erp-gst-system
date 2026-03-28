@@ -36,19 +36,19 @@
       <i class="bi bi-speedometer2"></i> Dashboard</a>
 
     <div class="sidebar-section">Company</div>
-    {% if current_user.is_authenticated and current_user.accessible_companies.count() > 1 %}
+    {% if current_user.is_authenticated %}
     <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
-      <i class="bi bi-building"></i> Switch Company
+      <i class="bi bi-building"></i> Company Management
     </a>
+    {% if current_user.accessible_companies.count() > 0 %}
     {% for company in current_user.accessible_companies %}
     <a href="{{ url_for('auth.switch_company', company_id=company.id) }}" class="nav-link {{ 'active' if company.id == session.get('company_id') }}">
       <i class="bi bi-{{ 'check-circle-fill' if company.id == session.get('company_id') else 'circle' }}"></i> {{ company.name }}
     </a>
     {% endfor %}
     {% else %}
-    <a href="{{ url_for('company.index') }}" class="nav-link {{ 'active' if 'company' in (request.endpoint or '') }}">
-      <i class="bi bi-building"></i> Company
-    </a>
+    <div class="text-muted small px-3">No companies assigned</div>
+    {% endif %}
     {% endif %}
 
     <div class="sidebar-section">Transactions</div>
