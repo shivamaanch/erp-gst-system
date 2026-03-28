@@ -13,6 +13,18 @@ import json
 
 enhanced_invoice_bp = Blueprint("enhanced_invoice", __name__)
 
+
+def _fy_aliases(fy: str):
+    if not fy:
+        return []
+    aliases = {fy}
+    # Accept both 2025-26 and 25-26 style FY strings
+    if len(fy) == 7 and fy[4] == "-":
+        aliases.add(f"{fy[2:4]}-{fy[5:7]}")
+    elif len(fy) == 5 and fy[2] == "-":
+        aliases.add(f"20{fy}")
+    return list(aliases)
+
 # Dynamic table templates for different business types
 INVOICE_TEMPLATES = {
     "Trading": {
@@ -43,85 +55,115 @@ def create_invoice():
     cid = session.get("company_id")
     fy = session.get("fin_year")
     btype = request.args.get("type", "Sales")
+    party_types = ["Debtor", "Both", "Customer"] if btype == "Sales" else ["Creditor", "Supplier", "Both", "Vendor"]
     
     if request.method == "POST":
         # Get company to determine business type
-        company = Company.query.get(cid)
-        template_type = request.form.get("template_type", company.business_type or "Trading")
+        company = Company.query.get(cid) if cid else None
+        template_type = request.form.get("template_type", (company.business_type if company else "Trading") or "Trading")
+
+        is_igst = request.form.get("is_igst") == "on"
+        item_ids = request.form.getlist("item_id[]")
+        qtys = request.form.getlist("quantity[]")
+        rates = request.form.getlist("rate[]")
+        gst_rates = request.form.getlist("gst_rate[]")
+
+        if not item_ids:
+            flash("Add at least one item", "danger")
+            return redirect(url_for("enhanced_invoice.create_invoice", type=btype))
         
         # Create bill
         bill = Bill(
             company_id=cid,
-            party_id=request.form["party_id"],
+            party_id=int(request.form["party_id"]),
             bill_type=btype,
             bill_no=request.form["bill_no"],
             bill_date=datetime.strptime(request.form["bill_date"], "%Y-%m-%d").date(),
             fin_year=fy,
             narration=request.form.get("narration", ""),
-            is_igst="is_igst" in request.form,
             template_type=template_type,
             created_by=session.get("user_id", 1)
         )
+        db.session.add(bill)
         
-        # Calculate totals based on template
-        template = INVOICE_TEMPLATES.get(template_type, INVOICE_TEMPLATES["Trading"])
-        items_data = json.loads(request.form.get("items_data", "[]"))
-        
-        total_taxable = 0
-        total_cgst = 0
-        total_sgst = 0
-        total_igst = 0
-        
-        for item_data in items_data:
-            if template_type == "Milk":
-                # Milk-specific calculations
-                qty = float(item_data.get("qty", 0))
-                fat = float(item_data.get("fat", 3.5))
-                snf = float(item_data.get("snf", 8.5))
-                rate = float(item_data.get("rate", 0))
-                
-                # SMF formula: (Fat% × 400 + SNF% × 65) × 10 ÷ 100
-                fat_value = round((fat / 100) * 400 * 10, 2)
-                snf_value = round((snf / 100) * 65 * 10, 2)
-                basic_amount = round(qty * rate, 2)
-                total_amount = round(fat_value + snf_value, 2)
-                taxable_amount = total_amount
-                
+        total_taxable = 0.0
+        total_cgst = 0.0
+        total_sgst = 0.0
+        total_igst = 0.0
+
+        for i, iid in enumerate(item_ids):
+            if not iid:
+                continue
+            try:
+                qty = float(qtys[i]) if i < len(qtys) else 0.0
+                rate = float(rates[i]) if i < len(rates) else 0.0
+                gst_rate = float(gst_rates[i]) if i < len(gst_rates) and gst_rates[i] != "" else 0.0
+            except Exception:
+                qty = 0.0
+                rate = 0.0
+                gst_rate = 0.0
+
+            taxable_amount = round(qty * rate, 2)
+            gst_amount = round(taxable_amount * gst_rate / 100, 2)
+
+            if is_igst:
+                igst = gst_amount
+                cgst = 0.0
+                sgst = 0.0
             else:
-                # Standard calculations
-                qty = float(item_data.get("qty", 0))
-                rate = float(item_data.get("rate", 0))
-                discount = float(item_data.get("discount", 0))
-                gst_rate = float(item_data.get("gst_rate", 18))
-                
-                taxable_amount = round(qty * rate * (1 - discount/100), 2)
-                gst_amount = round(taxable_amount * gst_rate / 100, 2)
-                total_amount = taxable_amount + gst_amount
-                
-                if bill.is_igst:
-                    total_igst += gst_amount
-                else:
-                    total_cgst += gst_amount / 2
-                    total_sgst += gst_amount / 2
-            
+                cgst = round(gst_amount / 2, 2)
+                sgst = round(gst_amount / 2, 2)
+                igst = 0.0
+
+            db.session.add(
+                BillItem(
+                    bill=bill,
+                    item_id=int(iid),
+                    qty=qty,
+                    rate=rate,
+                    taxable_amount=taxable_amount,
+                    gst_rate=gst_rate,
+                    cgst=cgst,
+                    sgst=sgst,
+                    igst=igst,
+                )
+            )
+
             total_taxable += taxable_amount
+            total_cgst += cgst
+            total_sgst += sgst
+            total_igst += igst
         
         # Update bill totals
-        bill.taxable_amount = total_taxable
-        bill.cgst = total_cgst
-        bill.sgst = total_sgst
-        bill.igst = total_igst
-        bill.total_amount = total_taxable + total_cgst + total_sgst + total_igst
+        bill.taxable_amount = round(total_taxable, 2)
+        bill.cgst = round(total_cgst, 2)
+        bill.sgst = round(total_sgst, 2)
+        bill.igst = round(total_igst, 2)
+        bill.total_amount = round(total_taxable + total_cgst + total_sgst + total_igst, 2)
+
+        # Optional TDS/TCS
+        try:
+            bill.tds_rate = float(request.form.get("tds_rate") or 0)
+        except Exception:
+            bill.tds_rate = 0
+        try:
+            bill.tcs_rate = float(request.form.get("tcs_rate") or 0)
+        except Exception:
+            bill.tcs_rate = 0
         
-        db.session.add(bill)
         db.session.commit()
         
         flash(f"{btype} invoice created successfully!", "success")
         return redirect(url_for("enhanced_invoice.list_invoices", type=btype))
     
     # Get data for form
-    parties = Party.query.filter_by(company_id=cid, is_active=True).all()
+    parties = Party.query.filter_by(company_id=cid, is_active=True).filter(
+        Party.party_type.in_(party_types)
+    ).order_by(Party.name).all()
     items = Item.query.filter_by(company_id=cid, is_active=True).all()
+    from models import MilkRateChart
+    charts = MilkRateChart.query.filter_by(company_id=cid).all()
+    
     company = Company.query.get(cid)
     
     # Generate bill number
@@ -131,7 +173,10 @@ def create_invoice():
     return render_template("enhanced_invoice/create.html",
                          btype=btype, bill_no=bill_no,
                          parties=parties, items=items,
+                         bill_date=date.today().isoformat(),
+                         fy=fy,
                          company=company,
+                         charts=charts,
                          templates=INVOICE_TEMPLATES)
 
 @enhanced_invoice_bp.route("/enhanced-invoice/delete/<int:bill_id>", methods=["POST"])
@@ -151,9 +196,17 @@ def delete_invoice(bill_id):
         # Delete bill items first
         BillItem.query.filter_by(bill_id=bill_id).delete()
         
+        # Find and delete any milk entry linked to this bill (not just clear bill_id)
+        from models import MilkTransaction
+        linked_milk = MilkTransaction.query.filter_by(bill_id=bill_id).first()
+        if linked_milk:
+            print(f"DEBUG: Deleting linked milk entry {linked_milk.id}")
+            db.session.delete(linked_milk)
+        
         # Delete the bill
         db.session.delete(bill)
         db.session.commit()
+        print("DEBUG: Invoice and linked milk entry deleted successfully")
         
         return jsonify({"success": True, "message": "Invoice deleted successfully"})
         
@@ -168,9 +221,15 @@ def list_invoices():
     fy = session.get("fin_year")
     btype = request.args.get("type", "Sales")
     
-    bills = Bill.query.filter_by(
-        company_id=cid, fin_year=fy, bill_type=btype, is_cancelled=False
-    ).order_by(Bill.bill_date.desc()).all()
+    fy_list = _fy_aliases(fy)
+    q = Bill.query.filter(
+        Bill.company_id == cid,
+        Bill.bill_type == btype,
+        Bill.is_cancelled == False,
+    )
+    if fy_list:
+        q = q.filter(Bill.fin_year.in_(fy_list))
+    bills = q.order_by(Bill.bill_date.desc()).all()
     
     return render_template("enhanced_invoice/list.html", bills=bills, btype=btype)
 
@@ -209,7 +268,9 @@ def export_invoice_excel(bill, party, company):
     """Export invoice to Excel with beautiful formatting"""
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = f"Invoice {bill.bill_no}"
+    # Excel sheet titles cannot contain certain characters like /, \\, ?, *, [, ] and must be <= 31 chars
+    safe_bill_no = (bill.bill_no or "").replace("/", "-").replace("\\", "-").replace("?", "-").replace("*", "-").replace("[", "(").replace("]", ")")
+    ws.title = ("Invoice " + safe_bill_no)[:31]
     
     # Company header
     ws.merge_cells("A1:H1")

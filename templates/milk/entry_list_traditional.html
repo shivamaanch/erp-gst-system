@@ -4,7 +4,32 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">🥛 Traditional Milk Entry List</h4>
   <div>
-    <div class="input-group" style="width: 300px;">
+    <a href="{{ url_for('milk.add_entry') }}" class="btn btn-primary">
+      <i class="fas fa-plus"></i> Add Milk Entry
+    </a>
+    <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">📊 Summary</a>
+  </div>
+</div>
+
+<!-- First Row: Date and Party Dropdown Filters -->
+<div class="row g-2 mb-3">
+  <div class="col-md-6">
+    <div class="input-group">
+      <input type="date" id="fromDate" class="form-control form-control-sm" placeholder="From Date">
+      <input type="date" id="toDate" class="form-control form-control-sm" placeholder="To Date">
+      <button class="btn btn-outline-secondary btn-sm" onclick="filterByDate()">
+        <i class="fas fa-filter"></i> Filter
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="filterLast10Days()">
+        <i class="fas fa-history"></i> Last 10 Days
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearDateFilter()">
+        <i class="fas fa-times"></i> Clear
+      </button>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="input-group">
       <select id="party_filter" class="form-select form-select-sm" onchange="filterByParty()">
         <option value="">All Parties</option>
         {% for party in parties %}
@@ -16,11 +41,40 @@
       </button>
     </div>
   </div>
-  <div>
-    <a href="{{ url_for('milk.add_entry') }}" class="btn btn-primary">
-      <i class="fas fa-plus"></i> Add Milk Entry
-    </a>
-    <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">📊 Summary</a>
+  <div class="col-md-1">
+    <button class="btn btn-sm btn-outline-primary w-100" onclick="resetAllFilters()">
+      <i class="fas fa-refresh"></i> Reset
+    </button>
+  </div>
+  <div class="col-md-1">
+    <button class="btn btn-sm btn-success w-100" onclick="showAllEntries()">
+      <i class="fas fa-eye"></i> Show All
+    </button>
+  </div>
+  </div>
+
+<!-- Second Row: Party Search Bar (Dedicated) -->
+<div class="row g-2 mb-4">
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white py-2">
+        <h6 class="mb-0"><i class="fas fa-search"></i> 🔍 Party Search Bar</h6>
+      </div>
+      <div class="card-body">
+        <div class="input-group input-group-lg">
+          <span class="input-group-text"><i class="fas fa-search"></i></span>
+          <input type="text" id="partySearch" class="form-control form-control-lg" 
+                 placeholder="Type party name here to search and filter entries instantly..." 
+                 onkeyup="filterByPartySearch()">
+          <button class="btn btn-outline-secondary btn-lg" onclick="clearPartySearch()">
+            <i class="fas fa-times"></i> Clear Search
+          </button>
+        </div>
+        <div class="mt-2">
+          <small class="text-muted">💡 Start typing to search parties • Results will appear instantly • Filters work together</small>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -152,28 +206,36 @@
 <script>
 function filterByParty() {
   const partyId = document.getElementById('party_filter').value;
-  const rows = document.querySelectorAll('tbody tr');
+  const allRows = document.querySelectorAll('tbody tr'); // Get ALL rows, not just ones with data-party-id
   
-  rows.forEach(row => {
+  console.log('Filtering by party ID:', partyId);
+  
+  allRows.forEach(row => {
     if (partyId === '') {
+      // "All Parties" selected - show all rows
       row.style.display = '';
     } else {
-      // Check if this row belongs to the selected party
+      // Specific party selected - show only matching rows
       const partyCell = row.querySelector('td:nth-child(6)'); // Party column
       if (partyCell) {
-        const partyName = partyCell.textContent.trim();
-        // Get the selected party name from the dropdown
+        const partyName = partyCell.textContent.trim().toLowerCase().replace(/\s+/g, '');
         const selectedOption = document.querySelector(`#party_filter option[value="${partyId}"]`);
-        const selectedPartyName = selectedOption ? selectedOption.textContent.trim() : '';
+        const selectedPartyName = selectedOption ? selectedOption.textContent.trim().toLowerCase().replace(/\s+/g, '') : '';
         
         if (partyName === selectedPartyName) {
           row.style.display = '';
         } else {
           row.style.display = 'none';
         }
+      } else {
+        row.style.display = '';
       }
     }
   });
+  
+  // Count visible rows
+  const visibleRows = document.querySelectorAll('tbody tr:not([style*="none"])').length;
+  console.log(`After party filter: ${visibleRows} rows visible`);
 }
 
 function clearFilter() {
@@ -181,18 +243,165 @@ function clearFilter() {
   filterByParty();
 }
 
-// Add party data attributes to rows for easier filtering
-document.addEventListener('DOMContentLoaded', function() {
+function filterByPartySearch() {
+  const searchText = document.getElementById('partySearch').value.toLowerCase();
   const rows = document.querySelectorAll('tbody tr');
+  
+  console.log('Party search in list:', searchText);
+  
   rows.forEach(row => {
     const partyCell = row.querySelector('td:nth-child(6)'); // Party column
     if (partyCell) {
+      const partyName = partyCell.textContent.trim().toLowerCase();
+      const showRow = searchText.length === 0 || partyName.includes(searchText);
+      row.style.display = showRow ? '' : 'none';
+    }
+  });
+}
+
+function clearPartySearch() {
+  document.getElementById('partySearch').value = '';
+  filterByPartySearch();
+}
+
+function resetAllFilters() {
+  // Clear date filters
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  
+  // Clear party dropdown
+  document.getElementById('party_filter').value = '';
+  
+  // Clear party search
+  document.getElementById('partySearch').value = '';
+  
+  // Reset all filters
+  filterByDate();
+  filterByParty();
+  filterByPartySearch();
+}
+
+function showAllEntries() {
+  console.log('Showing ALL entries - bypassing all filters');
+  
+  // Clear all filter inputs
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  document.getElementById('party_filter').value = '';
+  document.getElementById('partySearch').value = '';
+  
+  // Show ALL rows
+  const rows = document.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    row.style.display = '';
+  });
+  
+  // Count and log
+  console.log(`All ${rows.length} entries are now visible`);
+}
+
+
+function filterByDate() {
+  const fromDate = document.getElementById('fromDate').value ? new Date(document.getElementById('fromDate').value + 'T00:00:00') : null;
+  const toDate = document.getElementById('toDate').value ? new Date(document.getElementById('toDate').value + 'T23:59:59') : null;
+  const rows = document.querySelectorAll('tbody tr');
+  
+  console.log('Filtering dates:', {fromDate, toDate});
+  
+  rows.forEach((row, index) => {
+    const dateCell = row.querySelector('td:nth-child(3)'); // Date column
+    if (dateCell) {
+      const dateText = dateCell.textContent.trim();
+      console.log(`Row ${index + 1}: Date text = "${dateText}"`);
+      
+      // Parse "28-Mar-2026" format
+      const parts = dateText.split('-');
+      const day = parts[0];
+      const month = parts[1];
+      const year = parts[2];
+      const monthMap = {'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 
+                       'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'};
+      const formattedDate = `${year}-${monthMap[month]}-${day.padStart(2, '0')}`;
+      const rowDate = new Date(formattedDate + 'T12:00:00');
+      
+      console.log(`  -> Parsed date: ${formattedDate}, Row date: ${rowDate.toISOString()}`);
+      
+      let showRow = true;
+      let reason = '';
+      
+      if (fromDate && toDate) {
+        showRow = rowDate >= fromDate && rowDate <= toDate;
+        reason = `between ${fromDate.toISOString()} and ${toDate.toISOString()}`;
+      } else if (fromDate) {
+        showRow = rowDate >= fromDate;
+        reason = `after ${fromDate.toISOString()}`;
+      } else if (toDate) {
+        showRow = rowDate <= toDate;
+        reason = `before ${toDate.toISOString()}`;
+      } else {
+        reason = 'no date filter';
+      }
+      
+      console.log(`  -> Show row: ${showRow} (${reason})`);
+      row.style.display = showRow ? '' : 'none';
+    }
+  });
+}
+
+function clearDateFilter() {
+  const fromInput = document.getElementById('fromDate');
+  const toInput = document.getElementById('toDate');
+  if (fromInput) fromInput.value = '';
+  if (toInput) toInput.value = '';
+  // When no dates are set, filterByDate() will show all rows
+  filterByDate();
+}
+
+// Set date range to last 10 days (excluding today) and apply filter
+function filterLast10Days() {
+  const today = new Date();
+  const to = new Date(today);
+  // exclude today -> go to yesterday
+  to.setDate(to.getDate() - 1);
+  const from = new Date(to);
+  // last 10 days including "to"
+  from.setDate(from.getDate() - 9);
+
+  const pad = (n) => n.toString().padStart(2, '0');
+  const toStr = `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`;
+  const fromStr = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+
+  const fromInput = document.getElementById('fromDate');
+  const toInput = document.getElementById('toDate');
+  if (fromInput) fromInput.value = fromStr;
+  if (toInput) toInput.value = toStr;
+
+  filterByDate();
+}
+
+// Add party data attributes to rows for easier filtering
+document.addEventListener('DOMContentLoaded', function() {
+  const rows = document.querySelectorAll('tbody tr');
+  console.log('Processing rows for party matching...');
+  
+  rows.forEach((row, index) => {
+    const partyCell = row.querySelector('td:nth-child(7)'); // Party column (changed to 7)
+    if (partyCell) {
       const partyName = partyCell.textContent.trim();
-      // Find the corresponding party ID
+      console.log(`Row ${index + 1}: Party name = "${partyName}"`);
+      
+      // Find the corresponding party ID (case-insensitive, ignore spaces)
       const partyOption = Array.from(document.querySelectorAll('#party_filter option'))
-        .find(option => option.textContent.trim() === partyName);
+        .find(option => {
+          const optionText = option.textContent.trim().toLowerCase().replace(/\s+/g, '');
+          const rowText = partyName.toLowerCase().replace(/\s+/g, '');
+          return optionText === rowText;
+        });
       if (partyOption) {
         row.setAttribute('data-party-id', partyOption.value);
+        console.log(`  -> Matched with option value: ${partyOption.value}`);
+      } else {
+        console.log(`  -> No matching option found for "${partyName}"`);
       }
     }
   });

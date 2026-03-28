@@ -8,6 +8,139 @@
   </a>
 </div>
 
+<!-- Quick Milk Entry Toggle -->
+<div class="card border-info mb-3" id="milkQuickCard" style="display:none;">
+  <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+    <span class="fw-bold">🥛 Quick Milk Entry + Invoice</span>
+    <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleMilkQuick()">×</button>
+  </div>
+  <div class="card-body py-2">
+    <form id="milkQuickForm" class="row g-2">
+      <div class="col-auto">
+        <label class="form-label small">Party</label>
+        <select name="party_id" class="form-select form-select-sm">
+          <option value="">Select Party</option>
+          {% for party in parties %}
+            <option value="{{ party.id }}">{{ party.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Date</label>
+        <input type="date" name="txn_date" class="form-control form-control-sm" value="{{ bill_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Invoice No (opt)</label>
+        <input type="text" name="manual_bill_no" class="form-control form-control-sm" placeholder="Auto">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Create Invoice</label>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="milk_create_invoice" name="create_invoice" value="1" checked>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Shift</label>
+        <select name="shift" class="form-select form-select-sm">
+          <option value="Morning">Morning</option>
+          <option value="Evening">Evening</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Type</label>
+        <select id="txn_type_display" class="form-select form-select-sm" disabled>
+          <option value="Purchase" {% if btype != 'Sales' %}selected{% endif %}>Purchase</option>
+          <option value="Sale" {% if btype == 'Sales' %}selected{% endif %}>Sale</option>
+        </select>
+        <input type="hidden" name="txn_type" id="txn_type" value="{{ 'Sale' if btype == 'Sales' else 'Purchase' }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Qty (L)</label>
+        <input type="number" step="0.01" name="qty_liters" class="form-control form-control-sm" placeholder="1">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">FAT %</label>
+        <input type="number" step="0.01" name="fat" class="form-control form-control-sm" placeholder="3.5">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">CLR</label>
+        <input type="number" step="0.1" name="clr" class="form-control form-control-sm" placeholder="28">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Daily Rate/100kg</label>
+        <input type="number" step="0.01" name="rate_per_liter" class="form-control form-control-sm" placeholder="4500">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Chart (opt)</label>
+        <select name="chart_id" class="form-select form-select-sm">
+          <option value="">Manual</option>
+          {% for chart in charts %}
+          <option value="{{ chart.id }}" data-fat="{{ chart.fat_rate }}" data-snf="{{ chart.snf_rate }}">{{ chart.chart_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">GST Rate (%)</label>
+        <input type="number" step="0.01" name="gst_rate" class="form-control form-control-sm" value="0">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Narration</label>
+        <input type="text" name="narration" class="form-control form-control-sm" placeholder="Optional">
+      </div>
+      <div class="col-auto align-self-end">
+        <button type="button" onclick="submitMilkQuick()" class="btn btn-sm btn-success">Add & Invoice</button>
+      </div>
+
+      <input type="hidden" name="snf_auto" id="snf_auto_hidden" value="8.50">
+      <input type="hidden" name="calc_rate" id="calc_rate_hidden" value="0.0000">
+      <input type="hidden" name="amount" id="amount_hidden" value="0.00">
+    </form>
+    <!-- Auto-calculated display -->
+    <div class="row g-2 mt-2">
+      <div class="col-auto">
+        <label class="form-label small">SNF % (Auto)</label>
+        <input type="text" id="snf_auto" class="form-control form-control-sm bg-light" readonly placeholder="8.50" value="8.50">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">BF Kgs (Auto)</label>
+        <input type="text" id="bf_kgs" class="form-control form-control-sm bg-light" readonly placeholder="0.00" value="0.00">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">SNF Kgs (Auto)</label>
+        <input type="text" id="snf_kgs" class="form-control form-control-sm bg-light" readonly placeholder="0.00" value="0.00">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Rate/L (Calc)</label>
+        <input type="text" id="calculated_rate" class="form-control form-control-sm bg-light" readonly placeholder="0.00" value="0.00">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-bold text-success">Amount (₹)</label>
+        <input type="text" id="amount" class="form-control form-control-sm bg-success bg-opacity-10 text-success fw-bold" readonly placeholder="0.00" value="0.00">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">GST Amount</label>
+        <input type="text" id="gst_amount" class="form-control form-control-sm bg-light" readonly placeholder="0.00" value="0.00">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-bold">Total</label>
+        <input type="text" id="total_with_gst" class="form-control form-control-sm bg-light fw-bold" readonly placeholder="0.00" value="0.00">
+      </div>
+    </div>
+    <!-- Live invoice preview -->
+    <div class="alert alert-info py-2 mt-2" id="milkInvoicePreview">
+      <strong>Invoice Preview:</strong><br>
+      <span id="milkInvoiceDetails">Fill milk details to see invoice preview</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toggle Button -->
+<div class="text-center mb-3">
+  <button type="button" class="btn btn-sm btn-outline-info" onclick="toggleMilkQuick()">
+    <i class="bi bi-droplet"></i> Quick Milk Entry + Invoice
+  </button>
+</div>
+
 <form method="POST" class="row g-3">
   <div class="col-md-8">
     <div class="card border-0 shadow-sm">
@@ -26,20 +159,46 @@
           </div>
           <div class="col-md-12">
             <label class="form-label fw-bold">{{ 'Customer' if btype == 'Sales' else 'Supplier' }}</label>
-            <select name="party_id" class="form-select" required>
+            <div class="input-group">
+            <select name="party_id" id="partySelect" class="form-select" required>
               <option value="">Select {{ 'Customer' if btype == 'Sales' else 'Supplier' }}</option>
               {% for party in parties %}
-                {% if btype == 'Sales' and party.party_type == 'Debtor' %}
                 <option value="{{ party.id }}">{{ party.name }} ({{ party.gstin or 'No GSTIN' }})</option>
-                {% elif btype == 'Purchase' and party.party_type == 'Creditor' %}
-                <option value="{{ party.id }}">{{ party.name }} ({{ party.gstin or 'No GSTIN' }})</option>
-                {% endif %}
               {% endfor %}
             </select>
+            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#addPartyModal" title="Add New Party">
+              <i class="bi bi-plus-circle"></i>
+            </button>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <a href="{{ url_for('clients.add') }}" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-person-plus"></i> Add Client
+              </a>
+              <a href="{{ url_for('clients.index') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-people"></i> Client List
+              </a>
+              <a href="#" id="viewPartyBtn" class="btn btn-sm btn-outline-info disabled" tabindex="-1" aria-disabled="true">
+                <i class="bi bi-eye"></i> View
+              </a>
+              <a href="#" id="editPartyBtn" class="btn btn-sm btn-outline-primary disabled" tabindex="-1" aria-disabled="true">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+              <form id="deletePartyForm" method="POST" action="#" class="d-inline" onsubmit="return confirm('Delete this client from active use?');">
+                <button type="submit" id="deletePartyBtn" class="btn btn-sm btn-outline-danger" disabled>
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <div class="form-check mt-1">
+              <input type="checkbox" name="is_igst" id="is_igst" class="form-check-input">
+              <label for="is_igst" class="form-check-label">Interstate (IGST)</label>
+            </div>
           </div>
           <div class="col-md-12">
             <label class="form-label fw-bold">Remarks</label>
-            <textarea name="remarks" class="form-control" rows="2" placeholder="Enter invoice remarks"></textarea>
+            <textarea name="narration" class="form-control" rows="2" placeholder="Enter invoice remarks"></textarea>
           </div>
         </div>
       </div>
@@ -221,6 +380,35 @@
 </form>
 
 <script>
+const BT = "{{ btype }}";
+
+function updatePartyActions() {
+    const partyId = document.getElementById('partySelect').value;
+    const viewBtn = document.getElementById('viewPartyBtn');
+    const editBtn = document.getElementById('editPartyBtn');
+    const deleteBtn = document.getElementById('deletePartyBtn');
+    const deleteForm = document.getElementById('deletePartyForm');
+    const hasParty = !!partyId;
+
+    if (hasParty) {
+        viewBtn.href = `/clients/view/${partyId}`;
+        editBtn.href = `/clients/edit/${partyId}`;
+        deleteForm.action = `/clients/delete/${partyId}`;
+    } else {
+        viewBtn.href = '#';
+        editBtn.href = '#';
+        deleteForm.action = '#';
+    }
+
+    viewBtn.classList.toggle('disabled', !hasParty);
+    editBtn.classList.toggle('disabled', !hasParty);
+    viewBtn.setAttribute('aria-disabled', hasParty ? 'false' : 'true');
+    editBtn.setAttribute('aria-disabled', hasParty ? 'false' : 'true');
+    viewBtn.tabIndex = hasParty ? 0 : -1;
+    editBtn.tabIndex = hasParty ? 0 : -1;
+    deleteBtn.disabled = !hasParty;
+}
+
 function addInvoiceItem() {
     const container = document.getElementById('items-container');
     const template = document.getElementById('item-template');
@@ -266,6 +454,35 @@ function calculateTotals() {
     document.getElementById('total-amount').textContent = '₹' + (totalTaxable + totalCGST + totalSGST).toFixed(2);
 }
 
+async function quickAddParty() {
+    const name = document.getElementById('newPartyName').value.trim();
+    const gstin = document.getElementById('newPartyGstin').value.trim();
+    const phone = document.getElementById('newPartyPhone').value.trim();
+    if (!name) {
+        alert('Party name required');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('gstin', gstin);
+    formData.append('phone', phone);
+    formData.append('party_type', BT === 'Sales' ? 'Debtor' : 'Supplier');
+
+    const res = await fetch('/clients/quick-add', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+        const optionText = data.party.name + (data.party.gstin ? ` (${data.party.gstin})` : '');
+        const opt = new Option(optionText, data.party.id, true, true);
+        document.getElementById('partySelect').add(opt);
+        updatePartyActions();
+        bootstrap.Modal.getInstance(document.getElementById('addPartyModal')).hide();
+        document.getElementById('quickPartyForm').reset();
+    } else {
+        alert(data.error || 'Failed to add party');
+    }
+}
+
 // Add event listeners to existing inputs
 document.querySelectorAll('.quantity-input, .rate-input').forEach(input => {
     input.addEventListener('input', calculateTotals);
@@ -273,7 +490,248 @@ document.querySelectorAll('.quantity-input, .rate-input').forEach(input => {
 
 // Initialize totals on page load
 calculateTotals();
+document.getElementById('partySelect').addEventListener('change', updatePartyActions);
+updatePartyActions();
+
+// Quick Milk Entry helpers
+function toggleMilkQuick() {
+  const card = document.getElementById('milkQuickCard');
+  card.style.display = card.style.display === 'none' ? 'block' : 'none';
+}
+
+function _milkQuickForm() {
+  return document.getElementById('milkQuickForm');
+}
+
+function calculateGSTQuick() {
+  const form = _milkQuickForm();
+  const gstRate = parseFloat(form.querySelector('[name="gst_rate"]').value) || 0;
+  const amount = parseFloat(document.getElementById('amount').value) || 0;
+  const gstAmount = Math.round(amount * gstRate) / 100;
+  const total = amount + gstAmount;
+  document.getElementById('gst_amount').value = gstAmount.toFixed(2);
+  document.getElementById('total_with_gst').value = total.toFixed(2);
+}
+
+// Bihar SNF formula: SNF = (CLR/4) + (0.20 × Fat) + 0.14
+function calculateSNFQuick() {
+  const form = _milkQuickForm();
+  const clr = parseFloat(form.querySelector('[name="clr"]').value) || 0;
+  const fat = parseFloat(form.querySelector('[name="fat"]').value) || 0;
+  let snf = 0;
+  if (clr > 0) {
+    snf = (clr / 4) + (0.20 * fat) + 0.14;
+    snf = Math.max(7.0, Math.min(15.0, snf));
+  }
+  document.getElementById('snf_auto').value = snf.toFixed(2);
+  document.getElementById('snf_auto_hidden').value = snf.toFixed(2);
+  calculateMarketRatesQuick();
+}
+
+// Component rates calculation (60:40 split)
+function calculateMarketRatesQuick() {
+  const form = _milkQuickForm();
+  const dailyRate = parseFloat(form.querySelector('[name="rate_per_liter"]').value) || 0;
+
+  const chartSel = form.querySelector('[name="chart_id"]');
+  const chartOpt = chartSel ? chartSel.selectedOptions[0] : null;
+  const hasChart = !!(chartOpt && chartOpt.value);
+
+  let bfRate = 0, snfRate = 0;
+  if (dailyRate > 0) {
+    const fatShare = 0.60; const snfShare = 0.40;
+    const stdFatKg = 6.5; const stdSnfKg = 8.5;
+    bfRate = (dailyRate * fatShare) / stdFatKg;
+    snfRate = (dailyRate * snfShare) / stdSnfKg;
+  } else if (hasChart) {
+    bfRate = parseFloat(chartOpt.dataset.fat) || 0;
+    snfRate = parseFloat(chartOpt.dataset.snf) || 0;
+  }
+  
+  // Store rates for main calculation
+  window.quickFatRate = bfRate;
+  window.quickSnfRate = snfRate;
+  
+  calculateMilkQuick();
+}
+
+// Main milk calculation (component-based)
+function calculateMilkQuick() {
+  const form = _milkQuickForm();
+  const qty = parseFloat(form.querySelector('[name="qty_liters"]').value) || 0;
+  const fat = parseFloat(form.querySelector('[name="fat"]').value) || 0;
+  const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+  
+  const bfKgs = qty * fat / 100;
+  const snfKgs = qty * snf / 100;
+  const snfKgsRounded = Math.round(snfKgs * 100) / 100;
+  
+  const fatRate = window.quickFatRate || 0;
+  const snfRate = window.quickSnfRate || 0;
+  
+  const bfAmount = bfKgs * fatRate;
+  const snfAmount = snfKgsRounded * snfRate;
+  const finalAmount = bfAmount + snfAmount;
+  const ratePerLiter = qty > 0 ? finalAmount / qty : 0;
+  
+  // Update display fields
+  document.getElementById('bf_kgs').value = bfKgs.toFixed(2);
+  document.getElementById('snf_kgs').value = snfKgsRounded.toFixed(2);
+  document.getElementById('calculated_rate').value = ratePerLiter.toFixed(4);
+  document.getElementById('amount').value = finalAmount.toFixed(2);
+
+  // Sync hidden fields for backend (so calculations match Milk module)
+  document.getElementById('calc_rate_hidden').value = ratePerLiter.toFixed(4);
+  document.getElementById('amount_hidden').value = finalAmount.toFixed(2);
+
+  calculateGSTQuick();
+  
+  // Update live invoice preview
+  updateMilkInvoicePreview(qty, fat, snf, finalAmount);
+}
+
+// Live invoice preview helper
+function updateMilkInvoicePreview(qty, fat, snf, amount) {
+  const form = _milkQuickForm();
+  const partySelect = form.querySelector('[name="party_id"]');
+  const partyName = partySelect.options[partySelect.selectedIndex]?.text || 'Not Selected';
+  const txnType = form.querySelector('[name="txn_type"]').value;
+  const date = form.querySelector('[name="txn_date"]').value;
+  const manualBillNo = form.querySelector('[name="manual_bill_no"]').value;
+  const createInvoice = document.getElementById('milk_create_invoice').checked;
+  const gstRate = parseFloat(form.querySelector('[name="gst_rate"]').value) || 0;
+  const gstAmount = parseFloat(document.getElementById('gst_amount').value) || 0;
+  const total = parseFloat(document.getElementById('total_with_gst').value) || 0;
+  
+  let invoiceNo;
+  if (manualBillNo.trim()) {
+    invoiceNo = manualBillNo.trim();
+  } else {
+    const prefix = txnType === 'Sale' ? 'S' : 'P';
+    const fy = "{{ fy }}";
+    invoiceNo = `${prefix}/0001/${fy} (Auto)`;
+  }
+  
+  const details = `
+    <strong>Invoice No:</strong> ${invoiceNo}<br>
+    <strong>Type:</strong> ${txnType} Invoice<br>
+    <strong>Party:</strong> ${partyName}<br>
+    <strong>Date:</strong> ${date}<br>
+    <strong>Milk:</strong> ${qty}L @ FAT ${fat}% SNF ${snf}%<br>
+    <strong>Amount:</strong> ₹${amount.toFixed(2)}<br>
+    <strong>GST:</strong> ${gstRate}% (₹${gstAmount.toFixed(2)})<br>
+    <strong>Total:</strong> ₹${total.toFixed(2)}<br>
+    <strong>Status:</strong> ${createInvoice ? '<span class="text-success">Invoice will be created on submit</span>' : '<span class="text-warning">Only milk entry will be created</span>'}
+  `;
+  document.getElementById('milkInvoiceDetails').innerHTML = details;
+}
+
+// Wire up inputs
+document.addEventListener('DOMContentLoaded', function() {
+  const quickInputs = ['qty_liters','fat','clr','rate_per_liter','chart_id','party_id','txn_type','manual_bill_no','txn_date','gst_rate'];
+  quickInputs.forEach(name => {
+    const el = _milkQuickForm().querySelector(`[name="${name}"]`);
+    if (el) {
+      const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+      el.addEventListener(evt, () => {
+        if (name === 'clr' || name === 'fat') calculateSNFQuick();
+        if (name === 'rate_per_liter') calculateMarketRatesQuick();
+        if (name === 'gst_rate') calculateGSTQuick();
+        if (name === 'qty_liters') calculateMilkQuick();
+        if (name === 'party_id' || name === 'txn_type' || name === 'manual_bill_no' || name === 'txn_date') {
+          const form = _milkQuickForm();
+          const qty = parseFloat(form.querySelector('[name="qty_liters"]').value) || 0;
+          const fat = parseFloat(form.querySelector('[name="fat"]').value) || 0;
+          const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+          const amount = parseFloat(document.getElementById('amount').value) || 0;
+          updateMilkInvoicePreview(qty, fat, snf, amount);
+        }
+      });
+    }
+  });
+
+  document.getElementById('milk_create_invoice').addEventListener('change', () => {
+    const form = _milkQuickForm();
+    const qty = parseFloat(form.querySelector('[name="qty_liters"]').value) || 0;
+    const fat = parseFloat(form.querySelector('[name="fat"]').value) || 0;
+    const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+    updateMilkInvoicePreview(qty, fat, snf, amount);
+  });
+
+  // Initialize once
+  calculateSNFQuick();
+  calculateMarketRatesQuick();
+});
+
+async function submitMilkQuick() {
+  const form = document.getElementById('milkQuickForm');
+  const fd = new FormData(form);
+
+  // Enforce txn_type based on screen
+  fd.set('txn_type', document.getElementById('txn_type').value);
+  console.log('DEBUG: Sending txn_type =', fd.get('txn_type'));
+
+  // Ensure backend uses the same computed values
+  fd.set('snf_auto', document.getElementById('snf_auto_hidden').value);
+  fd.set('calc_rate', document.getElementById('calc_rate_hidden').value);
+  fd.set('amount', document.getElementById('amount_hidden').value);
+
+  if (document.getElementById('milk_create_invoice').checked) {
+    fd.set('create_invoice', '1');
+    console.log('DEBUG: create_invoice = 1');
+  } else {
+    fd.delete('create_invoice');
+    console.log('DEBUG: create_invoice removed');
+  }
+
+  // Keep user-entered gst_rate/narration as-is (already in fd)
+  try {
+    const resp = await fetch('/milk/entry/add', { method: 'POST', body: fd });
+    if (resp.ok) {
+      alert('Milk entry added and invoice created! Refreshing page...');
+      window.location.reload();
+    } else {
+      alert('Failed to add milk entry');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
 </script>
+
+<div class="modal fade" id="addPartyModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus"></i> Quick Add Party</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickPartyForm">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Party Name *</label>
+            <input type="text" id="newPartyName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">GSTIN</label>
+            <input type="text" id="newPartyGstin" class="form-control" maxlength="15" placeholder="Optional">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone</label>
+            <input type="text" id="newPartyPhone" class="form-control" placeholder="Optional">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="quickAddParty()">
+          <i class="bi bi-check-circle"></i> Add Party
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="alert alert-info mt-3">
   <h6><i class="bi bi-info-circle"></i> Enhanced Invoice Features</h6>

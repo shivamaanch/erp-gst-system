@@ -36,9 +36,9 @@
           <td class="text-end fw-bold">₹{{ "{:,.2f}".format(b.total_amount) }}</td>
           <td>
             <a href="{{ url_for('invoice.view', bid=b.id) }}" class="btn btn-sm btn-outline-info py-0">View</a>
-            <form action="{{ url_for('invoice.cancel', bid=b.id) }}" method="POST" class="d-inline"
-                  onsubmit="return confirm('Cancel this invoice?')">
-              <button class="btn btn-sm btn-outline-danger py-0">Cancel</button>
+            <form action="{{ url_for('invoice.delete', bid=b.id) }}" method="POST" class="d-inline"
+                  onsubmit="return confirm('Delete this invoice? This will also clear the milk entry link.')">
+              <button class="btn btn-sm btn-outline-danger py-0">Delete</button>
             </form>
           </td>
         </tr>

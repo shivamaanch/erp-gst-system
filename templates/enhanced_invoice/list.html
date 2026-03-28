@@ -4,6 +4,12 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">📋 {{ btype }} Invoices</h4>
   <div class="d-flex gap-2">
+    <a href="{{ url_for('clients.add') }}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-person-plus"></i> Add Client
+    </a>
+    <a href="{{ url_for('clients.index') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-people"></i> Client List
+    </a>
     <a href="{{ url_for('enhanced_invoice.create_invoice') }}?type={{ btype }}" class="btn btn-sm btn-primary">
       <i class="bi bi-plus-circle"></i> New Invoice
     </a>
@@ -55,7 +61,24 @@
           <tr>
             <td><strong>{{ bill.bill_no }}</strong></td>
             <td>{{ bill.bill_date.strftime('%d-%m-%Y') }}</td>
-            <td>{{ bill.party.name if bill.party else 'N/A' }}</td>
+            <td>
+              {{ bill.party.name if bill.party else 'N/A' }}
+              {% if bill.party %}
+              <div class="btn-group btn-group-sm ms-2" role="group">
+                <a href="{{ url_for('clients.view', pid=bill.party.id) }}" class="btn btn-outline-secondary" title="View Client">
+                  <i class="bi bi-person"></i>
+                </a>
+                <a href="{{ url_for('clients.edit', pid=bill.party.id) }}" class="btn btn-outline-primary" title="Edit Client">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form action="{{ url_for('clients.delete', pid=bill.party.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this client from active use?');">
+                  <button type="submit" class="btn btn-outline-danger" title="Delete Client">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+              {% endif %}
+            </td>
             <td><code>{{ bill.party.gstin if bill.party and bill.party.gstin else 'N/A' }}</code></td>
             <td class="text-end">₹{{ "{:,.2f}".format(bill.taxable_amount or 0) }}</td>
             <td class="text-end">₹{{ "{:,.2f}".format(bill.cgst or 0) }}</td>
@@ -83,7 +106,7 @@
                 <a href="{{ url_for('enhanced_invoice.export_invoice', bill_id=bill.id, format='pdf') }}" class="btn btn-outline-primary" title="Download PDF">
                   <i class="bi bi-file-earmark-pdf"></i>
                 </a>
-                <button onclick="deleteBill({{ bill.id }}, '{{ bill.bill_no }}')" class="btn btn-outline-danger" title="Delete">
+                <button type="button" class="btn btn-outline-danger delete-bill-btn" title="Delete" data-bill-id="{{ bill.id }}" data-bill-no="{{ bill.bill_no }}">
                   <i class="bi bi-trash"></i>
                 </button>
                 {% endif %}
@@ -170,6 +193,12 @@
 </div>
 
 <script>
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.delete-bill-btn');
+  if (!btn) return;
+  deleteBill(btn.dataset.billId, btn.dataset.billNo);
+});
+
 function deleteBill(billId, billNo) {
   if (confirm('Are you sure you want to delete invoice ' + billNo + '?')) {
     fetch('/enhanced-invoice/delete/' + billId, {

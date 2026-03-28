@@ -23,34 +23,34 @@
         <!-- Basic Info -->
         <div class="col-md-2">
           <label class="form-label fw-bold">Date *</label>
-          <input type="date" name="txn_date" class="form-control" value="{{ txn.txn_date.isoformat() if edit_mode else today }}" required>
+          <input type="date" name="txn_date" class="form-control" value="{% if edit_mode and txn %}{{ txn.txn_date.isoformat() }}{% else %}{{ today }}{% endif %}" required>
         </div>
         <div class="col-md-2">
           <label class="form-label fw-bold">Invoice No. (Optional)</label>
-          <input type="text" name="manual_bill_no" class="form-control" placeholder="Auto-generated if blank" value="{{ txn.bill.bill_no if edit_mode and txn.bill else '' }}">
+          <input type="text" name="manual_bill_no" class="form-control" placeholder="Auto-generated if blank" value="{% if edit_mode and txn and txn.bill %}{{ txn.bill.bill_no }}{% endif %}">
           <small class="text-muted">Leave blank for auto-number</small>
         </div>
         <div class="col-md-2">
           <label class="form-label fw-bold">Shift</label>
           <select name="shift" class="form-select">
-            <option value="Morning" {% if edit_mode and txn.shift == 'Morning' %}selected{% endif %}>Morning</option>
-            <option value="Evening" {% if edit_mode and txn.shift == 'Evening' %}selected{% endif %}>Evening</option>
+            <option value="Morning" {% if edit_mode and txn and txn.shift == 'Morning' %}selected{% endif %}>Morning</option>
+            <option value="Evening" {% if edit_mode and txn and txn.shift == 'Evening' %}selected{% endif %}>Evening</option>
           </select>
         </div>
         <div class="col-md-2">
           <label class="form-label fw-bold">Type *</label>
           <select name="txn_type" class="form-select" required>
-            <option value="Purchase" {% if edit_mode and txn.txn_type == 'Purchase' %}selected{% endif %}selected>Purchase</option>
-            <option value="Sale" {% if edit_mode and txn.txn_type == 'Sale' %}selected{% endif %}>Sale</option>
+            <option value="Purchase" {% if edit_mode and txn and txn.txn_type == 'Purchase' %}selected{% endif %}selected>Purchase</option>
+            <option value="Sale" {% if edit_mode and txn and txn.txn_type == 'Sale' %}selected{% endif %}>Sale</option>
           </select>
         </div>
         <div class="col-md-4">
           <label class="form-label fw-bold">Party *</label>
           <div class="input-group">
             <input type="text" id="partyName" class="form-control" list="partyList" placeholder="Type to search party..." 
-                   value="{% if edit_mode and txn.party %}{{ txn.party.name }}{% endif %}" 
+                   value="{% if edit_mode and txn and txn.party %}{{ txn.party.name }}{% endif %}" 
                    required autocomplete="off">
-            <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode %}{{ txn.party_id }}{% endif %}" required>
+            <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn %}{{ txn.party_id }}{% endif %}" required>
             <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#addPartyModal" title="Add New Party">
               <i class="fas fa-plus"></i>
             </button>
@@ -86,24 +86,24 @@
             <div class="col-md-2">
               <label class="form-label fw-bold">Item Qty (Liters) *</label>
               <input type="number" name="qty_liters" id="qty" class="form-control"
-                     step="0.01" placeholder="0.0" value="{{ txn.qty_liters if edit_mode else '0' }}" required onchange="calculateMarketRates(); calculateMilk()" oninput="calculateMarketRates(); calculateMilk()">
+                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.qty_liters }}{% endif %}" required onchange="calculateMarketRates(); calculateMilk()" oninput="calculateMarketRates(); calculateMilk()">
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">B.F % (Butter Fat) *</label>
               <input type="number" name="fat" id="fat" class="form-control"
-                     step="0.01" placeholder="0.0" value="{{ txn.fat if edit_mode else '0' }}" required onchange="calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="calculateSNF(); calculateMarketRates(); calculateMilk()">
+                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.fat }}{% endif %}" required onchange="calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="calculateSNF(); calculateMarketRates(); calculateMilk()">
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">CLR (Corrected Lactometer Reading) *</label>
               <input type="number" name="clr" id="clr" class="form-control"
-                     step="0.1" placeholder="0.0" value="{{ txn.clr if edit_mode else '0' }}" required onchange="calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="calculateSNF(); calculateMarketRates(); calculateMilk()">
+                     step="0.1" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.clr }}{% endif %}" required onchange="calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="calculateSNF(); calculateMarketRates(); calculateMilk()">
               <small class="text-muted">Enter CLR value (e.g., 14, 28, 29, etc.)</small>
             </div>
             <div class="col-md-2">
-              <label class="form-label fw-bold">Daily Rate (₹/Liter) *</label>
+              <label class="form-label fw-bold">Daily Rate (₹/100 kg) *</label>
               <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control"
-                     step="0.01" placeholder="0.00" value="{{ txn.rate if edit_mode else '0' }}" required onchange="calculateMilk(); calculateMarketRates()" oninput="calculateMilk(); calculateMarketRates()">
-              <small class="text-muted">Daily rate per liter (changes every day)</small>
+                     step="0.01" placeholder="0.00" value="{% if edit_mode and txn %}{{ txn.rate }}{% endif %}" required onchange="calculateMilk(); calculateMarketRates()" oninput="calculateMilk(); calculateMarketRates()">
+              <small class="text-muted">Daily rate per 100 kg milk (changes every day)</small>
             </div>
 
             <!-- Step 2: Auto-calculated SNF -->
@@ -113,7 +113,7 @@
             <div class="col-md-2">
               <label class="form-label fw-bold">SNF % (Auto)</label>
               <input type="number" id="snf_auto" class="form-control bg-light" 
-                     readonly placeholder="8.50" value="{{ txn.snf if edit_mode else '' }}">
+                     readonly placeholder="8.50" value="{% if edit_mode and txn %}{{ txn.snf }}{% endif %}">
               <small class="text-muted">Auto-calculated from CLR</small>
             </div>
             <div class="col-md-2">
@@ -122,13 +122,7 @@
                      readonly placeholder="0.00" value="0.00">
               <small class="text-muted">For reference only</small>
             </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Default Ratio</label>
-              <input type="number" id="default_ratio" class="form-control bg-light" 
-                     placeholder="8.50" readonly>
-              <small class="text-muted">Standard milk ratio</small>
-            </div>
-            <div class="col-md-2">
+                        <div class="col-md-2">
               <label class="form-label fw-bold">SNF Rate (Info)</label>
               <input type="number" id="snf_rate" class="form-control bg-light"
                      readonly placeholder="0.00" value="0.00">
@@ -150,12 +144,6 @@
               <input type="number" id="snf_kgs" class="form-control bg-light" 
                      readonly placeholder="0.00">
               <small class="text-muted">Qty × SNF% ÷ 100</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Ratio (Auto)</label>
-              <input type="number" id="ratio" class="form-control bg-light" 
-                     readonly placeholder="0.00">
-              <small class="text-muted">SNF Kgs ÷ BF Kgs</small>
             </div>
             <div class="col-md-2">
               <label class="form-label fw-bold">Rate per Liter (Calc)</label>
@@ -255,7 +243,7 @@
       <!-- Narration -->
       <div class="col-12 mt-3">
         <label class="form-label fw-bold">Narration</label>
-        <input type="text" name="narration" class="form-control" required value="Office Party" placeholder="Optional note" value="{{ txn.narration if edit_mode else '' }}">
+        <input type="text" name="narration" class="form-control" placeholder="Optional note" value="{% if edit_mode and txn %}{{ txn.narration }}{% endif %}">
       </div>
 
       <div class="d-flex gap-2 mt-4">
@@ -287,12 +275,11 @@ function calculateSNF() {
   // Bihar formula: SNF = (CLR/4) + (0.20 × Fat) + 0.14
   if (clr > 0) {
     snf = (clr / 4) + (0.20 * fat) + 0.14;
+    // Ensure SNF stays within reasonable bounds (7.0 - 15.0)
+    snf = Math.max(7.0, Math.min(15.0, snf));
   } else {
-    snf = 7.54; // Default if CLR is 0
+    snf = 0; // No SNF if CLR is 0
   }
-  
-  // Ensure SNF stays within reasonable bounds (7.0 - 15.0)
-  snf = Math.max(7.0, Math.min(15.0, snf));
   
   document.getElementById('snf_auto').value = snf.toFixed(2);
   calculateMarketRates(); // Auto-calc rates based on CLR
@@ -301,11 +288,12 @@ function calculateSNF() {
 
 // Calculate BF and SNF rates based on milk composition
 function calculateMarketRates() {
-  const dailyRate = parseFloat(document.getElementById('rate_per_liter').value) || 4500;
-  const clr = parseFloat(document.getElementById('clr').value) || 14;
+  const dailyRate = parseFloat(document.getElementById('rate_per_liter').value) || 0;
   const qty = parseFloat(document.getElementById('qty').value) || 0;
   const fat = parseFloat(document.getElementById('fat').value) || 0;
-  const snf = parseFloat(document.getElementById('snf_auto').value) || 14; // Use calculated SNF
+  const snf = parseFloat(document.getElementById('snf_auto').value) || 0;
+  
+  console.log(`MarketRates - Rate: ${dailyRate}, Qty: ${qty}, Fat: ${fat}, SNF: ${snf}`);
   
   // Calculate component weights
   const bfKgs = qty * fat / 100;
@@ -314,6 +302,9 @@ function calculateMarketRates() {
   // Use proper 60:40 split with standard composition
   // 60:40 split between fat and SNF
   // Standard composition: 6.5 kg fat and 8.5 kg SNF per 100 kg milk
+  
+  let bfRate = 0;
+  let snfRate = 0;
   
   if (dailyRate > 0) {
     const fatShare = 0.60;  // 60% for fat
@@ -324,13 +315,18 @@ function calculateMarketRates() {
     // Calculate component rates
     bfRate = (dailyRate * fatShare) / stdFatKg;
     snfRate = (dailyRate * snfShare) / stdSnfKg;
-  } else {
-    bfRate = 0;
-    snfRate = 0;
+    
+    console.log(`Component rates - BF: ₹${bfRate.toFixed(2)}/kg, SNF: ₹${snfRate.toFixed(2)}/kg`);
   }
   
-  document.getElementById('fat_rate').value = bfRate.toFixed(2);
-  document.getElementById('snf_rate').value = snfRate.toFixed(2);
+  // Update display
+  const fatRateElement = document.getElementById('fat_rate');
+  const snfRateElement = document.getElementById('snf_rate');
+  
+  if (fatRateElement) fatRateElement.value = bfRate.toFixed(2);
+  if (snfRateElement) snfRateElement.value = snfRate.toFixed(2);
+  
+  console.log(`Updated component rates display`);
 }
 
 // Main milk calculation
@@ -351,11 +347,11 @@ function calculateMilk() {
   let snfKgs = qty * snf / 100;
   // Round SNF Kgs to 2 decimal places like your software
   let snfKgsRounded = Math.round(snfKgs * 100) / 100;
-  let ratio = 8.5; // Fixed ratio like your software
-  
-  // Auto-calculate market rates based on CLR
-  calculateMarketRates();
-  
+  // Calculate ratio dynamically using formula: SNF Kgs ÷ BF Kgs
+  let ratio = 8.5; // Default fallback
+  if (bfKgs > 0) {
+    ratio = snfKgsRounded / bfKgs;
+  }
   // Get rates after calculation
   let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
   let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
@@ -557,6 +553,14 @@ function resetForm() {
 document.addEventListener('DOMContentLoaded', function() {
   toggleGST();
   calculateSNF(); // Set default SNF
+  
+  // Trigger calculations to populate all fields
+  setTimeout(function() {
+    console.log('Initializing calculations for add/edit mode...');
+    calculateMarketRates();
+    calculateMilk();
+    console.log('Calculations initialized');
+  }, 100);
 });
 </script>
 {% endblock %}

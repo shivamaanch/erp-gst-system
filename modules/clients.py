@@ -7,6 +7,18 @@ clients_bp = Blueprint("clients", __name__)
 
 PARTY_TYPES = ["Debtor", "Creditor", "Supplier", "Both"]
 
+
+def _fy_aliases(fy: str):
+    if not fy:
+        return []
+    aliases = {fy}
+    # Accept both 2025-26 and 25-26 style FY strings
+    if len(fy) == 7 and fy[4] == "-":
+        aliases.add(f"{fy[2:4]}-{fy[5:7]}")
+    elif len(fy) == 5 and fy[2] == "-":
+        aliases.add(f"20{fy}")
+    return list(aliases)
+
 @clients_bp.route("/clients")
 @login_required
 def index():
@@ -82,7 +94,15 @@ def view(pid):
     fy  = session.get("fin_year")
     p   = Party.query.filter_by(id=pid, company_id=cid).first_or_404()
     from models import Bill
-    bills = Bill.query.filter_by(company_id=cid, party_id=pid, fin_year=fy, is_cancelled=False).order_by(Bill.bill_date.desc()).all()
+    fy_list = _fy_aliases(fy)
+    q = Bill.query.filter(
+        Bill.company_id == cid,
+        Bill.party_id == pid,
+        Bill.is_cancelled == False,
+    )
+    if fy_list:
+        q = q.filter(Bill.fin_year.in_(fy_list))
+    bills = q.order_by(Bill.bill_date.desc()).all()
     return render_template("clients/view.html", party=p, bills=bills)
 
 @clients_bp.route("/api/party-search")
@@ -107,13 +127,24 @@ def quick_add():
         name = request.form.get("name","").strip()
         if not name:
             return jsonify({"success": False, "error": "Party name required"}), 400
+        requested_party_type = (request.form.get("party_type", "") or "").strip()
+        normalized_party_type = {
+            "customer": "Debtor",
+            "debtor": "Debtor",
+            "sales": "Debtor",
+            "supplier": "Supplier",
+            "vendor": "Supplier",
+            "creditor": "Creditor",
+            "purchase": "Supplier",
+            "both": "Both"
+        }.get(requested_party_type.lower(), "Debtor")
         
         p = Party(
             company_id=cid,
             name=name,
             gstin=request.form.get("gstin","").strip().upper() or None,
             phone=request.form.get("phone","").strip() or None,
-            party_type=request.form.get("party_type","Customer"),
+            party_type=normalized_party_type,
             is_active=True
         )
         db.session.add(p)
@@ -125,7 +156,8 @@ def quick_add():
                 "id": p.id,
                 "name": p.name,
                 "gstin": p.gstin or "",
-                "phone": p.phone or ""
+                "phone": p.phone or "",
+                "party_type": p.party_type
             }
         })
     except Exception as e:

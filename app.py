@@ -620,11 +620,11 @@ def create_app():
                     session["fin_year"] = fy.year_name if fy else "2025-26"
                     session["user_role"] = "admin"
                 
-                # Redirect to the requested page if available, otherwise go to reports hub
+                # Redirect back to the requested page (preserve querystring)
                 next_page = request.args.get('next')
                 if next_page and next_page.startswith('/'):
                     return redirect(next_page)
-                return redirect(url_for("reports.hub"))
+                return redirect(request.full_path.rstrip('?'))
         return redirect(url_for("auth.login"))
 
     from modules.auth           import auth_bp
@@ -688,7 +688,7 @@ def create_app():
         company_id = session.get("company_id")
         company_name = "No Company"
         if company_id:
-            company = Company.query.get(company_id)
+            company = db.session.get(Company, company_id)
             if company:
                 company_name = company.name
         

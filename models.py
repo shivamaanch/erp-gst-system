@@ -19,8 +19,8 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Multi-company relationships
-    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", lazy="dynamic")
-    user_companies = db.relationship("UserCompany", back_populates="company", lazy="dynamic")
+    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", lazy="dynamic", overlaps="user_companies")
+    user_companies = db.relationship("UserCompany", back_populates="company", lazy="dynamic", overlaps="users")
 
 class FinancialYear(db.Model):
     __tablename__ = "financial_years"
@@ -47,8 +47,8 @@ class User(UserMixin, db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
     
     # Relationships for multi-company access
-    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic")
-    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic")
+    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies")
+    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", overlaps="user_companies")
     
     @property
     def current_company(self):
@@ -97,8 +97,8 @@ class UserCompany(db.Model):
     expires_at = db.Column(db.DateTime)  # Optional expiry date for temporary access
     
     # Relationships
-    user = db.relationship("User", back_populates="user_companies")
-    company = db.relationship("Company", back_populates="user_companies")
+    user = db.relationship("User", back_populates="user_companies", overlaps="accessible_companies,users")
+    company = db.relationship("Company", back_populates="user_companies", overlaps="accessible_companies,users")
     
     def __repr__(self):
         return f"<UserCompany {self.user.username} -> {self.company.name} ({self.role})>"

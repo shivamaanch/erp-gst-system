@@ -34,11 +34,11 @@
             <td><code>{{ bi.item.hsn_code if bi.item else "" }}</code></td>
             <td>{{ bi.qty }}</td>
             <td>₹{{ "{:,.2f}".format(bi.rate) }}</td>
-            <td>₹{{ "{:,.2f}".format(bi.taxable_amount if hasattr(bi,"taxable_amount") and bi.taxable_amount else bi.amount - bi.cgst - bi.sgst - bi.igst) }}</td>
+            <td>₹{{ "{:,.2f}".format(bi.taxable_amount or 0) }}</td>
             <td>₹{{ "{:,.2f}".format(bi.cgst) }}</td>
             <td>₹{{ "{:,.2f}".format(bi.sgst) }}</td>
             <td>₹{{ "{:,.2f}".format(bi.igst) }}</td>
-            <td class="text-end fw-bold">₹{{ "{:,.2f}".format(bi.amount) }}</td>
+            <td class="text-end fw-bold">₹{{ "{:,.2f}".format((bi.taxable_amount or 0) + (bi.cgst or 0) + (bi.sgst or 0) + (bi.igst or 0)) }}</td>
           </tr>
           {% endfor %}
         </tbody>

@@ -9,6 +9,18 @@ import json
 
 invoice_bp = Blueprint("invoice", __name__)
 
+
+def _fy_aliases(fy: str):
+    if not fy:
+        return []
+    aliases = {fy}
+    # Accept both 2025-26 and 25-26 style FY strings
+    if len(fy) == 7 and fy[4] == "-":
+        aliases.add(f"{fy[2:4]}-{fy[5:7]}")
+    elif len(fy) == 5 and fy[2] == "-":
+        aliases.add(f"20{fy}")
+    return list(aliases)
+
 def next_bill_no(cid, fy, bill_type):
     prefix = "SI" if bill_type == "Sales" else "PI"
     count = Bill.query.filter_by(company_id=cid, fin_year=fy, bill_type=bill_type).count()
@@ -23,7 +35,14 @@ def index():
     fy   = session.get("fin_year")
     btype = request.args.get("type", "Sales")
     search = request.args.get("q","")
-    q = Bill.query.filter_by(company_id=cid, fin_year=fy, bill_type=btype, is_cancelled=False)
+    fy_list = _fy_aliases(fy)
+    q = Bill.query.filter(
+        Bill.company_id == cid,
+        Bill.bill_type == btype,
+        Bill.is_cancelled == False,
+    )
+    if fy_list:
+        q = q.filter(Bill.fin_year.in_(fy_list))
     if search:
         q = q.join(Party).filter(Party.name.ilike(f"%{search}%"))
     bills = q.order_by(Bill.bill_date.desc()).all()
@@ -37,8 +56,9 @@ def create(btype):
         return redirect(url_for("invoice.index"))
     cid = session.get("company_id")
     fy  = session.get("fin_year")
+    party_types = ["Debtor", "Both", "Customer"] if btype=="Sales" else ["Creditor", "Supplier", "Both", "Vendor"]
     parties = Party.query.filter_by(company_id=cid, is_active=True).filter(
-        Party.party_type.in_(["Debtor","Both"] if btype=="Sales" else ["Creditor","Supplier","Both"])
+        Party.party_type.in_(party_types)
     ).order_by(Party.name).all()
     items = Item.query.filter_by(company_id=cid, is_active=True).order_by(Item.name).all() if hasattr(Item, "is_active") else Item.query.filter_by(company_id=cid).order_by(Item.name).all()
 
@@ -83,24 +103,47 @@ def create(btype):
                 igst = round(taxable * gst_rate / 100, 2); cgst = sgst = 0
             else:
                 cgst = sgst = round(taxable * gst_rate / 200, 2); igst = 0
-            amount = taxable + cgst + sgst + igst
+            line_total = taxable + cgst + sgst + igst
 
-            bi = BillItem(bill_id=bill.id, item_id=int(iid),
-                         qty=qty, rate=rate, amount=amount,
-                         gst_rate=gst_rate, cgst=cgst, sgst=sgst, igst=igst)
-            if hasattr(bi, "taxable_amount"): bi.taxable_amount = taxable
+            bi = BillItem(
+                bill_id=bill.id,
+                item_id=int(iid),
+                qty=qty,
+                rate=rate,
+                taxable_amount=taxable,
+                gst_rate=gst_rate,
+                cgst=cgst,
+                sgst=sgst,
+                igst=igst,
+            )
             if hasattr(bi, "discount"):       bi.discount = disc
             db.session.add(bi)
-            total += amount
+            total += line_total
 
             # Update stock
-            sl = StockLedger(company_id=cid, fin_year=fy, item_id=int(iid),
-                            txn_date=bill_date, txn_type=btype,
-                            ref_id=bill.id, ref_no=bill_no,
-                            qty_in=(qty if btype=="Purchase" else 0),
-                            qty_out=(qty if btype=="Sales" else 0),
-                            rate=rate)
-            db.session.add(sl)
+            try:
+                sl = StockLedger(
+                    company_id=cid,
+                    fin_year=fy,
+                    item_id=int(iid),
+                    txn_date=bill_date,
+                    txn_type=btype,
+                    rate=rate,
+                )
+                if hasattr(sl, "in_qty"):
+                    sl.in_qty = qty if btype == "Purchase" else 0
+                if hasattr(sl, "out_qty"):
+                    sl.out_qty = qty if btype == "Sales" else 0
+                if hasattr(sl, "qty_in"):
+                    sl.qty_in = qty if btype == "Purchase" else 0
+                if hasattr(sl, "qty_out"):
+                    sl.qty_out = qty if btype == "Sales" else 0
+                if hasattr(sl, "bill_id"):
+                    sl.bill_id = bill.id
+                db.session.add(sl)
+            except Exception:
+                # Stock ledger is optional; do not block invoice creation
+                pass
 
         bill.total_amount = round(total, 2)
         db.session.commit()
@@ -116,6 +159,31 @@ def view(bid):
     cid  = session.get("company_id")
     bill = Bill.query.filter_by(id=bid, company_id=cid).first_or_404()
     return render_template("invoice/view.html", bill=bill)
+
+@invoice_bp.route("/invoice/delete/<int:bid>", methods=["POST"])
+@login_required
+def delete(bid):
+    """Delete an invoice and clear milk entry link if present"""
+    cid = session.get("company_id")
+    bill = Bill.query.filter_by(id=bid, company_id=cid).first_or_404()
+    try:
+        # Delete bill items first
+        BillItem.query.filter_by(bill_id=bid).delete()
+        # Find and delete any milk entry linked to this bill (not just clear bill_id)
+        from models import MilkTransaction
+        linked_milk = MilkTransaction.query.filter_by(bill_id=bid).first()
+        if linked_milk:
+            print(f"DEBUG: Deleting linked milk entry {linked_milk.id}")
+            db.session.delete(linked_milk)
+        # Delete the bill
+        db.session.delete(bill)
+        db.session.commit()
+        print("DEBUG: Invoice and linked milk entry deleted successfully")
+        flash(f"Invoice {bill.bill_no} deleted.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Failed to delete: {e}", "danger")
+    return redirect(url_for("invoice.index", type=bill.bill_type))
 
 @invoice_bp.route("/invoice/cancel/<int:bid>", methods=["POST"])
 @login_required
