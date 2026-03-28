@@ -109,12 +109,12 @@ function addRow() {
 function removeRow(btn) {
   const row = btn.closest('tr');
   const tbody = row.parentNode;
-  if (tbody.children.length > 1) {
-    row.remove();
-    calculateTotals();
-  } else {
-    alert('At least one row is required');
+  if (tbody.children.length <= 2) {
+    alert('Journal entry requires at least 2 accounts!');
+    return;
   }
+  row.remove();
+  calculateTotals();
 }
 
 function calculateTotals() {
@@ -193,8 +193,12 @@ function handleEnterKey(e) {
 document.getElementById('quickJournalForm').addEventListener('submit', function(e) {
   const totalDebit = parseFloat(document.getElementById('totalDebit').textContent) || 0;
   const totalCredit = parseFloat(document.getElementById('totalCredit').textContent) || 0;
+  const tbody = document.getElementById('journalBody');
   
-  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+  if (tbody.children.length < 2) {
+    e.preventDefault();
+    alert('Journal entry requires at least 2 accounts!');
+  } else if (Math.abs(totalDebit - totalCredit) > 0.01) {
     e.preventDefault();
     alert('Journal entry must be balanced (Debit = Credit)');
   }

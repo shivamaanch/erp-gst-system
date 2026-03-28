@@ -30,12 +30,21 @@
     <thead class="table-dark"><tr><th>Account</th><th>Debit</th><th>Credit</th><th></th></tr></thead>
     <tbody id="lineBody">
       <tr>
-        <td><select name="account_id[]" class="form-select form-select-sm">
+        <td><select name="account_id[]" class="form-select form-select-sm" required>
           <option value="">-- Select --</option>
           {% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}
         </select></td>
-        <td><input type="number" name="debit[]"  class="form-control form-control-sm dr" step="0.01" value="0"></td>
-        <td><input type="number" name="credit[]" class="form-control form-control-sm cr" step="0.01" value="0"></td>
+        <td><input type="number" name="debit[]"  class="form-control form-control-sm dr" step="0.01" value="0" required></td>
+        <td><input type="number" name="credit[]" class="form-control form-control-sm cr" step="0.01" value="0" required></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
+      </tr>
+      <tr>
+        <td><select name="account_id[]" class="form-select form-select-sm" required>
+          <option value="">-- Select --</option>
+          {% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}
+        </select></td>
+        <td><input type="number" name="debit[]"  class="form-control form-control-sm dr" step="0.01" value="0" required></td>
+        <td><input type="number" name="credit[]" class="form-control form-control-sm cr" step="0.01" value="0" required></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
       </tr>
     </tbody>
@@ -65,7 +74,15 @@ function addRow() {
   tbody.appendChild(tr);
   tr.querySelectorAll("input").forEach(i => i.addEventListener("input", calcTotals));
 }
-function removeRow(btn) { btn.closest("tr").remove(); calcTotals(); }
+function removeRow(btn) { 
+  const tbody = document.getElementById("lineBody");
+  if (tbody.children.length <= 2) {
+    alert("Journal entry requires at least 2 accounts!");
+    return;
+  }
+  btn.closest("tr").remove(); 
+  calcTotals(); 
+}
 function calcTotals() {
   let dr=0,cr=0;
   document.querySelectorAll(".dr").forEach(i=>dr+=parseFloat(i.value||0));
@@ -79,7 +96,15 @@ document.querySelectorAll(".dr,.cr").forEach(i=>i.addEventListener("input",calcT
 document.getElementById("jForm").addEventListener("submit", function(e) {
   const dr = parseFloat(document.getElementById("totalDr").textContent);
   const cr = parseFloat(document.getElementById("totalCr").textContent);
-  if (Math.abs(dr-cr)>0.01) { e.preventDefault(); alert("Entry not balanced!"); }
+  const tbody = document.getElementById("lineBody");
+  
+  if (tbody.children.length < 2) {
+    e.preventDefault(); 
+    alert("Journal entry requires at least 2 accounts!");
+  } else if (Math.abs(dr-cr)>0.01) { 
+    e.preventDefault(); 
+    alert("Entry not balanced!");
+  }
 });
 </script>
 {% endblock %}
