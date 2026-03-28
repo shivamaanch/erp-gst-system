@@ -60,6 +60,8 @@
       <i class="bi bi-cart3"></i> Purchase</a>
     <a href="{{ url_for('milk.entry_list') }}" class="nav-link {{ 'active' if 'milk' in (request.endpoint or '') }}">
       <i class="bi bi-droplet"></i> Milk Entry</a>
+    <a href="{{ url_for('milk.milk_statement') }}" class="nav-link {{ 'active' if request.endpoint=='milk.milk_statement' }}">
+      <i class="bi bi-journal-text"></i> Milk Statement</a>
     <a href="{{ url_for('milk.purchase_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.purchase_list' }}">
       <i class="bi bi-cart-arrow-down"></i> Milk Purchase</a>
     <a href="{{ url_for('milk.sale_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.sale_list' }}">

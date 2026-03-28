@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}🥛 Milk Statement{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 Milk Statement</h4>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-info" onclick="exportData('excel')">
+      <i class="bi bi-file-earmark-excel"></i> Excel
+    </button>
+    <button type="button" class="btn btn-outline-danger" onclick="exportData('pdf')">
+      <i class="bi bi-file-earmark-pdf"></i> PDF
+    </button>
+  </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">🔍 Party Search Bar</label>
+        <input type="text" id="partySearch" class="form-control" placeholder="💡 Start typing to search parties...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">From Date</label>
+        <input type="date" id="fromDate" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">To Date</label>
+        <input type="date" id="toDate" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">&nbsp;</label>
+        <div class="d-flex gap-2">
+          <button type="button" onclick="applyFilters()" class="btn btn-outline-primary">Filter</button>
+          <button type="button" onclick="resetFilters()" class="btn btn-outline-secondary">Reset</button>
+        </div>
+      </div>
+    </div>
+    <small class="text-muted">💡 Start typing to search parties • Results will appear instantly • Filters work together</small>
+  </div>
+</div>
+
+<!-- Purchase Section -->
+<div class="card border-danger mb-3">
+  <div class="card-header bg-danger text-white fw-bold">
+    <i class="bi bi-cart-arrow-down"></i> Milk Purchase Summary
+  </div>
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-2">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-warning">Total Qty (L)</h6>
+            <h4 class="mb-0" id="purchaseTotalQty">{{ "%.2f"|format(purchase_total_qty) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-success">Avg FAT%</h6>
+            <h4 class="mb-0" id="purchaseAvgFat">{{ "%.2f"|format(purchase_avg_fat) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="text-info">Avg SNF%</h6>
+            <h4 class="mb-0" id="purchaseAvgSnf">{{ "%.2f"|format(purchase_avg_snf) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-warning">Total BF Kgs</h6>
+            <h4 class="mb-0" id="purchaseTotalBfKgs">{{ "%.2f"|format(purchase_total_bf_kgs) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-secondary">
+          <div class="card-body text-center">
+            <h6 class="text-secondary">Total SNF Kgs</h6>
+            <h4 class="mb-0" id="purchaseTotalSnfKgs">{{ "%.2f"|format(purchase_total_snf_kgs) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-danger">
+          <div class="card-body text-center">
+            <h6 class="text-danger">Total Amount</h6>
+            <h4 class="mb-0">₹{{ "%.2f"|format(purchase_total_amount) }}</h4>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover" id="purchaseTable">
+        <thead class="table-dark">
+          <tr>
+            <th>Actions</th>
+            <th>Bill No.</th>
+            <th>Date</th>
+            <th>Shift</th>
+            <th>Party</th>
+            <th>Qty (L)</th>
+            <th>FAT%</th>
+            <th>SNF%</th>
+            <th>BF Kgs</th>
+            <th>SNF Kgs</th>
+            <th>Ratio</th>
+            <th>Rate/L</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="purchaseBody">
+          {% for txn in txns %}
+          {% if txn.txn_type == 'Purchase' %}
+          <tr data-party="{{ txn.party.name if txn.party else '' }}">
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if txn.bill %}
+                <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
+                  <i class="bi bi-receipt"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
+            <td>{{ txn.txn_date.strftime('%d-%b-%Y') }}</td>
+            <td>{{ txn.shift }}</td>
+            <td>{{ txn.party.name if txn.party else '-' }}</td>
+            <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
+            <td>{{ "%.2f"|format(txn.fat) }}</td>
+            <td>{{ "%.2f"|format(txn.snf) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
+            <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
+            <td>₹{{ "%.4f"|format(txn.rate) }}</td>
+            <td class="fw-bold">₹{{ "%.2f"|format(txn.amount) }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Sale Section -->
+<div class="card border-success mb-3">
+  <div class="card-header bg-success text-white fw-bold">
+    <i class="bi bi-cart-arrow-up"></i> Milk Sale Summary
+  </div>
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-2">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-warning">Total Qty (L)</h6>
+            <h4 class="mb-0" id="saleTotalQty">{{ "%.2f"|format(sale_total_qty) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-success">Avg FAT%</h6>
+            <h4 class="mb-0" id="saleAvgFat">{{ "%.2f"|format(sale_avg_fat) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="text-info">Avg SNF%</h6>
+            <h4 class="mb-0" id="saleAvgSnf">{{ "%.2f"|format(sale_avg_snf) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-warning">Total BF Kgs</h6>
+            <h4 class="mb-0" id="saleTotalBfKgs">{{ "%.2f"|format(sale_total_bf_kgs) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-secondary">
+          <div class="card-body text-center">
+            <h6 class="text-secondary">Total SNF Kgs</h6>
+            <h4 class="mb-0" id="saleTotalSnfKgs">{{ "%.2f"|format(sale_total_snf_kgs) }}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card border-danger">
+          <div class="card-body text-center">
+            <h6 class="text-danger">Total Amount</h6>
+            <h4 class="mb-0">₹{{ "%.2f"|format(sale_total_amount) }}</h4>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover" id="saleTable">
+        <thead class="table-dark">
+          <tr>
+            <th>Actions</th>
+            <th>Bill No.</th>
+            <th>Date</th>
+            <th>Shift</th>
+            <th>Party</th>
+            <th>Qty (L)</th>
+            <th>FAT%</th>
+            <th>SNF%</th>
+            <th>BF Kgs</th>
+            <th>SNF Kgs</th>
+            <th>Ratio</th>
+            <th>Rate/L</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="saleBody">
+          {% for txn in txns %}
+          {% if txn.txn_type == 'Sale' %}
+          <tr data-party="{{ txn.party.name if txn.party else '' }}">
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if txn.bill %}
+                <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
+                  <i class="bi bi-receipt"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
+            <td>{{ txn.txn_date.strftime('%d-%b-%Y') }}</td>
+            <td>{{ txn.shift }}</td>
+            <td>{{ txn.party.name if txn.party else '-' }}</td>
+            <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
+            <td>{{ "%.2f"|format(txn.fat) }}</td>
+            <td>{{ "%.2f"|format(txn.snf) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
+            <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
+            <td>₹{{ "%.4f"|format(txn.rate) }}</td>
+            <td class="fw-bold">₹{{ "%.2f"|format(txn.amount) }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function applyFilters() {
+  const partySearch = document.getElementById('partySearch').value.toLowerCase();
+  const fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  
+  // Filter Purchase data
+  const purchaseRows = document.querySelectorAll('#purchaseTable tbody tr');
+  let purchaseVisibleCount = 0;
+  let purchaseTotals = {qty: 0, fat: 0, snf: 0, amount: 0, bfKgs: 0, snfKgs: 0};
+  
+  purchaseRows.forEach(row => {
+    const party = row.getAttribute('data-party').toLowerCase();
+    const date = row.cells[2].textContent.trim();
+    const qty = parseFloat(row.cells[6].textContent) || 0;
+    const fat = parseFloat(row.cells[7].textContent) || 0;
+    const snf = parseFloat(row.cells[8].textContent) || 0;
+    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(',', '')) || 0;
+    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    
+    let show = true;
+    
+    if (partySearch && !party.includes(partySearch)) show = false;
+    if (fromDate && date < fromDate) show = false;
+    if (toDate && date > toDate) show = false;
+    
+    row.style.display = show ? '' : 'none';
+    
+    if (show) {
+      purchaseVisibleCount++;
+      purchaseTotals.qty += qty;
+      purchaseTotals.fat += fat;
+      purchaseTotals.snf += snf;
+      purchaseTotals.amount += amount;
+      purchaseTotals.bfKgs += bfKgs;
+      purchaseTotals.snfKgs += snfKgs;
+    }
+  });
+  
+  // Update Purchase summary
+  document.getElementById('purchaseTotalQty').textContent = purchaseTotals.qty.toFixed(2);
+  document.getElementById('purchaseAvgFat').textContent = purchaseVisibleCount > 0 ? (purchaseTotals.fat / purchaseVisibleCount).toFixed(2) : '0.00';
+  document.getElementById('purchaseAvgSnf').textContent = purchaseVisibleCount > 0 ? (purchaseTotals.snf / purchaseVisibleCount).toFixed(2) : '0.00';
+  document.getElementById('purchaseTotalBfKgs').textContent = purchaseTotals.bfKgs.toFixed(2);
+  document.getElementById('purchaseTotalSnfKgs').textContent = purchaseTotals.snfKgs.toFixed(2);
+  document.getElementById('purchaseTotalAmount').textContent = '₹' + purchaseTotals.amount.toFixed(2);
+  
+  // Filter Sale data
+  const saleRows = document.querySelectorAll('#saleTable tbody tr');
+  let saleVisibleCount = 0;
+  let saleTotals = {qty: 0, fat: 0, snf: 0, amount: 0, bfKgs: 0, snfKgs: 0};
+  
+  saleRows.forEach(row => {
+    const party = row.getAttribute('data-party').toLowerCase();
+    const date = row.cells[2].textContent.trim();
+    const qty = parseFloat(row.cells[6].textContent) || 0;
+    const fat = parseFloat(row.cells[7].textContent) || 0;
+    const snf = parseFloat(row.cells[8].textContent) || 0;
+    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(',', '')) || 0;
+    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    
+    let show = true;
+    
+    if (partySearch && !party.includes(partySearch)) show = false;
+    if (fromDate && date < fromDate) show = false;
+    if (toDate && date > toDate) show = false;
+    
+    row.style.display = show ? '' : 'none';
+    
+    if (show) {
+      saleVisibleCount++;
+      saleTotals.qty += qty;
+      saleTotals.fat += fat;
+      saleTotals.snf += snf;
+      saleTotals.amount += amount;
+      saleTotals.bfKgs += bfKgs;
+      saleTotals.snfKgs += snfKgs;
+    }
+  });
+  
+  // Update Sale summary
+  document.getElementById('saleTotalQty').textContent = saleTotals.qty.toFixed(2);
+  document.getElementById('saleAvgFat').textContent = saleVisibleCount > 0 ? (saleTotals.fat / saleVisibleCount).toFixed(2) : '0.00';
+  document.getElementById('saleAvgSnf').textContent = saleVisibleCount > 0 ? (saleTotals.snf / saleVisibleCount).toFixed(2) : '0.00';
+  document.getElementById('saleTotalBfKgs').textContent = saleTotals.bfKgs.toFixed(2);
+  document.getElementById('saleTotalSnfKgs').textContent = saleTotals.snfKgs.toFixed(2);
+  document.getElementById('saleTotalAmount').textContent = '₹' + saleTotals.amount.toFixed(2);
+}
+
+function resetFilters() {
+  document.getElementById('partySearch').value = '';
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  applyFilters();
+}
+
+function exportData(format) {
+  const partySearch = document.getElementById('partySearch').value;
+  const fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  
+  const params = new URLSearchParams({
+    format: format,
+    search: partySearch,
+    from_date: fromDate,
+    to_date: toDate
+  });
+  
+  window.open(`/milk/milk-statement/export?${params.toString()}`, '_blank');
+}
+
+// Real-time search
+document.getElementById('partySearch').addEventListener('input', applyFilters);
+document.getElementById('fromDate').addEventListener('change', applyFilters);
+document.getElementById('toDate').addEventListener('change', applyFilters);
+</script>
+{% endblock %}

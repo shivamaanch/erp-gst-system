@@ -133,9 +133,10 @@ def entry_list():
                 self.bill_id = row.bill_id
                 # Add bill object for template compatibility
                 class SimpleBill:
-                    def __init__(self, bill_no):
+                    def __init__(self, bill_id, bill_no):
+                        self.id = bill_id
                         self.bill_no = bill_no
-                self.bill = SimpleBill(row.bill_no) if row.bill_no else None
+                self.bill = SimpleBill(row.bill_id, row.bill_no) if row.bill_id and row.bill_no else None
         
         txns.append(SimpleMilkTransaction(row))
     total_qty = sum(float(t.qty_liters) for t in txns)
@@ -246,9 +247,10 @@ def purchase_list():
                 self.bill_id = row.bill_id
                 # Add bill object for template compatibility
                 class SimpleBill:
-                    def __init__(self, bill_no):
+                    def __init__(self, bill_id, bill_no):
+                        self.id = bill_id
                         self.bill_no = bill_no
-                self.bill = SimpleBill(row.bill_no) if row.bill_no else None
+                self.bill = SimpleBill(row.bill_id, row.bill_no) if row.bill_id and row.bill_no else None
         
         txns.append(SimpleMilkTransaction(row))
     
@@ -344,9 +346,10 @@ def sale_list():
                 self.bill_id = row.bill_id
                 # Add bill object for template compatibility
                 class SimpleBill:
-                    def __init__(self, bill_no):
+                    def __init__(self, bill_id, bill_no):
+                        self.id = bill_id
                         self.bill_no = bill_no
-                self.bill = SimpleBill(row.bill_no) if row.bill_no else None
+                self.bill = SimpleBill(row.bill_id, row.bill_no) if row.bill_id and row.bill_no else None
         
         txns.append(SimpleMilkTransaction(row))
     
@@ -365,6 +368,119 @@ def sale_list():
                      txns=txns, total_qty=total_qty, total_amt=total_amt,
                      avg_fat=avg_fat, avg_snf=avg_snf,
                      total_bf_kgs=total_bf_kgs, total_snf_kgs=total_snf_kgs,
+                     parties=parties)
+
+@milk_bp.route("/milk/milk-statement")
+@login_required
+def milk_statement():
+    # Initialize session if not set
+    if not session.get("company_id"):
+        session["company_id"] = 1
+        session["company_name"] = "Default Company"
+        session["fin_year"] = "2025-26"
+        session["user_role"] = "admin"
+    
+    cid = session.get("company_id"); fy = session.get("fin_year")
+    
+    # Check if bill_id column exists in milk_transactions
+    try:
+        db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
+        # If bill_id exists, use the full query
+        sql = """
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.bill_id, p.name as party_name, b.bill_no
+        FROM milk_transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN bills b ON t.bill_id = b.id
+        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        ORDER BY t.txn_date DESC 
+        LIMIT 500
+        """
+    except Exception:
+        # If bill_id doesn't exist, use query without it
+        sql = """
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               NULL as bill_id, p.name as party_name, NULL as bill_no
+        FROM milk_transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        ORDER BY t.txn_date DESC 
+        LIMIT 500
+        """
+    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    txns = []
+    for row in result:
+        # Create a simple object with the data
+        class SimpleMilkTransaction:
+            def __init__(self, row):
+                self.id = row.id
+                self.company_id = row.company_id
+                self.fin_year = row.fin_year
+                self.voucher_no = row.voucher_no
+                self.party_id = row.party_id
+                # Add party object for template compatibility
+                class SimpleParty:
+                    def __init__(self, name, id):
+                        self.name = name
+                        self.id = id
+                self.party = SimpleParty(row.party_name, row.party_id) if row.party_name else None
+                # Convert string date to datetime object for strftime compatibility
+                from datetime import datetime
+                if isinstance(row.txn_date, str):
+                    self.txn_date = datetime.strptime(row.txn_date, '%Y-%m-%d').date()
+                else:
+                    self.txn_date = row.txn_date
+                self.shift = row.shift
+                self.txn_type = row.txn_type
+                self.qty_liters = row.qty_liters
+                self.fat = row.fat
+                self.snf = row.snf
+                self.clr = 0.0  # Default CLR value
+                self.rate = row.rate
+                self.amount = row.amount
+                self.chart_id = row.chart_id
+                self.narration = row.narration
+                self.bill_id = row.bill_id
+                # Add bill object for template compatibility
+                class SimpleBill:
+                    def __init__(self, bill_id, bill_no):
+                        self.id = bill_id
+                        self.bill_no = bill_no
+                self.bill = SimpleBill(row.bill_id, row.bill_no) if row.bill_id and row.bill_no else None
+        
+        txns.append(SimpleMilkTransaction(row))
+    
+    # Calculate totals for Purchase only
+    purchase_txns = [t for t in txns if t.txn_type == 'Purchase']
+    purchase_total_qty = sum(float(t.qty_liters) for t in purchase_txns)
+    purchase_total_amt = sum(float(t.amount) for t in purchase_txns)
+    purchase_avg_fat = sum(t.fat for t in purchase_txns) / len(purchase_txns) if purchase_txns else 0
+    purchase_avg_snf = sum(t.snf for t in purchase_txns) / len(purchase_txns) if purchase_txns else 0
+    purchase_total_bf_kgs = sum(t.qty_liters * t.fat / 100 for t in purchase_txns)
+    purchase_total_snf_kgs = sum(t.qty_liters * t.snf / 100 for t in purchase_txns)
+    
+    # Calculate totals for Sale only
+    sale_txns = [t for t in txns if t.txn_type == 'Sale']
+    sale_total_qty = sum(float(t.qty_liters) for t in sale_txns)
+    sale_total_amt = sum(float(t.amount) for t in sale_txns)
+    sale_avg_fat = sum(t.fat for t in sale_txns) / len(sale_txns) if sale_txns else 0
+    sale_avg_snf = sum(t.snf for t in sale_txns) / len(sale_txns) if sale_txns else 0
+    sale_total_bf_kgs = sum(t.qty_liters * t.fat / 100 for t in sale_txns)
+    sale_total_snf_kgs = sum(t.qty_liters * t.snf / 100 for t in sale_txns)
+    
+    # Get parties for filter dropdown
+    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    
+    return render_template("milk/milk_statement.html", 
+                     txns=txns,
+                     purchase_total_qty=purchase_total_qty, purchase_total_amount=purchase_total_amt,
+                     purchase_avg_fat=purchase_avg_fat, purchase_avg_snf=purchase_avg_snf,
+                     purchase_total_bf_kgs=purchase_total_bf_kgs, purchase_total_snf_kgs=purchase_total_snf_kgs,
+                     sale_total_qty=sale_total_qty, sale_total_amount=sale_total_amt,
+                     sale_avg_fat=sale_avg_fat, sale_avg_snf=sale_avg_snf,
+                     sale_total_bf_kgs=sale_total_bf_kgs, sale_total_snf_kgs=sale_total_snf_kgs,
                      parties=parties)
 
 @milk_bp.route("/entry/add", methods=["GET","POST"])

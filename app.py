@@ -668,7 +668,6 @@ def create_app():
     app.register_blueprint(users_bp)
     app.register_blueprint(items_bp)
     app.register_blueprint(accounts_bp)
-    app.register_blueprint(gst_bp)
     app.register_blueprint(gst_reports_bp)
     app.register_blueprint(tds_bp)
     app.register_blueprint(tds_tcs_bp)
@@ -679,9 +678,9 @@ def create_app():
     app.register_blueprint(milk_bp, url_prefix="/milk")
     app.register_blueprint(milk_reports_bp, url_prefix="/milk")
     app.register_blueprint(parties_bp, url_prefix="/parties")
+    app.register_blueprint(banking_bp, url_prefix="/banking")
     app.register_blueprint(validator_bp)
     app.register_blueprint(gst_bp)
-    app.register_blueprint(tds_bp)
     app.register_blueprint(cash_book_bp, url_prefix="/cash-book")
     app.register_blueprint(day_book_bp, url_prefix="/day-book")
     
@@ -689,8 +688,10 @@ def create_app():
     @app.context_processor
     def inject_company_info():
         from models import Company, FinancialYear
-# ... (rest of the code remains the same)
+        from flask import session
+        
         company_name = "No Company"
+        company_id = session.get("company_id")
         if company_id:
             company = db.session.get(Company, company_id)
             if company:
