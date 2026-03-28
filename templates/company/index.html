@@ -43,6 +43,72 @@
 </div>
 {% endif %}
 
+<!-- All Companies Management -->
+<div class="card border-warning shadow-sm mb-3">
+  <div class="card-header bg-warning text-dark fw-bold">
+    <i class="bi bi-gear"></i> Company Management
+    <div class="float-end">
+      <a href="{{ url_for('company.add') }}" class="btn btn-sm btn-dark">+ Add Company</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Company Name</th>
+            <th>Business Type</th>
+            <th>GSTIN</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for comp in all_companies %}
+          <tr>
+            <td>
+              <strong>{{ comp.name }}</strong>
+              {% if comp.id == company.id %}
+              <span class="badge bg-success ms-1">Current</span>
+              {% endif %}
+            </td>
+            <td>{{ comp.business_type or "—" }}</td>
+            <td><code>{{ comp.gstin or "—" }}</code></td>
+            <td>
+              {% if comp.is_active %}
+              <span class="badge bg-success">Active</span>
+              {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('company.edit_company', company_id=comp.id) }}" class="btn btn-outline-warning" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if comp.id != company.id %}
+                <button type="button" class="btn btn-outline-danger" 
+                        data-company-id="{{ comp.id }}" 
+                        data-company-name="{{ comp.name|e }}"
+                        onclick="confirmDelete(this)" 
+                        title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% else %}
+                <button class="btn btn-outline-secondary" disabled title="Cannot delete current company">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="row g-3">
   <div class="col-md-5">
     <div class="card border-0 shadow-sm h-100">
@@ -99,4 +165,20 @@
     </div>
   </div>
 </div>
+
+<script>
+function confirmDelete(button) {
+  const companyId = button.getAttribute('data-company-id');
+  const companyName = button.getAttribute('data-company-name');
+  
+  if (confirm(`Are you sure you want to delete "${companyName}"?\n\nThis will also delete all associated data (invoices, transactions, etc.). This action cannot be undone.`)) {
+    // Create and submit a form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/company/delete/${companyId}`;
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
 {% endblock %}

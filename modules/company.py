@@ -2,8 +2,9 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for
 from flask_login import login_required, current_user
 from extensions import db
-from models import Company, FinancialYear, User
+from models import Company, FinancialYear, User, Bill, MilkTransaction, JournalHeader
 from werkzeug.security import generate_password_hash
+from sqlalchemy import text
 
 company_bp = Blueprint("company", __name__)
 
@@ -119,4 +120,110 @@ def activate_fy(fy_id):
     session["fin_year"] = fy.year_name
     db.session.commit()
     flash(f"FY {fy.year_name} set as active!", "success")
+    return redirect(url_for("company.index"))
+
+@company_bp.route("/company/add", methods=["GET","POST"])
+@login_required
+def add():
+    if request.method == "POST":
+        company = Company(
+            name=request.form["name"].strip(),
+            business_type=request.form.get("business_type", "Trading"),
+            gstin=request.form.get("gstin", "").strip().upper() or None,
+            address=request.form.get("address", "").strip() or None,
+            phone=request.form.get("phone", "").strip() or None,
+            email=request.form.get("email", "").strip() or None,
+            pan=request.form.get("pan", "").strip().upper() or None,
+            is_active=True
+        )
+        if hasattr(company, "state_code"):
+            company.state_code = request.form.get("state_code", "").strip() or None
+        
+        db.session.add(company)
+        db.session.commit()
+        
+        # Give current user access to this company
+        if not current_user.is_super_admin:
+            from models import user_companies
+            db.session.execute(text("""
+                INSERT INTO user_companies (user_id, company_id, role, is_active)
+                VALUES (:user_id, :company_id, 'admin', 1)
+            """), {"user_id": current_user.id, "company_id": company.id})
+            db.session.commit()
+        
+        flash(f"Company '{company.name}' added successfully!", "success")
+        return redirect(url_for("company.index"))
+    
+    business_types = ["Trading", "Manufacturing", "Service", "Milk", "Mixed"]
+    return render_template("company/form.html", company=None, business_types=business_types)
+
+@company_bp.route("/company/edit/<int:company_id>", methods=["GET","POST"])
+@login_required
+def edit_company(company_id):
+    # Check if user has access to edit this company
+    if current_user.is_super_admin:
+        company = Company.query.get_or_404(company_id)
+    else:
+        company = current_user.accessible_companies.filter_by(id=company_id).first_or_404()
+    
+    if request.method == "POST":
+        company.name = request.form["name"].strip()
+        company.business_type = request.form.get("business_type", "Trading")
+        company.gstin = request.form.get("gstin", "").strip().upper() or None
+        company.address = request.form.get("address", "").strip() or None
+        company.phone = request.form.get("phone", "").strip() or None
+        company.email = request.form.get("email", "").strip() or None
+        company.pan = request.form.get("pan", "").strip().upper() or None
+        company.is_active = request.form.get("is_active") == "1"
+        if hasattr(company, "state_code"):
+            company.state_code = request.form.get("state_code", "").strip() or None
+        
+        db.session.commit()
+        flash(f"Company '{company.name}' updated successfully!", "success")
+        return redirect(url_for("company.index"))
+    
+    business_types = ["Trading", "Manufacturing", "Service", "Milk", "Mixed"]
+    return render_template("company/form.html", company=company, business_types=business_types)
+
+@company_bp.route("/company/delete/<int:company_id>", methods=["POST"])
+@login_required
+def delete(company_id):
+    # Prevent deleting current company
+    if company_id == session.get("company_id"):
+        flash("Cannot delete the currently active company!", "danger")
+        return redirect(url_for("company.index"))
+    
+    # Check if user has access to delete this company
+    if current_user.is_super_admin:
+        company = Company.query.get_or_404(company_id)
+    else:
+        company = current_user.accessible_companies.filter_by(id=company_id).first_or_404()
+    
+    try:
+        # Check for existing records
+        bills_count = Bill.query.filter_by(company_id=company_id).count()
+        milk_count = MilkTransaction.query.filter_by(company_id=company_id).count()
+        journal_count = JournalHeader.query.filter_by(company_id=company_id).count()
+        
+        if bills_count > 0 or milk_count > 0 or journal_count > 0:
+            # Delete all associated data
+            db.session.execute(text("DELETE FROM bills WHERE company_id = :cid"), {"cid": company_id})
+            db.session.execute(text("DELETE FROM milk_transactions WHERE company_id = :cid"), {"cid": company_id})
+            db.session.execute(text("DELETE FROM journal_headers WHERE company_id = :cid"), {"cid": company_id})
+            db.session.execute(text("DELETE FROM financial_years WHERE company_id = :cid"), {"cid": company_id})
+            db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
+            
+            flash(f"Company '{company.name}' and all its data ({bills_count} bills, {milk_count} milk entries, {journal_count} journal entries) have been deleted!", "warning")
+        else:
+            # Just delete the company
+            db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
+            db.session.delete(company)
+            flash(f"Company '{company.name}' deleted successfully!", "success")
+        
+        db.session.commit()
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting company: {str(e)}", "danger")
+    
     return redirect(url_for("company.index"))

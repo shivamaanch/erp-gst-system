@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if company else 'Add' }} Company{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ 'Edit' if company else 'Add' }} Company</h4>
+  <a href="{{ url_for('company.index') }}" class="btn btn-outline-secondary">
+    ← Back to Companies
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Company Name *</label>
+          <input type="text" name="name" class="form-control" value="{{ company.name if company else '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Business Type</label>
+          <select name="business_type" class="form-select">
+            {% for type in business_types %}
+            <option value="{{ type }}" {{ 'selected' if company and company.business_type == type }}>{{ type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">GSTIN</label>
+          <input type="text" name="gstin" class="form-control" value="{{ company.gstin if company else '' }}" placeholder="e.g., 27AAAPL1234C1ZV">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">PAN</label>
+          <input type="text" name="pan" class="form-control" value="{{ company.pan if company else '' }}" placeholder="e.g., AAAPL1234C">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Phone</label>
+          <input type="tel" name="phone" class="form-control" value="{{ company.phone if company else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ company.email if company else '' }}">
+        </div>
+        {% if company %}
+        <div class="col-md-6">
+          <label class="form-label">Status</label>
+          <select name="is_active" class="form-select">
+            <option value="1" {{ 'selected' if company.is_active }}>Active</option>
+            <option value="0" {{ 'selected' if not company.is_active }}>Inactive</option>
+          </select>
+        </div>
+        {% endif %}
+        <div class="col-12">
+          <label class="form-label">Address</label>
+          <textarea name="address" class="form-control" rows="3">{{ company.address if company else '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-{{ 'pencil' if company else 'plus-circle' }}"></i> 
+              {{ 'Update' if company else 'Save' }} Company
+            </button>
+            <a href="{{ url_for('company.index') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if company %}
+<div class="card border-danger mt-3">
+  <div class="card-header bg-danger text-white">
+    <i class="bi bi-exclamation-triangle"></i> Danger Zone
+  </div>
+  <div class="card-body">
+    <p class="mb-2">Deleting this company will permanently remove:</p>
+    <ul class="mb-3">
+      <li>All invoices and bills</li>
+      <li>All milk transactions</li>
+      <li>All journal entries</li>
+      <li>All financial years</li>
+      <li>User access permissions</li>
+    </ul>
+    <p class="text-danger fw-bold">This action cannot be undone!</p>
+    {% if company.id != session.get('company_id') %}
+    <button type="button" class="btn btn-danger" 
+            data-company-id="{{ company.id }}" 
+            data-company-name="{{ company.name|e }}"
+            onclick="confirmDelete(this)">
+      <i class="bi bi-trash"></i> Delete Company
+    </button>
+    {% else %}
+    <button class="btn btn-secondary" disabled>
+      <i class="bi bi-trash"></i> Cannot Delete (Current Company)
+    </button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+function confirmDelete(button) {
+  const companyId = button.getAttribute('data-company-id');
+  const companyName = button.getAttribute('data-company-name');
+  
+  if (confirm(`Are you sure you want to delete "${companyName}"?\n\nThis will also delete all associated data (invoices, transactions, etc.). This action cannot be undone.`)) {
+    // Create and submit a form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/company/delete/${companyId}`;
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
+{% endblock %}
