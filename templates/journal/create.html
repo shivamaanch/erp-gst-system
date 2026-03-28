@@ -7,7 +7,8 @@
   <div class="row mb-3">
     <div class="col-md-3">
       <label class="form-label small fw-bold">Voucher No</label>
-      <input type="text" name="voucher_no" class="form-control form-control-sm" required>
+      <input type="text" name="voucher_no" class="form-control form-control-sm" value="{{ next_voucher }}" readonly>
+      <small class="text-muted">Auto-generated</small>
     </div>
     <div class="col-md-3">
       <label class="form-label small fw-bold">Date</label>

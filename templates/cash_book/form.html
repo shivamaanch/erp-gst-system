@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if entry else 'Add' }} Cash Book Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">{{ 'Edit' if entry else 'Add' }} Cash Book Entry</h4>
+  <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">
+    ← Back to Cash Book
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Voucher No</label>
+          <input type="text" class="form-control" value="{{ next_voucher }}" readonly>
+          <small class="text-muted">Auto-generated voucher number</small>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Transaction Date *</label>
+          <input type="date" name="transaction_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Transaction Type *</label>
+          <select name="transaction_type" class="form-select" required>
+            <option value="">Select Type</option>
+            <option value="Receipt" {{ 'selected' if entry and entry.transaction_type == 'Receipt' }}>Receipt</option>
+            <option value="Payment" {{ 'selected' if entry and entry.transaction_type == 'Payment' }}>Payment</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Amount *</label>
+          <input type="number" step="0.01" name="amount" class="form-control" 
+                 value="{{ entry.amount if entry else '' }}" placeholder="0.00" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Party Name</label>
+          <input type="text" name="party_name" class="form-control" 
+                 value="{{ entry.party_name if entry else '' }}" placeholder="Optional">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Payment Mode</label>
+          <select name="payment_mode" class="form-select">
+            <option value="Cash" {{ 'selected' if entry and entry.payment_mode == 'Cash' }}>Cash</option>
+            <option value="Bank" {{ 'selected' if entry and entry.payment_mode == 'Bank' }}>Bank</option>
+            <option value="Online" {{ 'selected' if entry and entry.payment_mode == 'Online' }}>Online</option>
+            <option value="Cheque" {{ 'selected' if entry and entry.payment_mode == 'Cheque' }}>Cheque</option>
+          </select>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Reference No</label>
+          <input type="text" name="reference_no" class="form-control" 
+                 value="{{ entry.reference_no if entry else '' }}" placeholder="Cheque number, transaction ID, etc.">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Narration *</label>
+          <textarea name="narration" class="form-control" rows="3" required>{{ entry.narration if entry else '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-{{ 'pencil' if entry else 'plus-circle' }}"></i> 
+              {{ 'Update' if entry else 'Save' }} Entry
+            </button>
+            <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="reset" class="btn btn-outline-warning">Reset</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

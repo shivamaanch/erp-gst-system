@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Quick Cash Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">💰 Quick Cash Entry</h4>
+  <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">
+    ← Back to Cash Book
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST" id="quickCashForm">
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Date *</label>
+          <input type="date" name="transaction_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Payment Mode</label>
+          <select name="payment_mode" class="form-select">
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+            <option value="Online">Online</option>
+            <option value="Cheque">Cheque</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Reference No</label>
+          <input type="text" name="reference_no" class="form-control" placeholder="Cheque no, transaction ID, etc.">
+        </div>
+      </div>
+
+      <div class="table-responsive mb-3">
+        <table class="table table-bordered" id="quickEntriesTable">
+          <thead class="table-dark">
+            <tr>
+              <th width="30%">Account</th>
+              <th width="15%">Type</th>
+              <th width="15%">Amount</th>
+              <th width="30%">Narration</th>
+              <th width="10%">Action</th>
+            </tr>
+          </thead>
+          <tbody id="entriesBody">
+            <tr>
+              <td>
+                <select name="account_id[]" class="form-select account-select" required>
+                  <option value="">-- Select Account --</option>
+                  {% for acc in accounts %}
+                  <option value="{{ acc.id }}">{{ acc.name }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select name="transaction_type[]" class="form-select type-select" required>
+                  <option value="">Select</option>
+                  <option value="Receipt">Receipt</option>
+                  <option value="Payment">Payment</option>
+                </select>
+              </td>
+              <td>
+                <input type="number" name="amount[]" class="form-control amount-input" step="0.01" min="0" required>
+              </td>
+              <td>
+                <input type="text" name="narration[]" class="form-control narration-input" required>
+              </td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-info fw-bold">
+              <td>Total</td>
+              <td></td>
+              <td id="totalAmount">0.00</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
+        <button type="submit" class="btn btn-success">Save All Entries</button>
+        <button type="reset" class="btn btn-outline-warning">Reset</button>
+        <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function addRow() {
+  const tbody = document.getElementById('entriesBody');
+  const newRow = document.createElement('tr');
+  newRow.innerHTML = `
+    <td>
+      <select name="account_id[]" class="form-select account-select" required>
+        <option value="">-- Select Account --</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}">{{ acc.name }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td>
+      <select name="transaction_type[]" class="form-select type-select" required>
+        <option value="">Select</option>
+        <option value="Receipt">Receipt</option>
+        <option value="Payment">Payment</option>
+      </select>
+    </td>
+    <td>
+      <input type="number" name="amount[]" class="form-control amount-input" step="0.01" min="0" required>
+    </td>
+    <td>
+      <input type="text" name="narration[]" class="form-control narration-input" required>
+    </td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
+    </td>
+  `;
+  tbody.appendChild(newRow);
+  attachEventListeners();
+}
+
+function removeRow(btn) {
+  const row = btn.closest('tr');
+  const tbody = row.parentNode;
+  if (tbody.children.length > 1) {
+    row.remove();
+    calculateTotal();
+  } else {
+    alert('At least one row is required');
+  }
+}
+
+function calculateTotal() {
+  let total = 0;
+  document.querySelectorAll('.amount-input').forEach(input => {
+    const value = parseFloat(input.value) || 0;
+    total += value;
+  });
+  document.getElementById('totalAmount').textContent = total.toFixed(2);
+}
+
+function attachEventListeners() {
+  document.querySelectorAll('.amount-input').forEach(input => {
+    input.addEventListener('input', calculateTotal);
+  });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  attachEventListeners();
+});
+</script>
+{% endblock %}

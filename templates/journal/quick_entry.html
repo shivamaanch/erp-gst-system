@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Quick Journal Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📝 Quick Journal Entry</h4>
+  <a href="{{ url_for('journal.index') }}" class="btn btn-outline-secondary">
+    ← Back to Journal
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST" id="quickJournalForm">
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Date *</label>
+          <input type="date" name="voucher_date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Voucher Type</label>
+          <select name="voucher_type" class="form-select">
+            <option value="Journal">Journal</option>
+            <option value="Payment">Payment</option>
+            <option value="Receipt">Receipt</option>
+            <option value="Contra">Contra</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Narration</label>
+          <input type="text" name="narration" class="form-control" placeholder="Overall journal narration">
+        </div>
+      </div>
+
+      <div class="table-responsive mb-3">
+        <table class="table table-bordered" id="quickJournalTable">
+          <thead class="table-dark">
+            <tr>
+              <th width="25%">Account</th>
+              <th width="15%">Debit</th>
+              <th width="15%">Credit</th>
+              <th width="40%">Narration</th>
+              <th width="5%">Action</th>
+            </tr>
+          </thead>
+          <tbody id="journalBody">
+            <tr>
+              <td>
+                <select name="account_id[]" class="form-select account-select" required>
+                  <option value="">-- Select Account --</option>
+                  {% for acc in accounts %}
+                  <option value="{{ acc.id }}">{{ acc.name }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <input type="number" name="debit[]" class="form-control debit-input" step="0.01" min="0" value="0">
+              </td>
+              <td>
+                <input type="number" name="credit[]" class="form-control credit-input" step="0.01" min="0" value="0">
+              </td>
+              <td>
+                <input type="text" name="line_narration[]" class="form-control narration-input" placeholder="Line narration">
+              </td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-info fw-bold">
+              <td>Total</td>
+              <td id="totalDebit">0.00</td>
+              <td id="totalCredit">0.00</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div id="balanceAlert" class="alert alert-danger d-none py-2">
+        <i class="bi bi-exclamation-triangle"></i> Debit ≠ Credit - Entry not balanced!
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
+        <button type="submit" class="btn btn-success" id="saveBtn">Save Journal</button>
+        <button type="reset" class="btn btn-outline-warning">Reset</button>
+        <a href="{{ url_for('journal.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function addRow() {
+  const tbody = document.getElementById('journalBody');
+  const newRow = document.createElement('tr');
+  newRow.innerHTML = `
+    <td>
+      <select name="account_id[]" class="form-select account-select" required>
+        <option value="">-- Select Account --</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}">{{ acc.name }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td>
+      <input type="number" name="debit[]" class="form-control debit-input" step="0.01" min="0" value="0">
+    </td>
+    <td>
+      <input type="number" name="credit[]" class="form-control credit-input" step="0.01" min="0" value="0">
+    </td>
+    <td>
+      <input type="text" name="line_narration[]" class="form-control narration-input" placeholder="Line narration">
+    </td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
+    </td>
+  `;
+  tbody.appendChild(newRow);
+  attachEventListeners();
+}
+
+function removeRow(btn) {
+  const row = btn.closest('tr');
+  const tbody = row.parentNode;
+  if (tbody.children.length > 1) {
+    row.remove();
+    calculateTotals();
+  } else {
+    alert('At least one row is required');
+  }
+}
+
+function calculateTotals() {
+  let totalDebit = 0;
+  let totalCredit = 0;
+  
+  document.querySelectorAll('.debit-input').forEach(input => {
+    totalDebit += parseFloat(input.value) || 0;
+  });
+  
+  document.querySelectorAll('.credit-input').forEach(input => {
+    totalCredit += parseFloat(input.value) || 0;
+  });
+  
+  document.getElementById('totalDebit').textContent = totalDebit.toFixed(2);
+  document.getElementById('totalCredit').textContent = totalCredit.toFixed(2);
+  
+  // Show/hide balance alert
+  const alert = document.getElementById('balanceAlert');
+  const saveBtn = document.getElementById('saveBtn');
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    alert.classList.remove('d-none');
+    saveBtn.disabled = true;
+  } else {
+    alert.classList.add('d-none');
+    saveBtn.disabled = false;
+  }
+}
+
+function attachEventListeners() {
+  document.querySelectorAll('.debit-input, .credit-input').forEach(input => {
+    input.addEventListener('input', calculateTotals);
+  });
+}
+
+// Form validation
+document.getElementById('quickJournalForm').addEventListener('submit', function(e) {
+  const totalDebit = parseFloat(document.getElementById('totalDebit').textContent) || 0;
+  const totalCredit = parseFloat(document.getElementById('totalCredit').textContent) || 0;
+  
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    e.preventDefault();
+    alert('Journal entry must be balanced (Debit = Credit)');
+  }
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  attachEventListeners();
+  calculateTotals();
+});
+</script>
+{% endblock %}

@@ -654,6 +654,7 @@ def create_app():
     from modules.validators     import validator_bp
     from modules.gst_module     import gst_bp
     from modules.tds_module     import tds_bp
+    from modules.cash_book      import cash_book_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(utilities_bp)
@@ -680,6 +681,7 @@ def create_app():
     app.register_blueprint(psi_bp)
     app.register_blueprint(banking_bp)
     app.register_blueprint(validator_bp)
+    app.register_blueprint(cash_book_bp, url_prefix="/cash-book")
     
     # Context processor to make company info available in all templates
     @app.context_processor

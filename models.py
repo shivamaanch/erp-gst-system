@@ -411,6 +411,25 @@ class MilkTransaction(db.Model):
     bill        = db.relationship("Bill", backref="milk_transactions", foreign_keys=[bill_id])
 
 
+class CashBook(db.Model):
+    __tablename__ = "cash_book"
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    fin_year = db.Column(db.String(10), nullable=False)
+    voucher_no = db.Column(db.String(50), nullable=False, unique=True)
+    transaction_date = db.Column(db.Date, nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)  # Receipt/Payment
+    amount = db.Column(db.Numeric(14,2), nullable=False)
+    narration = db.Column(db.Text, nullable=False)
+    party_name = db.Column(db.String(100))
+    payment_mode = db.Column(db.String(20), default="Cash")  # Cash/Bank/Online
+    reference_no = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    company = db.relationship("Company", backref="cash_book_entries")
+
+
 class PurchaseInvoice(db.Model):
     __tablename__ = "purchase_invoices"
     id = db.Column(db.Integer, primary_key=True)

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify, send_file
 from flask_login import login_required
 from extensions import db
-from models import BankAccount, BankTransaction, BankImportLog, Party
+from models import BankAccount, BankTransaction, BankImportLog, Party, Account, JournalHeader, JournalLine
 from datetime import date, datetime
 import hashlib, io, re, uuid
 
@@ -201,3 +201,93 @@ def manual_entry(bank_id):
         flash(f"✅ Entry saved → {ledger} Account ({mode})", "success")
         return redirect(url_for("banking.transactions", bank_id=bank_id))
     return render_template("banking/manual_entry.html", bank=bank, parties=parties, today=date.today().isoformat())
+
+@banking_bp.route("/banking/quick-entry", methods=["GET","POST"])
+@login_required
+def quick_entry():
+    cid = session.get("company_id")
+    banks = BankAccount.query.filter_by(company_id=cid, is_active=True).all()
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
+    
+    if request.method == "POST":
+        bank_account_id = request.form.get("bank_account_id")
+        transaction_date = datetime.strptime(request.form.get("transaction_date"), "%Y-%m-%d").date()
+        transaction_type = request.form.get("transaction_type", "Deposit")
+        payment_mode = request.form.get("payment_mode", "Cash")
+        reference_no = request.form.get("reference_no", "").strip()
+        party_name = request.form.get("party_name", "").strip()
+        
+        # Get form arrays
+        account_ids = request.form.getlist("account_id[]")
+        debits = request.form.getlist("debit[]")
+        credits = request.form.getlist("credit[]")
+        narrations = request.form.getlist("narration[]")
+        
+        # Generate voucher number
+        last_journal = JournalHeader.query.filter_by(company_id=cid).order_by(JournalHeader.id.desc()).first()
+        voucher_num = (last_journal.id + 1) if last_journal else 1
+        voucher_no = f"BNK-{session.get('fin_year', '2025-26')}-{voucher_num:04d}"
+        
+        # Create journal header
+        jh = JournalHeader(
+            company_id=cid,
+            fin_year=session.get("fin_year", "2025-26"),
+            voucher_no=voucher_no,
+            voucher_type="Bank",
+            voucher_date=transaction_date,
+            narration=f"Bank transaction - {payment_mode} {reference_no or ''}",
+            created_by=1  # Assuming admin user
+        )
+        db.session.add(jh)
+        db.session.flush()
+        
+        # Create journal lines
+        lines_created = 0
+        total_debit = 0
+        total_credit = 0
+        
+        for i in range(len(account_ids)):
+            if not account_ids[i]:
+                continue
+            
+            debit = float(debits[i] or 0)
+            credit = float(credits[i] or 0)
+            narration = narrations[i] or f"Bank transaction - {party_name or ''}"
+            
+            if debit > 0 or credit > 0:
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=int(account_ids[i]),
+                    debit=debit,
+                    credit=credit,
+                ))
+                lines_created += 1
+                total_debit += debit
+                total_credit += credit
+        
+        # Add bank account line if not already included
+        bank_account = BankAccount.query.get(bank_account_id)
+        if bank_account and lines_created >= 2:
+            # Create contra entry for bank account
+            bank_amount = total_debit if total_debit > total_credit else total_credit
+            if bank_amount > 0:
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=bank_account.account_id if bank_account.account_id else 1,  # Assuming cash account ID 1
+                    debit=bank_amount if transaction_type == "Deposit" else 0,
+                    credit=bank_amount if transaction_type == "Withdrawal" else 0,
+                ))
+        
+        if lines_created >= 2 and abs(total_debit - total_credit) < 0.01:
+            db.session.commit()
+            flash(f"Bank entry {voucher_no} created successfully!", "success")
+        else:
+            db.session.rollback()
+            flash("Bank entry must be balanced with at least 2 lines", "danger")
+        
+        return redirect(url_for("banking.accounts"))
+    
+    return render_template("banking/quick_entry.html", 
+                         banks=banks,
+                         accounts=accounts,
+                         today=date.today().isoformat())
