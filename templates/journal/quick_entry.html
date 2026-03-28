@@ -35,10 +35,11 @@
         <table class="table table-bordered" id="quickJournalTable">
           <thead class="table-dark">
             <tr>
-              <th width="25%">Account</th>
-              <th width="15%">Debit</th>
-              <th width="15%">Credit</th>
-              <th width="40%">Narration</th>
+              <th width="20%">Debit Account</th>
+              <th width="15%">Debit Amount</th>
+              <th width="20%">Credit Account</th>
+              <th width="15%">Credit Amount</th>
+              <th width="25%">Narration</th>
               <th width="5%">Action</th>
             </tr>
           </thead>
@@ -49,12 +50,17 @@
             <tr class="table-info fw-bold">
               <td>Total</td>
               <td id="totalDebit">0.00</td>
+              <td></td>
               <td id="totalCredit">0.00</td>
               <td></td>
               <td></td>
             </tr>
           </tfoot>
         </table>
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> 
+          <strong>Double Entry Journal:</strong> Each row is one complete transaction with debit and credit accounts. Total debits must equal total credits.
+        </div>
       </div>
 
       <div id="balanceAlert" class="alert alert-danger d-none py-2">
@@ -76,18 +82,26 @@ function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
     <td>
-      <select name="account_id[]" class="form-select account-select" required>
-        <option value="">-- Select Account --</option>
+      <select name="debit_account_id[]" class="form-select account-select" required>
+        <option value="">-- Select Debit Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
         {% endfor %}
       </select>
     </td>
     <td>
-      <input type="number" name="debit[]" class="form-control debit-input" step="0.01" min="0" value="0">
+      <input type="number" name="debit_amount[]" class="form-control debit-input" step="0.01" min="0" value="0">
     </td>
     <td>
-      <input type="number" name="credit[]" class="form-control credit-input" step="0.01" min="0" value="0">
+      <select name="credit_account_id[]" class="form-select account-select" required>
+        <option value="">-- Select Credit Account --</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}">{{ acc.name }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td>
+      <input type="number" name="credit_amount[]" class="form-control credit-input" step="0.01" min="0" value="0">
     </td>
     <td>
       <input type="text" name="line_narration[]" class="form-control narration-input" placeholder="Line narration">

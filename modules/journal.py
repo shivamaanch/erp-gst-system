@@ -84,17 +84,20 @@ def quick_entry():
     accounts = Account.query.filter_by(company_id=cid,is_active=True).order_by(Account.name).all()
     
     if request.method == "POST":
-        # Auto-generate voucher number
-        voucher_no = next_journal_voucher_no(cid, fy)
+        # Auto-generate voucher number if not provided
+        voucher_no = request.form.get("voucher_no", "").strip()
+        if not voucher_no:
+            voucher_no = next_journal_voucher_no(cid, fy)
         
         voucher_date = datetime.strptime(request.form.get("voucher_date"),"%Y-%m-%d").date()
         voucher_type = request.form.get("voucher_type","Journal")
         narration = request.form.get("narration","")
         
-        # Get form arrays
-        account_ids = request.form.getlist("account_id[]")
-        debits = request.form.getlist("debit[]")
-        credits = request.form.getlist("credit[]")
+        # Get form arrays for new structure
+        debit_account_ids = request.form.getlist("debit_account_id[]")
+        debit_amounts = request.form.getlist("debit_amount[]")
+        credit_account_ids = request.form.getlist("credit_account_id[]")
+        credit_amounts = request.form.getlist("credit_amount[]")
         line_narrations = request.form.getlist("line_narration[]")
         
         # Create journal header
@@ -110,24 +113,37 @@ def quick_entry():
         db.session.add(jh)
         db.session.flush()
         
-        # Create journal lines
+        # Create journal lines - each row creates 2 lines (debit and credit)
         lines_created = 0
-        for i in range(len(account_ids)):
-            if not account_ids[i]:
+        for i in range(len(debit_account_ids)):
+            if not debit_account_ids[i] or not credit_account_ids[i]:
                 continue
             
-            debit = float(debits[i] or 0)
-            credit = float(credits[i] or 0)
+            debit_amount = float(debit_amounts[i] or 0)
+            credit_amount = float(credit_amounts[i] or 0)
+            line_narration = line_narrations[i] or f"Journal entry {i+1}"
             
-            # Only create line if there's a debit or credit amount
-            if debit > 0 or credit > 0:
-                db.session.add(JournalLine(
-                    journal_header_id=jh.id,
-                    account_id=int(account_ids[i]),
-                    debit=debit,
-                    credit=credit,
-                ))
-                lines_created += 1
+            # Only create if amounts are provided
+            if debit_amount > 0 or credit_amount > 0:
+                # Create debit line
+                if debit_amount > 0:
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=int(debit_account_ids[i]),
+                        debit=debit_amount,
+                        credit=0,
+                    ))
+                    lines_created += 1
+                
+                # Create credit line
+                if credit_amount > 0:
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=int(credit_account_ids[i]),
+                        debit=0,
+                        credit=credit_amount,
+                    ))
+                    lines_created += 1
         
         if lines_created >= 2:  # At least 2 lines required for a valid journal
             db.session.commit()
