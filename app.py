@@ -64,6 +64,46 @@ def run_database_migration():
 
         
 
+        # CRITICAL FIX: Add missing columns first
+
+        critical_fixes = [
+
+            ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
+
+            ("cash_book", "account_id", "INTEGER"),
+
+        ]
+
+        
+
+        for table_name, col_name, col_type in critical_fixes:
+
+            try:
+
+                cursor.execute(f"""
+
+                    SELECT column_name FROM information_schema.columns 
+
+                    WHERE table_name = '{table_name}' AND column_name = '{col_name}'
+
+                """)
+
+                if not cursor.fetchone():
+
+                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+
+                    print(f"[CRITICAL FIX] Added {col_name} to {table_name}")
+
+            except Exception as e:
+
+                print(f"[WARNING] {table_name}.{col_name}: {e}")
+
+        
+
+        conn.commit()
+
+        
+
         # 1. Fix users table
 
         try:
