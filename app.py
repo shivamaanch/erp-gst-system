@@ -10,16 +10,74 @@ from dotenv import load_dotenv
 
 import os
 
+import psycopg2
+
+import urllib.parse
+
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
 
 
 load_dotenv()
 
+def emergency_database_fix():
+    """Run emergency database fix immediately on startup - BEFORE any models are loaded"""
+    db_url = os.getenv('DATABASE_URL')
+    if not db_url:
+        print("❌ DATABASE_URL not found - skipping emergency fix")
+        return False
+    
+    try:
+        parsed = urllib.parse.urlparse(db_url)
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password
+        )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
+        
+        print("🚨 EMERGENCY: Running critical database fix BEFORE app startup...")
+        
+        # Add missing columns that prevent app from starting
+        critical_fixes = [
+            ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
+            ("cash_book", "account_id", "INTEGER"),
+        ]
+        
+        for table_name, col_name, col_type in critical_fixes:
+            try:
+                cursor.execute(f"""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = '{table_name}' AND column_name = '{col_name}'
+                """)
+                if not cursor.fetchone():
+                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+                    print(f"🚨 EMERGENCY: Added {col_name} to {table_name}")
+                else:
+                    print(f"🚨 EMERGENCY: {col_name} already exists in {table_name}")
+            except Exception as e:
+                print(f"🚨 EMERGENCY: Error adding {col_name} to {table_name}: {e}")
+        
+        # Update existing records
+        cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
+        print("🚨 EMERGENCY: Updated companies.is_active defaults")
+        
+        conn.close()
+        print("🚨 EMERGENCY: Critical database fix completed! App can now start safely.")
+        return True
+        
+    except Exception as e:
+        print(f"🚨 EMERGENCY: Critical fix failed: {e}")
+        return False
 
+# Run emergency fix BEFORE importing models or creating app
+emergency_database_fix()
 
 def run_database_migration():
-
-    """Run database migration before app initialization"""
-
+    """Run comprehensive database migration"""
     import psycopg2
 
     import urllib.parse

@@ -5,23 +5,26 @@ from datetime import datetime, date
 from sqlalchemy import Numeric
 
 class Company(db.Model):
+    """Company model for multi-company support"""
+    
     __tablename__ = "companies"
+    
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    business_type = db.Column(db.String(20), default="Trading")
+    name = db.Column(db.String(100), nullable=False)
+    business_type = db.Column(db.String(50), default="service")
     gstin = db.Column(db.String(15))
     pan = db.Column(db.String(10))
     state_code = db.Column(db.String(2))
     address = db.Column(db.Text)
     phone = db.Column(db.String(15))
     email = db.Column(db.String(100))
-    logo_path = db.Column(db.String(300))
-    is_active = db.Column(db.Boolean, default=True)
+    logo_path = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Multi-company relationships
-    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", lazy="dynamic", overlaps="user_companies")
-    user_companies = db.relationship("UserCompany", back_populates="company", lazy="dynamic", overlaps="users")
+    # Relationships
+    users = db.relationship("UserCompany", back_populates="company")
+    accessible_companies = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", overlaps="user_companies,users")
 
 class FinancialYear(db.Model):
     __tablename__ = "financial_years"
