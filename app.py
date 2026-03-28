@@ -1520,6 +1520,84 @@ def create_app():
 
 
 
+    @app.route("/debug/db")
+    def debug_db():
+        """Debug database schema and missing columns"""
+        import psycopg2
+        import urllib.parse
+        
+        debug_info = {"database_url": os.getenv("DATABASE_URL", "Not found")}
+        
+        if os.getenv("DATABASE_URL"):
+            try:
+                parsed = urllib.parse.urlparse(os.getenv("DATABASE_URL"))
+                conn = psycopg2.connect(
+                    host=parsed.hostname,
+                    port=parsed.port or 5432,
+                    database=parsed.path[1:],
+                    user=parsed.username,
+                    password=parsed.password
+                )
+                cursor = conn.cursor()
+                
+                # Check companies table columns
+                cursor.execute("""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns 
+                    WHERE table_name = 'companies' 
+                    ORDER BY ordinal_position
+                """)
+                debug_info["companies_columns"] = cursor.fetchall()
+                
+                # Check cash_book table columns
+                cursor.execute("""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns 
+                    WHERE table_name = 'cash_book' 
+                    ORDER BY ordinal_position
+                """)
+                debug_info["cash_book_columns"] = cursor.fetchall()
+                
+                # Check if is_active exists in companies
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'companies' AND column_name = 'is_active'
+                """)
+                debug_info["companies_has_is_active"] = bool(cursor.fetchone())
+                
+                # Check if account_id exists in cash_book
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'cash_book' AND column_name = 'account_id'
+                """)
+                debug_info["cash_book_has_account_id"] = bool(cursor.fetchone())
+                
+                conn.close()
+                
+            except Exception as e:
+                debug_info["error"] = str(e)
+        
+        return debug_info
+    
+    @app.route("/debug/fix-db")
+    def fix_db():
+        """Force fix database schema"""
+        success = run_database_migration()
+        return {"migration_success": success}
+    
+    @app.route("/debug/companies")
+    def debug_companies():
+        """Debug company data"""
+        from models import Company
+        try:
+            companies = Company.query.all()
+            return {
+                "count": len(companies),
+                "companies": [{"id": c.id, "name": c.name, "business_type": c.business_type} for c in companies]
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
     @app.route("/bypass")
 
     def bypass_login():

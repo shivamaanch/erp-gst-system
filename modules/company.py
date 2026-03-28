@@ -199,35 +199,51 @@ def delete(company_id):
     else:
         company = current_user.accessible_companies.filter_by(id=company_id).first_or_404()
     
+    print(f"[DEBUG] Deleting company: {company.name} (ID: {company_id})")
+    
     try:
         # Delete ALL associated data for this company
         company_name = company.name
         
         # Delete all related records using raw SQL for efficiency
-        db.session.execute(text("DELETE FROM bill_items WHERE bill_id IN (SELECT id FROM bills WHERE company_id = :cid)"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM bills WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM milk_transactions WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM journal_lines WHERE journal_header_id IN (SELECT id FROM journal_headers WHERE company_id = :cid)"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM journal_headers WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM cash_book WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM parties WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM items WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM accounts WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM financial_years WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM gst_returns WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM tds_returns WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM bank_accounts WHERE company_id = :cid"), {"cid": company_id})
-        db.session.execute(text("DELETE FROM bank_transactions WHERE company_id = :cid"), {"cid": company_id})
+        print(f"[DEBUG] Starting deletion of all data for company {company_name}")
+        
+        tables_to_delete = [
+            ("bill_items", "bill_id IN (SELECT id FROM bills WHERE company_id = :cid)"),
+            ("bills", "company_id = :cid"),
+            ("milk_transactions", "company_id = :cid"),
+            ("journal_lines", "journal_header_id IN (SELECT id FROM journal_headers WHERE company_id = :cid)"),
+            ("journal_headers", "company_id = :cid"),
+            ("cash_book", "company_id = :cid"),
+            ("parties", "company_id = :cid"),
+            ("items", "company_id = :cid"),
+            ("accounts", "company_id = :cid"),
+            ("financial_years", "company_id = :cid"),
+            ("user_companies", "company_id = :cid"),
+            ("gst_returns", "company_id = :cid"),
+            ("tds_returns", "company_id = :cid"),
+            ("bank_accounts", "company_id = :cid"),
+            ("bank_transactions", "company_id = :cid"),
+        ]
+        
+        for table_name, condition in tables_to_delete:
+            try:
+                result = db.session.execute(text(f"DELETE FROM {table_name} WHERE {condition}"), {"cid": company_id})
+                print(f"[DEBUG] Deleted {result.rowcount} rows from {table_name}")
+            except Exception as e:
+                print(f"[DEBUG] Error deleting from {table_name}: {e}")
         
         # Finally delete the company itself
+        print(f"[DEBUG] Deleting company record...")
         db.session.delete(company)
         db.session.commit()
         
+        print(f"[DEBUG] Successfully deleted company {company_name}")
         flash(f"Company '{company_name}' and all its data have been permanently deleted!", "success")
         
     except Exception as e:
         db.session.rollback()
+        print(f"[DEBUG] Error deleting company: {e}")
         flash(f"Error deleting company: {str(e)}", "danger")
     
     return redirect(url_for("company.index"))
