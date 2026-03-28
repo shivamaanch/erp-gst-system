@@ -90,7 +90,12 @@ def entry_list():
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
                 self.party_id = row.party_id
-                self.txn_date = row.txn_date
+                # Convert string date to datetime object for strftime compatibility
+                from datetime import datetime
+                if isinstance(row.txn_date, str):
+                    self.txn_date = datetime.strptime(row.txn_date, '%Y-%m-%d').date()
+                else:
+                    self.txn_date = row.txn_date
                 self.shift = row.shift
                 self.txn_type = row.txn_type
                 self.qty_liters = row.qty_liters
