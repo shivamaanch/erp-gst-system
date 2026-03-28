@@ -1,0 +1,88 @@
+<!-- Quick Add Ledger Modal -->
+<div class="modal fade" id="quickAddLedgerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">⚡ Quick Add Ledger Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddLedgerForm">
+          <div class="mb-3">
+            <label class="form-label">Account Name *</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Account Type *</label>
+            <select name="account_type" class="form-select" required>
+              <option value="">Select Type</option>
+              <option value="Asset">Asset</option>
+              <option value="Liability">Liability</option>
+              <option value="Equity">Equity</option>
+              <option value="Income">Income</option>
+              <option value="Expense">Expense</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Opening Balance</label>
+            <input type="number" name="opening_balance" class="form-control" step="0.01" value="0">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Balance Type</label>
+            <select name="balance_type" class="form-select">
+              <option value="debit">Debit</option>
+              <option value="credit">Credit</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveQuickLedger()">Save Ledger</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showQuickAddLedger() {
+  const modal = new bootstrap.Modal(document.getElementById('quickAddLedgerModal'));
+  modal.show();
+}
+
+function saveQuickLedger() {
+  const form = document.getElementById('quickAddLedgerForm');
+  const formData = new FormData(form);
+  
+  fetch('/accounts/quick-add', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Close modal
+      bootstrap.Modal.getInstance(document.getElementById('quickAddLedgerModal')).hide();
+      
+      // Reset form
+      form.reset();
+      
+      // Show success message
+      alert('Ledger account added successfully!');
+      
+      // Refresh the page to update dropdowns
+      window.location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error adding ledger account');
+  });
+}
+</script>

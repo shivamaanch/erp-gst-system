@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}🥛 Milk Purchase Entry List{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">🥛 Traditional Milk Purchase Entry List</h4>
+  <a href="{{ url_for('milk.add_entry') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> Add Purchase Entry
+  </a>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">🔍 Party Search Bar</label>
+        <input type="text" id="partySearch" class="form-control" placeholder="💡 Start typing to search parties...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">From Date</label>
+        <input type="date" id="fromDate" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">To Date</label>
+        <input type="date" id="toDate" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Shift</label>
+        <select id="shiftFilter" class="form-select">
+          <option value="">All Shifts</option>
+          <option value="Morning">Morning</option>
+          <option value="Evening">Evening</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">&nbsp;</label>
+        <div class="d-flex gap-2">
+          <button type="button" onclick="applyFilters()" class="btn btn-outline-primary">Filter</button>
+          <button type="button" onclick="resetFilters()" class="btn btn-outline-secondary">Reset</button>
+        </div>
+      </div>
+    </div>
+    <small class="text-muted">💡 Start typing to search parties • Results will appear instantly • Filters work together</small>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-3">
+  <div class="col-md-2">
+    <div class="card border-primary">
+      <div class="card-body text-center">
+        <h6 class="text-primary">Total Qty (L)</h6>
+        <h4 class="mb-0" id="totalQty">{{ "%.2f"|format(total_qty) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-success">
+      <div class="card-body text-center">
+        <h6 class="text-success">Avg FAT%</h6>
+        <h4 class="mb-0" id="avgFat">{{ "%.2f"|format(avg_fat) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-info">
+      <div class="card-body text-center">
+        <h6 class="text-info">Avg SNF%</h6>
+        <h4 class="mb-0" id="avgSnf">{{ "%.2f"|format(avg_snf) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-warning">
+      <div class="card-body text-center">
+        <h6 class="text-warning">Total BF Kgs</h6>
+        <h4 class="mb-0" id="totalBf">{{ "%.2f"|format(total_bf_kgs) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-secondary">
+      <div class="card-body text-center">
+        <h6 class="text-secondary">Total SNF Kgs</h6>
+        <h4 class="mb-0" id="totalSnfKgs">{{ "%.2f"|format(total_snf_kgs) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card border-danger">
+      <div class="card-body text-center">
+        <h6 class="text-danger">Total Amount</h6>
+        <h4 class="mb-0" id="totalAmount">₹{{ "%.2f"|format(total_amt) }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Entries Table -->
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover" id="purchaseTable">
+        <thead class="table-dark">
+          <tr>
+            <th>Actions</th>
+            <th>Bill No.</th>
+            <th>Date</th>
+            <th>Shift</th>
+            <th>Type</th>
+            <th>Party</th>
+            <th>Qty (L)</th>
+            <th>FAT%</th>
+            <th>SNF%</th>
+            <th>BF Kgs</th>
+            <th>SNF Kgs</th>
+            <th>Ratio</th>
+            <th>Rate/L</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in txns %}
+          {% if txn.txn_type == 'Purchase' %}
+          <tr data-party="{{ txn.party.name if txn.party else '' }}">
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if txn.bill %}
+                <a href="{{ url_for('enhanced_invoice.view_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
+                  <i class="bi bi-receipt"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
+            <td>{{ txn.txn_date.strftime('%d-%b-%Y') }}</td>
+            <td>{{ txn.shift }}</td>
+            <td><span class="badge bg-danger">{{ txn.txn_type }}</span></td>
+            <td>{{ txn.party.name if txn.party else '-' }}</td>
+            <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
+            <td>{{ "%.2f"|format(txn.fat) }}</td>
+            <td>{{ "%.2f"|format(txn.snf) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
+            <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
+            <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
+            <td>₹{{ "%.4f"|format(txn.rate) }}</td>
+            <td class="fw-bold">₹{{ "%.2f"|format(txn.amount) }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let allData = [
+  {% for txn in txns %}
+  {% if txn.txn_type == 'Purchase' %}
+  {
+    billNo: "{{ txn.bill.bill_no if txn.bill else '-' }}",
+    date: "{{ txn.txn_date.strftime('%Y-%m-%d') }}",
+    shift: "{{ txn.shift }}",
+    type: "{{ txn.txn_type }}",
+    party: "{{ txn.party.name if txn.party else '' }}",
+    qty: {{ txn.qty_liters }},
+    fat: {{ txn.fat }},
+    snf: {{ txn.snf }},
+    bfKgs: {{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }},
+    snfKgs: {{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }},
+    ratio: {{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }},
+    rate: {{ txn.rate }},
+    amount: {{ txn.amount }}
+  }{% if not loop.last %},{% endif %}
+  {% endif %}
+  {% endfor %}
+];
+
+function applyFilters() {
+  const partySearch = document.getElementById('partySearch').value.toLowerCase();
+  const fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  const shiftFilter = document.getElementById('shiftFilter').value;
+  
+  const rows = document.querySelectorAll('#purchaseTable tbody tr');
+  let visibleCount = 0;
+  let totals = {qty: 0, fat: 0, snf: 0, amount: 0, bfKgs: 0, snfKgs: 0};
+  
+  rows.forEach(row => {
+    const party = row.getAttribute('data-party').toLowerCase();
+    const date = row.cells[2].textContent.trim();
+    const shift = row.cells[3].textContent.trim();
+    const qty = parseFloat(row.cells[6].textContent) || 0;
+    const fat = parseFloat(row.cells[7].textContent) || 0;
+    const snf = parseFloat(row.cells[8].textContent) || 0;
+    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(',', '')) || 0;
+    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    
+    let show = true;
+    
+    if (partySearch && !party.includes(partySearch)) show = false;
+    if (fromDate && date < fromDate) show = false;
+    if (toDate && date > toDate) show = false;
+    if (shiftFilter && shift !== shiftFilter) show = false;
+    
+    row.style.display = show ? '' : 'none';
+    
+    if (show) {
+      visibleCount++;
+      totals.qty += qty;
+      totals.fat += fat;
+      totals.snf += snf;
+      totals.amount += amount;
+      totals.bfKgs += bfKgs;
+      totals.snfKgs += snfKgs;
+    }
+  });
+  
+  // Update summary
+  document.getElementById('totalQty').textContent = totals.qty.toFixed(2);
+  document.getElementById('avgFat').textContent = visibleCount > 0 ? (totals.fat / visibleCount).toFixed(2) : '0.00';
+  document.getElementById('avgSnf').textContent = visibleCount > 0 ? (totals.snf / visibleCount).toFixed(2) : '0.00';
+  document.getElementById('totalBf').textContent = totals.bfKgs.toFixed(2);
+  document.getElementById('totalSnfKgs').textContent = totals.snfKgs.toFixed(2);
+  document.getElementById('totalAmount').textContent = '₹' + totals.amount.toFixed(2);
+}
+
+function resetFilters() {
+  document.getElementById('partySearch').value = '';
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  document.getElementById('shiftFilter').value = '';
+  applyFilters();
+}
+
+// Real-time party search
+document.getElementById('partySearch').addEventListener('input', applyFilters);
+document.getElementById('fromDate').addEventListener('change', applyFilters);
+document.getElementById('toDate').addEventListener('change', applyFilters);
+document.getElementById('shiftFilter').addEventListener('change', applyFilters);
+</script>
+{% endblock %}

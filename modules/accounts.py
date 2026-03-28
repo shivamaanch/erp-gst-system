@@ -4,6 +4,7 @@ from flask_login import login_required
 from extensions import db
 from models import Account
 from modules.permissions import require_role
+from datetime import date
 
 accounts_bp = Blueprint("accounts", __name__)
 
@@ -128,3 +129,38 @@ def groups():
     return render_template("accounts/groups.html", 
                          group_stats=group_stats,
                          total_accounts=len(accounts))
+
+@accounts_bp.route("/accounts/quick-add", methods=["POST"])
+@login_required
+def quick_add():
+    cid = session.get("company_id")
+    
+    try:
+        # Create new account
+        account = Account(
+            company_id=cid,
+            name=request.form["name"].strip(),
+            account_type=request.form["account_type"],
+            opening_balance=float(request.form.get("opening_balance", 0)),
+            balance_type=request.form.get("balance_type", "debit"),
+            description=request.form.get("description", "").strip(),
+            is_active=True,
+            created_at=date.today()
+        )
+        
+        # Set opening balance based on type
+        if account.balance_type == "debit":
+            account.opening_dr = account.opening_balance
+            account.opening_cr = 0
+        else:
+            account.opening_dr = 0
+            account.opening_cr = account.opening_balance
+        
+        db.session.add(account)
+        db.session.commit()
+        
+        return jsonify({"success": True, "message": "Account added successfully"})
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)})

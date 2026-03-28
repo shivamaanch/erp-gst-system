@@ -3,9 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">{{ 'Edit' if entry else 'Add' }} Cash Book Entry</h4>
-  <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">
-    ← Back to Cash Book
-  </a>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-info" onclick="showQuickAddLedger()">
+      <i class="bi bi-plus-circle"></i> Add Ledger
+    </button>
+    <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">
+      ← Back to Cash Book
+    </a>
+  </div>
 </div>
 
 <div class="card">
@@ -71,4 +76,7 @@
     </form>
   </div>
 </div>
+
+<!-- Include Quick Add Ledger Modal -->
+{% include 'shared/quick_add_ledger.html' %}
 {% endblock %}

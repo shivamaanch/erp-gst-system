@@ -3,9 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">📝 Quick Journal Entry</h4>
-  <a href="{{ url_for('journal.index') }}" class="btn btn-outline-secondary">
-    ← Back to Journal
-  </a>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-info" onclick="showQuickAddLedger()">
+      <i class="bi bi-plus-circle"></i> Add Ledger
+    </button>
+    <a href="{{ url_for('journal.index') }}" class="btn btn-outline-secondary">
+      ← Back to Journal
+    </a>
+  </div>
 </div>
 
 <div class="card">
@@ -228,4 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
   calculateTotals();
 });
 </script>
+
+<!-- Include Quick Add Ledger Modal -->
+{% include 'shared/quick_add_ledger.html' %}
 {% endblock %}
