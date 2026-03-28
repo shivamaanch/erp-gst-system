@@ -220,6 +220,7 @@ def delete(company_id):
             ("accounts", "company_id = :cid"),
             ("financial_years", "company_id = :cid"),
             ("user_companies", "company_id = :cid"),
+            ("company_access_log", "company_id = :cid"),  # Add this missing table
             ("gst_returns", "company_id = :cid"),
             ("tds_returns", "company_id = :cid"),
             ("bank_accounts", "company_id = :cid"),
