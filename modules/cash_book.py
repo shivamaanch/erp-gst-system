@@ -87,7 +87,8 @@ def add():
             narration=narration,
             party_name=party_name,
             payment_mode=payment_mode,
-            reference_no=reference_no
+            reference_no=reference_no,
+            account_id=int(account_id) if account_id else None
         )
         db.session.add(entry)
         db.session.commit()
@@ -196,7 +197,8 @@ def quick_entry():
                 narration=narrations[i],
                 party_name=party_name,
                 payment_mode=payment_mode,
-                reference_no=reference_no
+                reference_no=reference_no,
+                account_id=int(account_ids[i]) if account_ids[i] else None
             )
             db.session.add(entry)
             entries_created += 1

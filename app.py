@@ -656,6 +656,7 @@ def create_app():
     from modules.tds_module     import tds_bp
     from modules.cash_book      import cash_book_bp
     from modules.day_book       import day_book_bp
+    from modules.universal_invoice import universal_invoice_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(utilities_bp)
@@ -683,6 +684,7 @@ def create_app():
     app.register_blueprint(gst_bp)
     app.register_blueprint(cash_book_bp, url_prefix="/cash-book")
     app.register_blueprint(day_book_bp, url_prefix="/day-book")
+    app.register_blueprint(universal_invoice_bp)
     
     # Context processor to make company info available in all templates
     @app.context_processor

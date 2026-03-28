@@ -129,7 +129,7 @@
                   <i class="bi bi-pencil"></i>
                 </a>
                 {% if txn.bill %}
-                <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
+                <a href="{{ url_for('universal_invoice.view_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
                   <i class="bi bi-receipt"></i>
                 </a>
                 {% endif %}

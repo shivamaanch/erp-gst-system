@@ -96,7 +96,7 @@
             </td>
             <td>
               <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=bill.id) }}" class="btn btn-outline-info" title="Print">
+                <a href="{{ url_for('universal_invoice.print_invoice', bill_id=bill.id) }}" class="btn btn-outline-info" title="Print">
                   <i class="bi bi-printer"></i>
                 </a>
                 <a href="{{ url_for('enhanced_invoice.export_invoice', bill_id=bill.id, format='excel') }}" class="btn btn-outline-success" title="Download Excel">
