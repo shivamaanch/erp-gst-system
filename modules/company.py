@@ -200,27 +200,31 @@ def delete(company_id):
         company = current_user.accessible_companies.filter_by(id=company_id).first_or_404()
     
     try:
-        # Check for existing records
-        bills_count = Bill.query.filter_by(company_id=company_id).count()
-        milk_count = MilkTransaction.query.filter_by(company_id=company_id).count()
-        journal_count = JournalHeader.query.filter_by(company_id=company_id).count()
+        # Delete ALL associated data for this company
+        company_name = company.name
         
-        if bills_count > 0 or milk_count > 0 or journal_count > 0:
-            # Delete all associated data
-            db.session.execute(text("DELETE FROM bills WHERE company_id = :cid"), {"cid": company_id})
-            db.session.execute(text("DELETE FROM milk_transactions WHERE company_id = :cid"), {"cid": company_id})
-            db.session.execute(text("DELETE FROM journal_headers WHERE company_id = :cid"), {"cid": company_id})
-            db.session.execute(text("DELETE FROM financial_years WHERE company_id = :cid"), {"cid": company_id})
-            db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
-            
-            flash(f"Company '{company.name}' and all its data ({bills_count} bills, {milk_count} milk entries, {journal_count} journal entries) have been deleted!", "warning")
-        else:
-            # Just delete the company
-            db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
-            db.session.delete(company)
-            flash(f"Company '{company.name}' deleted successfully!", "success")
+        # Delete all related records using raw SQL for efficiency
+        db.session.execute(text("DELETE FROM bill_items WHERE bill_id IN (SELECT id FROM bills WHERE company_id = :cid)"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM bills WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM milk_transactions WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM journal_lines WHERE journal_header_id IN (SELECT id FROM journal_headers WHERE company_id = :cid)"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM journal_headers WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM cash_book WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM parties WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM items WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM accounts WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM financial_years WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM user_companies WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM gst_returns WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM tds_returns WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM bank_accounts WHERE company_id = :cid"), {"cid": company_id})
+        db.session.execute(text("DELETE FROM bank_transactions WHERE company_id = :cid"), {"cid": company_id})
         
+        # Finally delete the company itself
+        db.session.delete(company)
         db.session.commit()
+        
+        flash(f"Company '{company_name}' and all its data have been permanently deleted!", "success")
         
     except Exception as e:
         db.session.rollback()
