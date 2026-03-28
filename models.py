@@ -49,20 +49,18 @@ class User(UserMixin, db.Model):
     
     # Relationships for multi-company access
     user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies,users")
+    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", overlaps="user_companies")
     
     @property
-    def accessible_companies(self):
-        """Get all companies this user can access"""
+    def all_accessible_companies(self):
+        """Get all companies this user can access (including all for super admin)"""
         if self.is_super_admin:
             # Super admins can access all companies
             from models import Company
             return Company.query
         else:
             # Regular users get companies through UserCompany
-            return Company.query.join(UserCompany).filter(
-                UserCompany.user_id == self.id,
-                UserCompany.is_active == True
-            )
+            return self.accessible_companies
     
     @property
     def current_company(self):
