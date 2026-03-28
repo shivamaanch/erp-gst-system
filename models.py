@@ -48,8 +48,21 @@ class User(UserMixin, db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
     
     # Relationships for multi-company access
-    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies")
-    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", overlaps="user_companies")
+    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies,users")
+    
+    @property
+    def accessible_companies(self):
+        """Get all companies this user can access"""
+        if self.is_super_admin:
+            # Super admins can access all companies
+            from models import Company
+            return Company.query
+        else:
+            # Regular users get companies through UserCompany
+            return Company.query.join(UserCompany).filter(
+                UserCompany.user_id == self.id,
+                UserCompany.is_active == True
+            )
     
     @property
     def current_company(self):

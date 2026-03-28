@@ -107,7 +107,7 @@ def switch_company(company_id):
     session["company_id"] = company_id
     session["company_name"] = company.name
     session["fin_year"] = fy.year_name if fy else "2025-26"
-    session["user_role"] = user_company.role if not user.is_super_admin else 'admin'
+    session["user_role"] = user_company.role if not user.is_super_admin and user_company else 'admin'
     
     # Log company switch
     access_log = CompanyAccessLog(
