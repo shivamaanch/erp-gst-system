@@ -41,6 +41,13 @@ def emergency_database_fix():
         
         print("🚨 EMERGENCY: Running critical database fix BEFORE app startup...")
         
+        # First, rollback any existing failed transactions
+        try:
+            cursor.execute("ROLLBACK")
+            print("🚨 EMERGENCY: Rolled back any existing failed transactions")
+        except:
+            pass  # Ignore if no transaction to rollback
+        
         # Add missing columns that prevent app from starting
         critical_fixes = [
             ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
@@ -60,10 +67,14 @@ def emergency_database_fix():
                     print(f"🚨 EMERGENCY: {col_name} already exists in {table_name}")
             except Exception as e:
                 print(f"🚨 EMERGENCY: Error adding {col_name} to {table_name}: {e}")
+                # Continue with other fixes even if this one fails
         
         # Update existing records
-        cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
-        print("🚨 EMERGENCY: Updated companies.is_active defaults")
+        try:
+            cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
+            print("🚨 EMERGENCY: Updated companies.is_active defaults")
+        except Exception as e:
+            print(f"🚨 EMERGENCY: Error updating companies.is_active: {e}")
         
         conn.close()
         print("🚨 EMERGENCY: Critical database fix completed! App can now start safely.")
