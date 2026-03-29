@@ -25,6 +25,13 @@ def safe_db_execute(sql, params=None):
         result = db.session.execute(text(sql), params or {})
         return result
 
+def to_int_or_none(val):
+    """Convert form value to integer or None if empty/invalid"""
+    try:
+        return int(val) if val and str(val).strip() else None
+    except (ValueError, TypeError):
+        return None
+
 milk_bp = Blueprint("milk", __name__)
 
 def calc_rate(fat, snf, fat_rate, snf_rate):
@@ -539,8 +546,8 @@ def add_entry():
         qty=float(request.form["qty_liters"])
         
         # Handle rate chart selection
-        chart_id=request.form.get("chart_id")
-        if chart_id and chart_id != "":
+        chart_id=to_int_or_none(request.form.get("chart_id"))
+        if chart_id:
             chart=MilkRateChart.query.get(int(chart_id))
             fat_rate=chart.fat_rate; snf_rate=chart.snf_rate
         else:
