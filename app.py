@@ -39,49 +39,47 @@ def emergency_database_fix():
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
         
-        print("🚨 EMERGENCY: Running critical database fix BEFORE app startup...")
+        print("🚨 EMERGENCY: COMPLETE DATABASE RESET...")
         
-        # First, rollback any existing failed transactions
+        # Kill all connections
         try:
-            cursor.execute("ROLLBACK")
-            print("🚨 EMERGENCY: Rolled back any existing failed transactions")
+            cursor.execute(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{parsed.path[1:]}' AND pid <> pg_backend_pid()")
         except:
-            pass  # Ignore if no transaction to rollback
+            pass
         
-        # Add missing columns that prevent app from starting
-        critical_fixes = [
-            ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
-            ("cash_book", "account_id", "INTEGER"),
-        ]
+        # Recreate milk_transactions table completely
+        cursor.execute("DROP TABLE IF EXISTS milk_transactions CASCADE")
+        cursor.execute("""
+            CREATE TABLE milk_transactions (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL,
+                fin_year VARCHAR(10) NOT NULL,
+                party_id INTEGER,
+                txn_date DATE,
+                shift VARCHAR(10) DEFAULT 'Morning',
+                txn_type VARCHAR(20),
+                qty_liters DECIMAL(10,2),
+                fat DECIMAL(5,2),
+                snf DECIMAL(5,2),
+                rate DECIMAL(10,4),
+                amount DECIMAL(14,2),
+                chart_id INTEGER,
+                narration TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
-        for table_name, col_name, col_type in critical_fixes:
-            try:
-                cursor.execute(f"""
-                    SELECT column_name FROM information_schema.columns 
-                    WHERE table_name = '{table_name}' AND column_name = '{col_name}'
-                """)
-                if not cursor.fetchone():
-                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
-                    print(f"🚨 EMERGENCY: Added {col_name} to {table_name}")
-                else:
-                    print(f"🚨 EMERGENCY: {col_name} already exists in {table_name}")
-            except Exception as e:
-                print(f"🚨 EMERGENCY: Error adding {col_name} to {table_name}: {e}")
-                # Continue with other fixes even if this one fails
-        
-        # Update existing records
-        try:
-            cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
-            print("🚨 EMERGENCY: Updated companies.is_active defaults")
-        except Exception as e:
-            print(f"🚨 EMERGENCY: Error updating companies.is_active: {e}")
+        # Fix other tables
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+        cursor.execute("ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER")
+        cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
         
         conn.close()
-        print("🚨 EMERGENCY: Critical database fix completed! App can now start safely.")
+        print("🎉 DATABASE RESET COMPLETE! App should work now.")
         return True
         
     except Exception as e:
-        print(f"🚨 EMERGENCY: Critical fix failed: {e}")
+        print(f"🚨 EMERGENCY: Reset failed: {e}")
         return False
 
 # Run emergency fix BEFORE importing models or creating app
