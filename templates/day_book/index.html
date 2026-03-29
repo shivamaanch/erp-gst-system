@@ -90,6 +90,7 @@
       <table class="table table-striped">
         <thead>
           <tr>
+            <th>Type</th>
             <th>Voucher No</th>
             <th>Date</th>
             <th>Account</th>
@@ -100,34 +101,53 @@
           </tr>
         </thead>
         <tbody>
-          {% for entry in transactions %}
+          {% for txn in transactions %}
           <tr>
-            <td>{{ entry.voucher_no }}</td>
-            <td>{{ entry.transaction_date.strftime('%d-%m-%Y') }}</td>
-            <td>{{ entry.account.name if entry.account else '-' }}</td>
-            <td class="text-success fw-bold">₹{{ "{:,.2f}".format(entry.debit_amount) if entry.debit_amount > 0 else '' }}</td>
-            <td class="text-danger fw-bold">₹{{ "{:,.2f}".format(entry.credit_amount) if entry.credit_amount > 0 else '' }}</td>
-            <td>{{ entry.narration[:50] }}{% if entry.narration|length > 50 %}...{% endif %}</td>
+            <td>
+              <span class="badge bg-{{ 
+                'primary' if txn.type == 'Journal' else 
+                'success' if txn.type == 'Sales' else 
+                'warning' if txn.type == 'Purchase' else 
+                'info' if 'Milk' in txn.type else 
+                'secondary' 
+              }}">{{ txn.type }}</span>
+            </td>
+            <td>{{ txn.voucher_no }}</td>
+            <td>{{ txn.date.strftime('%d-%m-%Y') }}</td>
+            <td>{{ txn.account }}</td>
+            <td class="text-success fw-bold">₹{{ "{:,.2f}".format(txn.debit) if txn.debit > 0 else '' }}</td>
+            <td class="text-danger fw-bold">₹{{ "{:,.2f}".format(txn.credit) if txn.credit > 0 else '' }}</td>
+            <td>{{ txn.narration[:50] }}{% if txn.narration|length > 50 %}...{% endif %}</td>
             <td>
               <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('day_book.view', entry_id=entry.id) }}" class="btn btn-outline-primary" title="View">
+                {% if 'Journal' in txn.type %}
+                <a href="{{ url_for('day_book.view', entry_id=txn.id) }}" class="btn btn-outline-primary" title="View">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a href="{{ url_for('day_book.edit', entry_id=entry.id) }}" class="btn btn-outline-warning" title="Edit">
+                {% else %}
+                <a href="{{ txn.edit_url }}" class="btn btn-outline-primary" title="View">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% endif %}
+                {% if txn.edit_url != '#' and 'Journal' in txn.type %}
+                <a href="{{ txn.edit_url }}" class="btn btn-outline-warning" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </a>
-                <form method="POST" action="{{ url_for('day_book.delete', entry_id=entry.id) }}" class="d-inline" 
+                {% endif %}
+                {% if txn.delete_url != '#' and 'Journal' in txn.type %}
+                <form method="POST" action="{{ txn.delete_url }}" class="d-inline" 
                       onsubmit="return confirm('Are you sure you want to delete this entry?')">
                   <button type="submit" class="btn btn-outline-danger" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
                 </form>
+                {% endif %}
               </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted">No day book entries found</td>
+            <td colspan="8" class="text-center text-muted">No transactions found</td>
           </tr>
           {% endfor %}
         </tbody>

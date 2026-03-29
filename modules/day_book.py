@@ -1,9 +1,9 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, make_response
 from flask_login import login_required
 from extensions import db
-from models import DayBook, Account, Company
+from models import DayBook, Account, Company, Bill, MilkTransaction, Party
 from datetime import date, datetime
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 import csv
 import io
 
@@ -33,26 +33,96 @@ def index():
     to_date = request.args.get("to_date")
     account_filter = request.args.get("account_id", "")
     
-    # Build query
-    query = DayBook.query.filter_by(company_id=cid, fin_year=fy)
+    # Collect all transactions
+    transactions = []
     
+    # 1. Day Book entries (manual journal entries)
+    daybook_query = DayBook.query.filter_by(company_id=cid, fin_year=fy)
     if search:
-        query = query.filter(DayBook.narration.contains(search))
+        daybook_query = daybook_query.filter(DayBook.narration.contains(search))
     if from_date:
-        query = query.filter(DayBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+        daybook_query = daybook_query.filter(DayBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
     if to_date:
-        query = query.filter(DayBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+        daybook_query = daybook_query.filter(DayBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
     if account_filter:
-        query = query.filter(DayBook.account_id == int(account_filter))
+        daybook_query = daybook_query.filter(DayBook.account_id == int(account_filter))
     
-    transactions = query.order_by(DayBook.transaction_date.desc()).all()
+    for entry in daybook_query.all():
+        transactions.append({
+            'type': 'Journal',
+            'date': entry.transaction_date,
+            'voucher_no': entry.voucher_no,
+            'account': entry.account.name if entry.account else 'Unknown',
+            'debit': entry.debit_amount or 0,
+            'credit': entry.credit_amount or 0,
+            'narration': entry.narration,
+            'id': entry.id,
+            'edit_url': url_for('day_book.edit', entry_id=entry.id),
+            'delete_url': url_for('day_book.delete', entry_id=entry.id)
+        })
+    
+    # 2. Bills (Sales/Purchase invoices)
+    bills_query = Bill.query.filter_by(company_id=cid, fin_year=fy)
+    if search:
+        bills_query = bills_query.filter(or_(
+            Bill.narration.contains(search),
+            Bill.bill_no.contains(search)
+        ))
+    if from_date:
+        bills_query = bills_query.filter(Bill.bill_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+    if to_date:
+        bills_query = bills_query.filter(Bill.bill_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    
+    for bill in bills_query.all():
+        party = Party.query.get(bill.party_id) if bill.party_id else None
+        transactions.append({
+            'type': bill.bill_type or 'Invoice',
+            'date': bill.bill_date or datetime.now().date(),
+            'voucher_no': bill.bill_no or f'BILL-{bill.id}',
+            'account': party.name if party else 'Unknown Party',
+            'debit': bill.total_amount or 0 if bill.bill_type == 'Purchase' else 0,
+            'credit': bill.total_amount or 0 if bill.bill_type == 'Sales' else 0,
+            'narration': bill.narration or f'{bill.bill_type or "Invoice"} #{bill.bill_no}',
+            'id': bill.id,
+            'edit_url': url_for('enhanced_invoice.print_invoice', bill_id=bill.id),
+            'delete_url': '#'
+        })
+    
+    # 3. Milk Transactions
+    milk_query = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy)
+    if search:
+        milk_query = milk_query.filter(or_(
+            MilkTransaction.narration.contains(search)
+        ))
+    if from_date:
+        milk_query = milk_query.filter(MilkTransaction.txn_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+    if to_date:
+        milk_query = milk_query.filter(MilkTransaction.txn_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    
+    for milk in milk_query.all():
+        party = Party.query.get(milk.party_id) if milk.party_id else None
+        transactions.append({
+            'type': f'Milk {milk.txn_type}',
+            'date': milk.txn_date,
+            'voucher_no': f'MILK-{milk.id}',
+            'account': party.name if party else 'Unknown Party',
+            'debit': milk.amount or 0 if milk.txn_type == 'Purchase' else 0,
+            'credit': milk.amount or 0 if milk.txn_type == 'Sale' else 0,
+            'narration': milk.narration or f'{milk.txn_type} - {milk.qty_liters}L @ {milk.rate}',
+            'id': milk.id,
+            'edit_url': url_for('milk.edit_entry', txn_id=milk.id),
+            'delete_url': '#'
+        })
+    
+    # Sort all transactions by date (newest first)
+    transactions.sort(key=lambda x: x['date'], reverse=True)
     
     # Calculate totals
-    total_debit = sum(t.debit_amount for t in transactions)
-    total_credit = sum(t.credit_amount for t in transactions)
+    total_debit = sum(t['debit'] for t in transactions)
+    total_credit = sum(t['credit'] for t in transactions)
     balance = total_debit - total_credit
     
-    # Get accounts for filter
+    # Get accounts for filter dropdown
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     return render_template("day_book/index.html", 
