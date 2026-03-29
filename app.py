@@ -69,6 +69,27 @@ def emergency_database_fix():
             )
         """)
         
+        # Recreate bills table with fin_year
+        cursor.execute("DROP TABLE IF EXISTS bills CASCADE")
+        cursor.execute("""
+            CREATE TABLE bills (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL,
+                fin_year VARCHAR(10) NOT NULL,
+                bill_no VARCHAR(50),
+                bill_date DATE,
+                party_id INTEGER,
+                bill_type VARCHAR(20),
+                total_amount DECIMAL(15,2),
+                gst_amount DECIMAL(15,2),
+                net_amount DECIMAL(15,2),
+                status VARCHAR(20),
+                is_cancelled BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by INTEGER
+            )
+        """)
+        
         # Fix other tables
         cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
         cursor.execute("ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER")
