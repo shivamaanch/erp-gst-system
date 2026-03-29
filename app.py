@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 
 import os
 
+import warnings
+
+# Suppress SQLAlchemy relationship warnings
+warnings.filterwarnings('ignore', r'.*relationship.*will copy column.*conflicts.*')
+
 import psycopg2
 
 import urllib.parse
@@ -21,11 +26,16 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 load_dotenv()
 
 def emergency_database_fix():
-    """Run emergency database fix with individual AUTOCOMMIT connections"""
+    """Run emergency database fix with proper migration pattern - PostgreSQL only"""
     db_url = os.getenv('DATABASE_URL')
     if not db_url:
         print("❌ DATABASE_URL not found - skipping emergency fix")
         return False
+    
+    # Only run on PostgreSQL, not SQLite
+    if not db_url.startswith('postgresql://'):
+        print("🔄 SQLite detected - skipping emergency fix")
+        return True
     
     try:
         # Import here to avoid circular imports

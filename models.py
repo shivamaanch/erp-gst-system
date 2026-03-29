@@ -23,8 +23,8 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    user_companies = db.relationship("UserCompany", back_populates="company", overlaps="accessible_companies,users")
-    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", viewonly=True, overlaps="user_companies")
+    user_companies = db.relationship("UserCompany", back_populates="company")
+    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", viewonly=True)
 
 class FinancialYear(db.Model):
     __tablename__ = "financial_years"
@@ -51,8 +51,8 @@ class User(UserMixin, db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
     
     # Relationships for multi-company access
-    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies,companies")
-    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", viewonly=True, overlaps="user_companies")
+    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic")
+    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", viewonly=True)
     
     @property
     def all_accessible_companies(self):
@@ -112,8 +112,8 @@ class UserCompany(db.Model):
     expires_at = db.Column(db.DateTime)  # Optional expiry date for temporary access
     
     # Relationships
-    user = db.relationship("User", back_populates="user_companies", overlaps="accessible_companies,users")
-    company = db.relationship("Company", back_populates="user_companies", overlaps="accessible_companies,users")
+    user = db.relationship("User", back_populates="user_companies")
+    company = db.relationship("Company", back_populates="user_companies")
     
     def __repr__(self):
         return f"<UserCompany {self.user.username} -> {self.company.name} ({self.role})>"
