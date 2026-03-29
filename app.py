@@ -69,7 +69,7 @@ def emergency_database_fix():
             )
         """)
         
-        # Recreate bills table with fin_year
+        # Recreate bills table with ALL required columns
         cursor.execute("DROP TABLE IF EXISTS bills CASCADE")
         cursor.execute("""
             CREATE TABLE bills (
@@ -77,12 +77,22 @@ def emergency_database_fix():
                 company_id INTEGER NOT NULL,
                 fin_year VARCHAR(10) NOT NULL,
                 bill_no VARCHAR(50),
+                voucher_no VARCHAR(50),
                 bill_date DATE,
                 party_id INTEGER,
                 bill_type VARCHAR(20),
+                narration TEXT,
+                taxable_amount DECIMAL(15,2),
+                cgst DECIMAL(15,2),
+                sgst DECIMAL(15,2),
+                igst DECIMAL(15,2),
                 total_amount DECIMAL(15,2),
-                gst_amount DECIMAL(15,2),
-                net_amount DECIMAL(15,2),
+                paid_amount DECIMAL(15,2),
+                tds_rate DECIMAL(5,2),
+                tds_amount DECIMAL(15,2),
+                tcs_rate DECIMAL(5,2),
+                tcs_amount DECIMAL(15,2),
+                template_type VARCHAR(50) DEFAULT 'standard',
                 status VARCHAR(20),
                 is_cancelled BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
