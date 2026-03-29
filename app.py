@@ -39,110 +39,59 @@ def emergency_database_fix():
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
         
-        print("🚨 EMERGENCY: COMPLETE DATABASE RESET...")
+        print("🚨 EMERGENCY: Adding missing columns...")
         
-        # Kill all connections
+        # Kill all connections first
         try:
             cursor.execute(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{parsed.path[1:]}' AND pid <> pg_backend_pid()")
         except:
             pass
         
-        # Recreate milk_transactions table completely
-        cursor.execute("DROP TABLE IF EXISTS milk_transactions CASCADE")
-        cursor.execute("""
-            CREATE TABLE milk_transactions (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER NOT NULL,
-                fin_year VARCHAR(10) NOT NULL,
-                party_id INTEGER,
-                txn_date DATE,
-                shift VARCHAR(10) DEFAULT 'Morning',
-                txn_type VARCHAR(20),
-                qty_liters DECIMAL(10,2),
-                fat DECIMAL(5,2),
-                snf DECIMAL(5,2),
-                rate DECIMAL(10,4),
-                amount DECIMAL(14,2),
-                chart_id INTEGER,
-                narration TEXT,
-                voucher_no VARCHAR(50),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # Add missing columns without dropping tables
+        critical_columns = [
+            ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
+            ("cash_book", "account_id", "INTEGER"),
+            ("bills", "fin_year", "VARCHAR(10)"),
+            ("bills", "voucher_no", "VARCHAR(50)"),
+            ("bills", "taxable_amount", "DECIMAL(15,2)"),
+            ("bills", "cgst", "DECIMAL(15,2)"),
+            ("bills", "sgst", "DECIMAL(15,2)"),
+            ("bills", "igst", "DECIMAL(15,2)"),
+            ("bills", "paid_amount", "DECIMAL(15,2)"),
+            ("bills", "tds_rate", "DECIMAL(5,2)"),
+            ("bills", "tds_amount", "DECIMAL(15,2)"),
+            ("bills", "tcs_rate", "DECIMAL(5,2)"),
+            ("bills", "tcs_amount", "DECIMAL(15,2)"),
+            ("bills", "template_type", "VARCHAR(50) DEFAULT 'standard'"),
+            ("bills", "is_cancelled", "BOOLEAN DEFAULT FALSE"),
+            ("bills", "created_by", "INTEGER"),
+            ("milk_transactions", "voucher_no", "VARCHAR(50)"),
+            ("journal_headers", "fin_year", "VARCHAR(10)"),
+            ("journal_headers", "created_by", "INTEGER"),
+        ]
         
-        # Recreate bills table with ALL required columns
-        cursor.execute("DROP TABLE IF EXISTS bills CASCADE")
-        cursor.execute("""
-            CREATE TABLE bills (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER NOT NULL,
-                fin_year VARCHAR(10) NOT NULL,
-                bill_no VARCHAR(50),
-                voucher_no VARCHAR(50),
-                bill_date DATE,
-                party_id INTEGER,
-                bill_type VARCHAR(20),
-                narration TEXT,
-                taxable_amount DECIMAL(15,2),
-                cgst DECIMAL(15,2),
-                sgst DECIMAL(15,2),
-                igst DECIMAL(15,2),
-                total_amount DECIMAL(15,2),
-                paid_amount DECIMAL(15,2),
-                tds_rate DECIMAL(5,2),
-                tds_amount DECIMAL(15,2),
-                tcs_rate DECIMAL(5,2),
-                tcs_amount DECIMAL(15,2),
-                template_type VARCHAR(50) DEFAULT 'standard',
-                status VARCHAR(20),
-                is_cancelled BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_by INTEGER
-            )
-        """)
+        for table_name, col_name, col_type in critical_columns:
+            try:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                print(f"✅ Added {col_name} to {table_name}")
+            except Exception as e:
+                print(f"⚠️ {table_name}.{col_name}: {e}")
         
-        # Recreate journal_headers table with fin_year and created_by
-        cursor.execute("DROP TABLE IF EXISTS journal_headers CASCADE")
-        cursor.execute("""
-            CREATE TABLE journal_headers (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER NOT NULL,
-                voucher_no VARCHAR(50),
-                voucher_date DATE,
-                narration TEXT,
-                total_debit DECIMAL(15,2),
-                total_credit DECIMAL(15,2),
-                fin_year VARCHAR(10),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_by INTEGER
-            )
-        """)
-        
-        # Recreate journal_lines table
-        cursor.execute("DROP TABLE IF EXISTS journal_lines CASCADE")
-        cursor.execute("""
-            CREATE TABLE journal_lines (
-                id SERIAL PRIMARY KEY,
-                journal_header_id INTEGER NOT NULL,
-                account_id INTEGER NOT NULL,
-                debit_amount DECIMAL(15,2) DEFAULT 0.00,
-                credit_amount DECIMAL(15,2) DEFAULT 0.00,
-                narration TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Fix other tables
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-        cursor.execute("ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER")
-        cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
+        # Update defaults
+        try:
+            cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
+            cursor.execute("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL")
+            cursor.execute("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL")
+            print("✅ Updated defaults")
+        except Exception as e:
+            print(f"⚠️ Update defaults: {e}")
         
         conn.close()
-        print("🎉 DATABASE RESET COMPLETE! App should work now.")
+        print("🎉 DATABASE FIX COMPLETE! App should work now.")
         return True
         
     except Exception as e:
-        print(f"🚨 EMERGENCY: Reset failed: {e}")
+        print(f"🚨 EMERGENCY: Fix failed: {e}")
         return False
 
 # Run emergency fix BEFORE importing models or creating app
