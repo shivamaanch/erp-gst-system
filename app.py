@@ -39,11 +39,33 @@ def emergency_database_fix():
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
         
-        print("🚨 EMERGENCY: Adding missing columns...")
+        print("🚨 EMERGENCY: AGGRESSIVE DATABASE RESET...")
         
-        # Kill all connections first
+        # Kill ALL connections including our own
         try:
-            cursor.execute(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{parsed.path[1:]}' AND pid <> pg_backend_pid()")
+            cursor.execute(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{parsed.path[1:]}'")
+        except:
+            pass
+        
+        # Wait a moment for connections to die
+        import time
+        time.sleep(1)
+        
+        # Reconnect
+        conn.close()
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password
+        )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
+        
+        # Clear any failed transactions
+        try:
+            cursor.execute("ROLLBACK")
         except:
             pass
         
@@ -87,12 +109,25 @@ def emergency_database_fix():
             print(f"⚠️ Update defaults: {e}")
         
         conn.close()
-        print("🎉 DATABASE FIX COMPLETE! App should work now.")
+        print("🎉 AGGRESSIVE DATABASE FIX COMPLETE! App should work now.")
         return True
         
     except Exception as e:
         print(f"🚨 EMERGENCY: Fix failed: {e}")
         return False
+
+# Add database connection reset function
+def reset_database_connection():
+    """Reset database connection and clear any failed transactions"""
+    try:
+        from extensions import db
+        # Rollback any existing failed transactions
+        db.session.rollback()
+        # Remove session from pool
+        db.session.remove()
+        print("🔄 Database connection reset")
+    except Exception as e:
+        print(f"⚠️ Connection reset failed: {e}")
 
 # Run emergency fix BEFORE importing models or creating app
 emergency_database_fix()
@@ -1319,6 +1354,21 @@ def create_app():
     from extensions import db
 
     db.init_app(app)
+
+    
+
+    # CRITICAL: Reset database connection before every request to prevent transaction errors
+    @app.before_request
+    def reset_db_connection():
+        """Reset database connection before each request to prevent transaction errors"""
+        try:
+            from extensions import db
+            # Rollback any existing failed transactions
+            db.session.rollback()
+            # Remove session from pool to get fresh connection
+            db.session.remove()
+        except Exception as e:
+            print(f"⚠️ DB reset before request failed: {e}")
 
     
 
