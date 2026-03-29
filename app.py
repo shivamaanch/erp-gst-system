@@ -21,88 +21,105 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 load_dotenv()
 
 def emergency_database_fix():
-    """Run emergency database fix with advisory lock to prevent concurrent execution"""
+    """Run emergency database fix with proper migration pattern"""
     db_url = os.getenv('DATABASE_URL')
     if not db_url:
         print("❌ DATABASE_URL not found - skipping emergency fix")
         return False
     
     try:
-        # Connect directly with psycopg2 to get advisory lock
-        parsed = urllib.parse.urlparse(db_url)
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            port=parsed.port or 5432,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password
-        )
-        conn.autocommit = True
-        cursor = conn.cursor()
+        # Import here to avoid circular imports
+        from sqlalchemy import text
         
-        # Acquire advisory lock - only 1 worker proceeds
-        result = cursor.execute("SELECT pg_try_advisory_lock(12345)")
-        lock_acquired = cursor.fetchone()[0]
+        # Create a minimal Flask app for app context
+        temp_app = Flask(__name__)
+        temp_app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+        temp_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         
-        if not lock_acquired:
-            print("🔄 Emergency fix already running in another worker - skipping")
-            conn.close()
-            return True
+        # Initialize database with temp app
+        from extensions import db
+        db.init_app(temp_app)
         
-        try:
-            print("🚨 EMERGENCY: Adding missing columns with advisory lock...")
-            
-            # Add missing columns without dropping tables
-            critical_columns = [
-                ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
-                ("cash_book", "account_id", "INTEGER"),
-                ("milk_transactions", "bill_id", "INTEGER"),
-                ("milk_transactions", "fin_year", "VARCHAR(10)"),
-                ("milk_transactions", "voucher_no", "VARCHAR(50)"),
-                ("bills", "fin_year", "VARCHAR(10)"),
-                ("bills", "voucher_no", "VARCHAR(50)"),
-                ("bills", "taxable_amount", "DECIMAL(15,2)"),
-                ("bills", "cgst", "DECIMAL(15,2)"),
-                ("bills", "sgst", "DECIMAL(15,2)"),
-                ("bills", "igst", "DECIMAL(15,2)"),
-                ("bills", "paid_amount", "DECIMAL(15,2)"),
-                ("bills", "tds_rate", "DECIMAL(5,2)"),
-                ("bills", "tds_amount", "DECIMAL(15,2)"),
-                ("bills", "tcs_rate", "DECIMAL(5,2)"),
-                ("bills", "tcs_amount", "DECIMAL(15,2)"),
-                ("bills", "template_type", "VARCHAR(50) DEFAULT 'standard'"),
-                ("bills", "is_cancelled", "BOOLEAN DEFAULT FALSE"),
-                ("bills", "created_by", "INTEGER"),
-                ("journal_headers", "fin_year", "VARCHAR(10)"),
-                ("journal_headers", "created_by", "INTEGER"),
-            ]
-            
-            for table_name, col_name, col_type in critical_columns:
+        with temp_app.app_context():
+            # Use raw engine with AUTOCOMMIT - NEVER db.session for DDL
+            with db.engine.connect() as conn:
+                conn.execution_options(isolation_level="AUTOCOMMIT")
+
+                # Advisory lock - only 1 worker runs migration
+                if not conn.execute(text("SELECT pg_try_advisory_lock(99991)")).scalar():
+                    print("🔄 Emergency fix locked by another worker - skipping")
+                    return True
+
                 try:
-                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
-                    print(f"✅ Added {col_name} to {table_name}")
-                except Exception as e:
-                    print(f"⚠️ {table_name}.{col_name}: {e}")
-            
-            # Update defaults
-            try:
-                cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
-                cursor.execute("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL")
-                cursor.execute("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL")
-                print("✅ Updated defaults")
-            except Exception as e:
-                print(f"⚠️ Update defaults: {e}")
-            
-            print("🎉 EMERGENCY FIX COMPLETE! App should work now.")
+                    migrations = [
+                        # milk_transactions - bill_id FIRST (critical)
+                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS bill_id INTEGER",
+                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
+                        # bills
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS taxable_amount DECIMAL(15,2)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS cgst DECIMAL(15,2)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS sgst DECIMAL(15,2)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS igst DECIMAL(15,2)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(15,2)",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_rate NUMERIC(5,2) DEFAULT 0",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_amount NUMERIC(12,2) DEFAULT 0",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2) DEFAULT 0",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_amount NUMERIC(12,2) DEFAULT 0",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS template_type VARCHAR(50) DEFAULT 'standard'",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false",
+                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS created_by INTEGER",
+                        # journal_headers
+                        "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                        "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS created_by INTEGER",
+                        # companies
+                        "ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+                        # cash_book
+                        "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER",
+                        # parties
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS gstin VARCHAR(15)",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS pan VARCHAR(10)",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS state_code VARCHAR(5)",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS address TEXT",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS email VARCHAR(100)",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
+                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS balance_type VARCHAR(10) DEFAULT 'Dr'",
+                        # items
+                        "ALTER TABLE items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20)",
+                        "ALTER TABLE items ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2) DEFAULT 0",
+                        # accounts
+                        "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_type VARCHAR(50)",
+                        "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
+                    ]
+
+                    for sql in migrations:
+                        try:
+                            conn.execute(text(sql))
+                            print(f"✅ {sql[:60]}")
+                        except Exception as e:
+                            print(f"⚠️ {sql[:60]}: {e}")
+
+                    # Update defaults
+                    try:
+                        conn.execute(text("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL"))
+                        conn.execute(text("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL"))
+                        conn.execute(text("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL"))
+                        print("✅ Updated defaults")
+                    except Exception as e:
+                        print(f"⚠️ Update defaults: {e}")
+
+                finally:
+                    conn.execute(text("SELECT pg_advisory_unlock(99991)"))
+
+            db.session.remove()
+            print("🎉 Emergency fix complete!")
             return True
-            
-        finally:
-            # Always release the advisory lock
-            cursor.execute("SELECT pg_advisory_unlock(12345)")
-            conn.close()
         
     except Exception as e:
-        print(f"🚨 EMERGENCY: Fix failed: {e}")
+        print(f"🚨 Emergency fix failed: {e}")
         return False
 
 # Add database connection reset function
