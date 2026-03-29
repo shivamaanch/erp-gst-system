@@ -21,7 +21,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 load_dotenv()
 
 def emergency_database_fix():
-    """Run emergency database fix with proper migration pattern"""
+    """Run emergency database fix with individual AUTOCOMMIT connections"""
     db_url = os.getenv('DATABASE_URL')
     if not db_url:
         print("❌ DATABASE_URL not found - skipping emergency fix")
@@ -41,78 +41,67 @@ def emergency_database_fix():
         db.init_app(temp_app)
         
         with temp_app.app_context():
-            # Use raw engine with AUTOCOMMIT - NEVER db.session for DDL
-            with db.engine.connect() as conn:
-                conn.execution_options(isolation_level="AUTOCOMMIT")
+            engine = db.engine
+            
+            # Each ALTER runs in its own AUTOCOMMIT connection - nothing can cascade
+            all_ddl = [
+                "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS bill_id INTEGER",
+                "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_rate NUMERIC(5,2) DEFAULT 0",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_amount NUMERIC(12,2) DEFAULT 0",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2) DEFAULT 0",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_amount NUMERIC(12,2) DEFAULT 0",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS template_type VARCHAR(50) DEFAULT 'standard'",
+                "ALTER TABLE bills ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false",
+                "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS created_by INTEGER",
+                "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE journal_lines ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS gstin VARCHAR(15)",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS pan VARCHAR(10)",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS state_code VARCHAR(5)",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS address TEXT",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS email VARCHAR(100)",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS balance_type VARCHAR(10) DEFAULT 'Dr'",
+                "ALTER TABLE parties ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20)",
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2) DEFAULT 0",
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_type VARCHAR(50)",
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false",
+                "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+            ]
 
-                # Advisory lock - only 1 worker runs migration
-                if not conn.execute(text("SELECT pg_try_advisory_lock(99991)")).scalar():
-                    print("🔄 Emergency fix locked by another worker - skipping")
-                    return True
-
+            for sql in all_ddl:
                 try:
-                    migrations = [
-                        # milk_transactions - bill_id FIRST (critical)
-                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS bill_id INTEGER",
-                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
-                        "ALTER TABLE milk_transactions ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
-                        # bills
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS taxable_amount DECIMAL(15,2)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS cgst DECIMAL(15,2)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS sgst DECIMAL(15,2)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS igst DECIMAL(15,2)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(15,2)",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_rate NUMERIC(5,2) DEFAULT 0",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tds_amount NUMERIC(12,2) DEFAULT 0",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2) DEFAULT 0",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS tcs_amount NUMERIC(12,2) DEFAULT 0",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS template_type VARCHAR(50) DEFAULT 'standard'",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false",
-                        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS created_by INTEGER",
-                        # journal_headers
-                        "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
-                        "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS created_by INTEGER",
-                        # companies
-                        "ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
-                        # cash_book
-                        "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER",
-                        # parties
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS gstin VARCHAR(15)",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS pan VARCHAR(10)",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS state_code VARCHAR(5)",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS address TEXT",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS email VARCHAR(100)",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
-                        "ALTER TABLE parties ADD COLUMN IF NOT EXISTS balance_type VARCHAR(10) DEFAULT 'Dr'",
-                        # items
-                        "ALTER TABLE items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20)",
-                        "ALTER TABLE items ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2) DEFAULT 0",
-                        # accounts
-                        "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_type VARCHAR(50)",
-                        "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(15,2) DEFAULT 0",
-                    ]
+                    with engine.connect() as conn:
+                        conn.execution_options(isolation_level="AUTOCOMMIT")
+                        conn.execute(text(sql))
+                    print(f"✅ {sql[:70]}")
+                except Exception as e:
+                    print(f"⚠️ {sql[:50]}: {e}")
 
-                    for sql in migrations:
-                        try:
-                            conn.execute(text(sql))
-                            print(f"✅ {sql[:60]}")
-                        except Exception as e:
-                            print(f"⚠️ {sql[:60]}: {e}")
-
-                    # Update defaults
-                    try:
-                        conn.execute(text("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL"))
-                        conn.execute(text("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL"))
-                        conn.execute(text("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL"))
-                        print("✅ Updated defaults")
-                    except Exception as e:
-                        print(f"⚠️ Update defaults: {e}")
-
-                finally:
-                    conn.execute(text("SELECT pg_advisory_unlock(99991)"))
+            # Safe defaults — each in its own connection
+            defaults = [
+                "UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL",
+                "UPDATE parties SET balance_type = 'Dr' WHERE balance_type IS NULL",
+                "UPDATE parties SET opening_balance = 0 WHERE opening_balance IS NULL",
+            ]
+            for sql in defaults:
+                try:
+                    with engine.connect() as conn:
+                        conn.execution_options(isolation_level="AUTOCOMMIT")
+                        conn.execute(text(sql))
+                    print(f"✅ {sql[:70]}")
+                except Exception as e:
+                    print(f"⚠️ {sql[:50]}: {e}")
 
             db.session.remove()
             print("🎉 Emergency fix complete!")
@@ -144,25 +133,9 @@ def run_database_migration():
     return True
 
 def create_app():
-    # SKIP POSTGRESQL MIGRATION FOR SQLITE DEVELOPMENT
-
     print("Starting ERP application...")
-
-    # Only run PostgreSQL migration if DATABASE_URL is explicitly set to PostgreSQL
-
-    db_url = os.getenv("DATABASE_URL", "")
-
-    if db_url.startswith("postgresql://"):
-
-        migration_success = run_database_migration()
-
-        if not migration_success:
-
-            print("Migration failed, but continuing with app startup...")
-
-    else:
-
-        print("Using SQLite - skipping PostgreSQL migration")
+    
+    # Emergency database fix already runs at startup - no need for old migration
 
     
 
