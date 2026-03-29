@@ -65,6 +65,7 @@ def emergency_database_fix():
                 amount DECIMAL(14,2),
                 chart_id INTEGER,
                 narration TEXT,
+                voucher_no VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -97,6 +98,37 @@ def emergency_database_fix():
                 is_cancelled BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_by INTEGER
+            )
+        """)
+        
+        # Recreate journal_headers table with fin_year and created_by
+        cursor.execute("DROP TABLE IF EXISTS journal_headers CASCADE")
+        cursor.execute("""
+            CREATE TABLE journal_headers (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL,
+                voucher_no VARCHAR(50),
+                voucher_date DATE,
+                narration TEXT,
+                total_debit DECIMAL(15,2),
+                total_credit DECIMAL(15,2),
+                fin_year VARCHAR(10),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by INTEGER
+            )
+        """)
+        
+        # Recreate journal_lines table
+        cursor.execute("DROP TABLE IF EXISTS journal_lines CASCADE")
+        cursor.execute("""
+            CREATE TABLE journal_lines (
+                id SERIAL PRIMARY KEY,
+                journal_header_id INTEGER NOT NULL,
+                account_id INTEGER NOT NULL,
+                debit_amount DECIMAL(15,2) DEFAULT 0.00,
+                credit_amount DECIMAL(15,2) DEFAULT 0.00,
+                narration TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
@@ -1272,13 +1304,22 @@ def run_database_migration():
 
         return True
 
-        
-
     except Exception as e:
 
         print(f"Migration error: {e}")
 
         return False
+
+    finally:
+
+        # CRITICAL: Reset session regardless of success/failure
+        try:
+            from extensions import db
+            db.session.rollback()
+            db.session.remove()
+            print("[CLEANUP] Session reset complete")
+        except:
+            pass
 
 
 
