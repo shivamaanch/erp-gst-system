@@ -5,6 +5,26 @@ from models import MilkRateChart, MilkTransaction, Party, Bill, BillItem
 from datetime import date, datetime
 from sqlalchemy import text
 
+# Safe database execution wrapper to handle transaction errors
+def safe_db_execute(sql, params=None):
+    """Execute database query with transaction error handling"""
+    try:
+        # Clear any existing failed transactions
+        db.session.rollback()
+        # Execute the query
+        result = db.session.execute(text(sql), params or {})
+        return result
+    except Exception as e:
+        # Force rollback and remove session
+        try:
+            db.session.rollback()
+            db.session.remove()
+        except:
+            pass
+        # Try once more with fresh session
+        result = db.session.execute(text(sql), params or {})
+        return result
+
 milk_bp = Blueprint("milk", __name__)
 
 def calc_rate(fat, snf, fat_rate, snf_rate):
