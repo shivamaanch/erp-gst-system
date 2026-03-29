@@ -23,8 +23,8 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    users = db.relationship("UserCompany", back_populates="company")
-    accessible_companies = db.relationship("User", secondary="user_companies", back_populates="accessible_companies", overlaps="user_companies,users")
+    user_companies = db.relationship("UserCompany", back_populates="company")
+    users = db.relationship("User", secondary="user_companies", back_populates="accessible_companies")
 
 class FinancialYear(db.Model):
     __tablename__ = "financial_years"
@@ -51,8 +51,8 @@ class User(UserMixin, db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
     
     # Relationships for multi-company access
-    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic", overlaps="accessible_companies,users")
-    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic", overlaps="user_companies")
+    user_companies = db.relationship("UserCompany", back_populates="user", lazy="dynamic")
+    accessible_companies = db.relationship("Company", secondary="user_companies", back_populates="users", lazy="dynamic")
     
     @property
     def all_accessible_companies(self):
