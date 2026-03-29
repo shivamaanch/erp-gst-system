@@ -88,8 +88,8 @@ def index():
             'delete_url': '#'
         })
     
-    # 3. Milk Transactions
-    milk_query = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy)
+    # 3. Milk Transactions (only those without bills to avoid duplicates)
+    milk_query = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).filter(MilkTransaction.bill_id.is_(None))
     if search:
         milk_query = milk_query.filter(or_(
             MilkTransaction.narration.contains(search)
