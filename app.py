@@ -21,13 +21,14 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 load_dotenv()
 
 def emergency_database_fix():
-    """Run emergency database fix immediately on startup - BEFORE any models are loaded"""
+    """Run emergency database fix with advisory lock to prevent concurrent execution"""
     db_url = os.getenv('DATABASE_URL')
     if not db_url:
         print("❌ DATABASE_URL not found - skipping emergency fix")
         return False
     
     try:
+        # Connect directly with psycopg2 to get advisory lock
         parsed = urllib.parse.urlparse(db_url)
         conn = psycopg2.connect(
             host=parsed.hostname,
@@ -36,81 +37,69 @@ def emergency_database_fix():
             user=parsed.username,
             password=parsed.password
         )
-        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        conn.autocommit = True
         cursor = conn.cursor()
         
-        print("🚨 EMERGENCY: AGGRESSIVE DATABASE RESET...")
+        # Acquire advisory lock - only 1 worker proceeds
+        result = cursor.execute("SELECT pg_try_advisory_lock(12345)")
+        lock_acquired = cursor.fetchone()[0]
         
-        # Kill ALL connections including our own
+        if not lock_acquired:
+            print("🔄 Emergency fix already running in another worker - skipping")
+            conn.close()
+            return True
+        
         try:
-            cursor.execute(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{parsed.path[1:]}'")
-        except:
-            pass
-        
-        # Wait a moment for connections to die
-        import time
-        time.sleep(1)
-        
-        # Reconnect
-        conn.close()
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            port=parsed.port or 5432,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password
-        )
-        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        cursor = conn.cursor()
-        
-        # Clear any failed transactions
-        try:
-            cursor.execute("ROLLBACK")
-        except:
-            pass
-        
-        # Add missing columns without dropping tables
-        critical_columns = [
-            ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
-            ("cash_book", "account_id", "INTEGER"),
-            ("bills", "fin_year", "VARCHAR(10)"),
-            ("bills", "voucher_no", "VARCHAR(50)"),
-            ("bills", "taxable_amount", "DECIMAL(15,2)"),
-            ("bills", "cgst", "DECIMAL(15,2)"),
-            ("bills", "sgst", "DECIMAL(15,2)"),
-            ("bills", "igst", "DECIMAL(15,2)"),
-            ("bills", "paid_amount", "DECIMAL(15,2)"),
-            ("bills", "tds_rate", "DECIMAL(5,2)"),
-            ("bills", "tds_amount", "DECIMAL(15,2)"),
-            ("bills", "tcs_rate", "DECIMAL(5,2)"),
-            ("bills", "tcs_amount", "DECIMAL(15,2)"),
-            ("bills", "template_type", "VARCHAR(50) DEFAULT 'standard'"),
-            ("bills", "is_cancelled", "BOOLEAN DEFAULT FALSE"),
-            ("bills", "created_by", "INTEGER"),
-            ("milk_transactions", "voucher_no", "VARCHAR(50)"),
-            ("journal_headers", "fin_year", "VARCHAR(10)"),
-            ("journal_headers", "created_by", "INTEGER"),
-        ]
-        
-        for table_name, col_name, col_type in critical_columns:
+            print("🚨 EMERGENCY: Adding missing columns with advisory lock...")
+            
+            # Add missing columns without dropping tables
+            critical_columns = [
+                ("companies", "is_active", "BOOLEAN DEFAULT TRUE"),
+                ("cash_book", "account_id", "INTEGER"),
+                ("milk_transactions", "bill_id", "INTEGER"),
+                ("milk_transactions", "fin_year", "VARCHAR(10)"),
+                ("milk_transactions", "voucher_no", "VARCHAR(50)"),
+                ("bills", "fin_year", "VARCHAR(10)"),
+                ("bills", "voucher_no", "VARCHAR(50)"),
+                ("bills", "taxable_amount", "DECIMAL(15,2)"),
+                ("bills", "cgst", "DECIMAL(15,2)"),
+                ("bills", "sgst", "DECIMAL(15,2)"),
+                ("bills", "igst", "DECIMAL(15,2)"),
+                ("bills", "paid_amount", "DECIMAL(15,2)"),
+                ("bills", "tds_rate", "DECIMAL(5,2)"),
+                ("bills", "tds_amount", "DECIMAL(15,2)"),
+                ("bills", "tcs_rate", "DECIMAL(5,2)"),
+                ("bills", "tcs_amount", "DECIMAL(15,2)"),
+                ("bills", "template_type", "VARCHAR(50) DEFAULT 'standard'"),
+                ("bills", "is_cancelled", "BOOLEAN DEFAULT FALSE"),
+                ("bills", "created_by", "INTEGER"),
+                ("journal_headers", "fin_year", "VARCHAR(10)"),
+                ("journal_headers", "created_by", "INTEGER"),
+            ]
+            
+            for table_name, col_name, col_type in critical_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                    print(f"✅ Added {col_name} to {table_name}")
+                except Exception as e:
+                    print(f"⚠️ {table_name}.{col_name}: {e}")
+            
+            # Update defaults
             try:
-                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
-                print(f"✅ Added {col_name} to {table_name}")
+                cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
+                cursor.execute("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL")
+                cursor.execute("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL")
+                print("✅ Updated defaults")
             except Exception as e:
-                print(f"⚠️ {table_name}.{col_name}: {e}")
-        
-        # Update defaults
-        try:
-            cursor.execute("UPDATE companies SET is_active = TRUE WHERE is_active IS NULL")
-            cursor.execute("UPDATE bills SET template_type = 'standard' WHERE template_type IS NULL")
-            cursor.execute("UPDATE bills SET is_cancelled = FALSE WHERE is_cancelled IS NULL")
-            print("✅ Updated defaults")
-        except Exception as e:
-            print(f"⚠️ Update defaults: {e}")
-        
-        conn.close()
-        print("🎉 AGGRESSIVE DATABASE FIX COMPLETE! App should work now.")
-        return True
+                print(f"⚠️ Update defaults: {e}")
+            
+            print("🎉 EMERGENCY FIX COMPLETE! App should work now.")
+            return True
+            
+        finally:
+            # Always release the advisory lock
+            cursor.execute("SELECT pg_advisory_unlock(12345)")
+            conn.close()
         
     except Exception as e:
         print(f"🚨 EMERGENCY: Fix failed: {e}")
