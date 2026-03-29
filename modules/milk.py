@@ -178,7 +178,7 @@ def entry_list():
             phone="",
             email="",
             address="",
-            balance_type="debit",
+            balance_type="Dr",
             opening_balance=0.0,
             is_active=True
         )
@@ -523,7 +523,7 @@ def add_entry():
             phone="",
             email="",
             address="",
-            balance_type="debit",
+            balance_type="Dr",
             opening_balance=0.0,
             is_active=True
         )
@@ -694,7 +694,7 @@ def edit_entry(txn_id):
             phone="",
             email="",
             address="",
-            balance_type="debit",
+            balance_type="Dr",
             opening_balance=0.0,
             is_active=True
         )

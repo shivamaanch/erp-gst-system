@@ -77,6 +77,8 @@ def emergency_database_fix():
                 "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false",
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                # Fix existing balance_type column to allow longer values
+                "ALTER TABLE parties ALTER COLUMN balance_type TYPE VARCHAR(10)",
             ]
 
             for sql in all_ddl:

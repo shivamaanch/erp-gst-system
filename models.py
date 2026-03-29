@@ -183,7 +183,7 @@ class Party(db.Model):
     address = db.Column(db.Text)
     state_code = db.Column(db.String(2))
     opening_balance = db.Column(Numeric(18,2), default=0)
-    balance_type = db.Column(db.String(2), default="Dr")
+    balance_type = db.Column(db.String(10), default="Dr")
     is_active = db.Column(db.Boolean, default=True)
 
 class Item(db.Model):
