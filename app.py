@@ -136,6 +136,8 @@ def emergency_database_fix():
                 # financial_years
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false",
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                # cash_book - missing fin_year column
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
                 # Fix existing balance_type column to allow longer values
                 "ALTER TABLE parties ALTER COLUMN balance_type TYPE VARCHAR(10)",
             ]
