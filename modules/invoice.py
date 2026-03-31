@@ -56,6 +56,7 @@ def create(btype):
         return redirect(url_for("invoice.index"))
     cid = session.get("company_id")
     fy  = session.get("fin_year")
+    default_date = session.get("last_txn_date") or date.today().isoformat()
     party_types = ["Debtor", "Both", "Customer"] if btype=="Sales" else ["Creditor", "Supplier", "Both", "Vendor"]
     parties = Party.query.filter_by(company_id=cid, is_active=True).filter(
         Party.party_type.in_(party_types)
@@ -79,7 +80,7 @@ def create(btype):
         if not item_ids:
             flash("Add at least one item!", "danger")
             return render_template("invoice/create.html", btype=btype, parties=parties, items=items,
-                                   bill_no=next_bill_no(cid,fy,btype), today=date.today().isoformat())
+                                   bill_no=next_bill_no(cid,fy,btype), today=default_date)
 
         bill = Bill(
             company_id=cid, fin_year=fy, bill_type=btype,
@@ -147,11 +148,12 @@ def create(btype):
 
         bill.total_amount = round(total, 2)
         db.session.commit()
+        session["last_txn_date"] = bill_date.isoformat()
         flash(f"{btype} invoice {bill.bill_no} created — ₹{bill.total_amount:,.2f}", "success")
         return redirect(url_for("invoice.view", bid=bill.id))
 
     return render_template("invoice/create.html", btype=btype, parties=parties, items=items,
-                           bill_no=next_bill_no(cid,fy,btype), today=date.today().isoformat())
+                           bill_no=next_bill_no(cid,fy,btype), today=default_date)
 
 @invoice_bp.route("/invoice/view/<int:bid>")
 @login_required

@@ -33,7 +33,7 @@ def emergency_database_fix():
         return False
     
     # Only run on PostgreSQL, not SQLite
-    if not db_url.startswith('postgresql://'):
+    if not (db_url.startswith('postgresql://') or db_url.startswith('postgres://')):
         print("🔄 SQLite detected - skipping emergency fix")
         return True
     

@@ -92,7 +92,7 @@
         <div class="card border-danger">
           <div class="card-body text-center">
             <h6 class="text-danger">Total Amount</h6>
-            <h4 class="mb-0">₹{{ "%.2f"|format(purchase_total_amount) }}</h4>
+            <h4 class="mb-0" id="purchaseTotalAmount">₹{{ "%.2f"|format(purchase_total_amount) }}</h4>
           </div>
         </div>
       </div>
@@ -120,7 +120,7 @@
         <tbody id="purchaseBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Purchase' %}
-          <tr data-party="{{ txn.party.name if txn.party else '' }}">
+          <tr data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -205,7 +205,7 @@
         <div class="card border-danger">
           <div class="card-body text-center">
             <h6 class="text-danger">Total Amount</h6>
-            <h4 class="mb-0">₹{{ "%.2f"|format(sale_total_amount) }}</h4>
+            <h4 class="mb-0" id="saleTotalAmount">₹{{ "%.2f"|format(sale_total_amount) }}</h4>
           </div>
         </div>
       </div>
@@ -233,7 +233,7 @@
         <tbody id="saleBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Sale' %}
-          <tr data-party="{{ txn.party.name if txn.party else '' }}">
+          <tr data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -280,13 +280,13 @@ function applyFilters() {
   
   purchaseRows.forEach(row => {
     const party = row.getAttribute('data-party').toLowerCase();
-    const date = row.cells[2].textContent.trim();
-    const qty = parseFloat(row.cells[6].textContent) || 0;
-    const fat = parseFloat(row.cells[7].textContent) || 0;
-    const snf = parseFloat(row.cells[8].textContent) || 0;
-    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(',', '')) || 0;
-    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
-    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    const date = row.getAttribute('data-date') || '';
+    const qty = parseFloat(row.cells[5].textContent) || 0;
+    const fat = parseFloat(row.cells[6].textContent) || 0;
+    const snf = parseFloat(row.cells[7].textContent) || 0;
+    const bfKgs = parseFloat(row.cells[8].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const amount = parseFloat(row.cells[12].textContent.replace('₹', '').replace(/,/g, '')) || 0;
     
     let show = true;
     
@@ -322,13 +322,13 @@ function applyFilters() {
   
   saleRows.forEach(row => {
     const party = row.getAttribute('data-party').toLowerCase();
-    const date = row.cells[2].textContent.trim();
-    const qty = parseFloat(row.cells[6].textContent) || 0;
-    const fat = parseFloat(row.cells[7].textContent) || 0;
-    const snf = parseFloat(row.cells[8].textContent) || 0;
-    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(',', '')) || 0;
-    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
-    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    const date = row.getAttribute('data-date') || '';
+    const qty = parseFloat(row.cells[5].textContent) || 0;
+    const fat = parseFloat(row.cells[6].textContent) || 0;
+    const snf = parseFloat(row.cells[7].textContent) || 0;
+    const bfKgs = parseFloat(row.cells[8].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const amount = parseFloat(row.cells[12].textContent.replace('₹', '').replace(/,/g, '')) || 0;
     
     let show = true;
     

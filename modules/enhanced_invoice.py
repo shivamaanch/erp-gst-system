@@ -152,6 +152,7 @@ def create_invoice():
             bill.tcs_rate = 0
         
         db.session.commit()
+        session["last_txn_date"] = bill.bill_date.isoformat()
         
         flash(f"{btype} invoice created successfully!", "success")
         return redirect(url_for("enhanced_invoice.list_invoices", type=btype))
@@ -170,10 +171,12 @@ def create_invoice():
     last_bill = Bill.query.filter_by(company_id=cid, bill_type=btype, fin_year=fy).order_by(Bill.id.desc()).first()
     bill_no = f"{btype[0]}{fy[:4]}{(last_bill.id if last_bill else 0) + 1:04d}"
     
+    default_bill_date = session.get("last_txn_date") or date.today().isoformat()
+
     return render_template("enhanced_invoice/create.html",
                          btype=btype, bill_no=bill_no,
                          parties=parties, items=items,
-                         bill_date=date.today().isoformat(),
+                         bill_date=default_bill_date,
                          fy=fy,
                          company=company,
                          charts=charts,

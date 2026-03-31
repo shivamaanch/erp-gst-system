@@ -539,6 +539,7 @@ def add_entry():
         parties = [default_party]
     
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
+    default_date = session.get("last_txn_date") or date.today().isoformat()
     
     if request.method == "POST":
         fat=float(request.form["fat"]) 
@@ -655,12 +656,19 @@ def add_entry():
                 print(f"WARNING: Could not set bill_id (column may not exist): {e}")
             print(f"DEBUG: Invoice creation completed")
             db.session.commit()
+            session["last_txn_date"] = txn_date.isoformat()
             msg=f"Saved {qty}L @ Rs{rate}/L = Rs{amount}"
             if bill_no: msg+=f" | Invoice {bill_no} created"
             flash(msg,"success")
             return redirect(url_for("milk.entry_list"))
+
+        db.session.commit()
+        session["last_txn_date"] = txn_date.isoformat()
+        msg=f"Saved {qty}L @ Rs{rate}/L = Rs{amount}"
+        flash(msg,"success")
+        return redirect(url_for("milk.entry_list"))
         
-    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=date.today().isoformat(), edit_mode=False)
+    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False)
 
 @milk_bp.route("/entry/<int:txn_id>/edit", methods=["GET","POST"])
 def edit_entry(txn_id):
@@ -918,6 +926,7 @@ def edit_entry(txn_id):
         
         print("DEBUG: Committing to database...")
         db.session.commit()
+        session["last_txn_date"] = actual_txn.txn_date.isoformat()
         print(f"DEBUG: After update - FAT: {actual_txn.fat}, SNF: {actual_txn.snf}, RATE: {actual_txn.rate}, AMOUNT: {actual_txn.amount}")
         print("DEBUG: Database commit successful!")
         flash(f"Milk entry updated successfully", "success")
