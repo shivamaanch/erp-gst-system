@@ -136,16 +136,27 @@ def emergency_database_fix():
                 # financial_years
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false",
                 "ALTER TABLE financial_years ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
-                # cash_book - missing fin_year column
+                # cash_book
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS company_id INTEGER",
                 "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS fin_year VARCHAR(10)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(50)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS transaction_date DATE",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS transaction_type VARCHAR(20)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS narration TEXT",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS party_name VARCHAR(100)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS reference_no VARCHAR(50)",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS account_id INTEGER",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
+                "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
                 # Fix existing balance_type column to allow longer values
                 "ALTER TABLE parties ALTER COLUMN balance_type TYPE VARCHAR(10)",
             ]
 
             for sql in all_ddl:
                 try:
-                    with engine.connect() as conn:
-                        conn.execution_options(isolation_level="AUTOCOMMIT")
+                    with engine.begin() as conn:
                         conn.execute(text(sql))
                     print(f"✅ {sql[:70]}")
                 except Exception as e:
@@ -159,8 +170,7 @@ def emergency_database_fix():
             ]
             for sql in defaults:
                 try:
-                    with engine.connect() as conn:
-                        conn.execution_options(isolation_level="AUTOCOMMIT")
+                    with engine.begin() as conn:
                         conn.execute(text(sql))
                     print(f"✅ {sql[:70]}")
                 except Exception as e:
