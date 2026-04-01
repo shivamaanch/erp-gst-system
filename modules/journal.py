@@ -93,12 +93,11 @@ def quick_entry():
         voucher_type = request.form.get("voucher_type","Journal")
         narration = request.form.get("narration","")
         
-        # Get form arrays for new structure
-        debit_account_ids = request.form.getlist("debit_account_id[]")
-        debit_amounts = request.form.getlist("debit_amount[]")
-        credit_account_ids = request.form.getlist("credit_account_id[]")
-        credit_amounts = request.form.getlist("credit_amount[]")
-        line_narrations = request.form.getlist("line_narration[]")
+        # Update session with last used date
+        session["last_txn_date"] = voucher_date.isoformat()
+        
+        # Check if this is a single row save or batch save
+        single_save = request.form.get("single_save") == "true"
         
         # Create journal header
         jh = JournalHeader(
@@ -113,47 +112,91 @@ def quick_entry():
         db.session.add(jh)
         db.session.flush()
         
-        # Create journal lines - each row creates 2 lines (debit and credit)
-        lines_created = 0
-        for i in range(len(debit_account_ids)):
-            if not debit_account_ids[i] or not credit_account_ids[i]:
-                continue
+        if single_save:
+            # Single row save - get first row data only
+            debit_account_id = request.form.get("debit_account_id")
+            credit_account_id = request.form.get("credit_account_id")
+            debit_amount = float(request.form.get("debit_amount") or 0)
+            credit_amount = float(request.form.get("credit_amount") or 0)
+            line_narration = request.form.get("line_narration") or f"Journal entry"
             
-            debit_amount = float(debit_amounts[i] or 0)
-            credit_amount = float(credit_amounts[i] or 0)
-            line_narration = line_narrations[i] or f"Journal entry {i+1}"
+            lines_created = 0
+            if debit_account_id and debit_amount > 0:
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=int(debit_account_id),
+                    debit=debit_amount,
+                    credit=0,
+                ))
+                lines_created += 1
             
-            # Only create if amounts are provided
-            if debit_amount > 0 or credit_amount > 0:
-                # Create debit line
-                if debit_amount > 0:
-                    db.session.add(JournalLine(
-                        journal_header_id=jh.id,
-                        account_id=int(debit_account_ids[i]),
-                        debit=debit_amount,
-                        credit=0,
-                    ))
-                    lines_created += 1
-                
-                # Create credit line
-                if credit_amount > 0:
-                    db.session.add(JournalLine(
-                        journal_header_id=jh.id,
-                        account_id=int(credit_account_ids[i]),
-                        debit=0,
-                        credit=credit_amount,
-                    ))
-                    lines_created += 1
-        
-        if lines_created >= 2:  # At least 2 lines required for a valid journal
-            db.session.commit()
-            flash(f"Journal entry {voucher_no} created with {lines_created} lines!", "success")
+            if credit_account_id and credit_amount > 0:
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=int(credit_account_id),
+                    debit=0,
+                    credit=credit_amount,
+                ))
+                lines_created += 1
+            
+            if lines_created >= 2:
+                db.session.commit()
+                flash(f"Journal entry {voucher_no} created successfully!", "success")
+            else:
+                db.session.rollback()
+                flash("Journal entry requires both debit and credit accounts with amounts", "danger")
         else:
-            db.session.rollback()
-            flash("Journal entry requires at least 2 lines with amounts", "danger")
+            # Batch save (original logic)
+            debit_account_ids = request.form.getlist("debit_account_id[]")
+            debit_amounts = request.form.getlist("debit_amount[]")
+            credit_account_ids = request.form.getlist("credit_account_id[]")
+            credit_amounts = request.form.getlist("credit_amount[]")
+            line_narrations = request.form.getlist("line_narration[]")
+            
+            # Create journal lines - each row creates 2 lines (debit and credit)
+            lines_created = 0
+            for i in range(len(debit_account_ids)):
+                if not debit_account_ids[i] or not credit_account_ids[i]:
+                    continue
+                
+                debit_amount = float(debit_amounts[i] or 0)
+                credit_amount = float(credit_amounts[i] or 0)
+                line_narration = line_narrations[i] or f"Journal entry {i+1}"
+                
+                # Only create if amounts are provided
+                if debit_amount > 0 or credit_amount > 0:
+                    # Create debit line
+                    if debit_amount > 0:
+                        db.session.add(JournalLine(
+                            journal_header_id=jh.id,
+                            account_id=int(debit_account_ids[i]),
+                            debit=debit_amount,
+                            credit=0,
+                        ))
+                        lines_created += 1
+                    
+                    # Create credit line
+                    if credit_amount > 0:
+                        db.session.add(JournalLine(
+                            journal_header_id=jh.id,
+                            account_id=int(credit_account_ids[i]),
+                            debit=0,
+                            credit=credit_amount,
+                        ))
+                        lines_created += 1
+            
+            if lines_created >= 2:  # At least 2 lines required for a valid journal
+                db.session.commit()
+                flash(f"Journal entry {voucher_no} created with {lines_created} lines!", "success")
+            else:
+                db.session.rollback()
+                flash("Journal entry requires at least 2 lines with amounts", "danger")
         
         return redirect(url_for("journal.index"))
     
+    # Default date to last used or today
+    default_date = session.get("last_txn_date") or datetime.now().date().isoformat()
+    
     return render_template("journal/quick_entry.html", 
                          accounts=accounts,
-                         today=datetime.now().date().isoformat())
+                         today=default_date)

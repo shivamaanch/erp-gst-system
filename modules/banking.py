@@ -217,11 +217,11 @@ def quick_entry():
         reference_no = request.form.get("reference_no", "").strip()
         party_name = request.form.get("party_name", "").strip()
         
-        # Get form arrays
-        account_ids = request.form.getlist("account_id[]")
-        debits = request.form.getlist("debit[]")
-        credits = request.form.getlist("credit[]")
-        narrations = request.form.getlist("narration[]")
+        # Update session with last used date
+        session["last_txn_date"] = transaction_date.isoformat()
+        
+        # Check if this is a single row save or batch save
+        single_save = request.form.get("single_save") == "true"
         
         # Generate voucher number
         last_journal = JournalHeader.query.filter_by(company_id=cid).order_by(JournalHeader.id.desc()).first()
@@ -241,53 +241,104 @@ def quick_entry():
         db.session.add(jh)
         db.session.flush()
         
-        # Create journal lines
-        lines_created = 0
-        total_debit = 0
-        total_credit = 0
-        
-        for i in range(len(account_ids)):
-            if not account_ids[i]:
-                continue
+        if single_save:
+            # Single row save - get first row data only
+            account_id = request.form.get("account_id")
+            debit = float(request.form.get("debit") or 0)
+            credit = float(request.form.get("credit") or 0)
+            narration = request.form.get("narration") or f"Bank transaction - {party_name or ''}"
             
-            debit = float(debits[i] or 0)
-            credit = float(credits[i] or 0)
-            narration = narrations[i] or f"Bank transaction - {party_name or ''}"
+            lines_created = 0
+            bank_amount = debit if debit > 0 else credit
             
-            if debit > 0 or credit > 0:
+            if account_id and bank_amount > 0:
+                # Add account line
                 db.session.add(JournalLine(
                     journal_header_id=jh.id,
-                    account_id=int(account_ids[i]),
+                    account_id=int(account_id),
                     debit=debit,
                     credit=credit,
                 ))
                 lines_created += 1
-                total_debit += debit
-                total_credit += credit
-        
-        # Add bank account line if not already included
-        bank_account = BankAccount.query.get(bank_account_id)
-        if bank_account and lines_created >= 2:
-            # Create contra entry for bank account
-            bank_amount = total_debit if total_debit > total_credit else total_credit
-            if bank_amount > 0:
-                db.session.add(JournalLine(
-                    journal_header_id=jh.id,
-                    account_id=bank_account.account_id if bank_account.account_id else 1,  # Assuming cash account ID 1
-                    debit=bank_amount if transaction_type == "Deposit" else 0,
-                    credit=bank_amount if transaction_type == "Withdrawal" else 0,
-                ))
-        
-        if lines_created >= 2 and abs(total_debit - total_credit) < 0.01:
-            db.session.commit()
-            flash(f"Bank entry {voucher_no} created successfully!", "success")
+                
+                # Add bank account line
+                bank_account = BankAccount.query.get(bank_account_id)
+                if bank_account:
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=bank_account.account_id if bank_account.account_id else 1,
+                        debit=bank_amount if transaction_type == "Withdrawal" else 0,
+                        credit=bank_amount if transaction_type == "Deposit" else 0,
+                    ))
+                    lines_created += 1
+            
+            if lines_created >= 2:
+                db.session.commit()
+                flash(f"Bank entry {voucher_no} created successfully!", "success")
+            else:
+                db.session.rollback()
+                flash("Bank entry requires valid account and amount", "danger")
         else:
-            db.session.rollback()
-            flash("Bank entry must be balanced with at least 2 lines", "danger")
+            # Batch save (original logic)
+            account_ids = request.form.getlist("account_id[]")
+            debits = request.form.getlist("debit[]")
+            credits = request.form.getlist("credit[]")
+            narrations = request.form.getlist("narration[]")
+            
+            # Create journal lines
+            lines_created = 0
+            total_debit = 0
+            total_credit = 0
+            
+            for i in range(len(account_ids)):
+                if not account_ids[i]:
+                    continue
+                
+                debit = float(debits[i] or 0)
+                credit = float(credits[i] or 0)
+                narration = narrations[i] or f"Bank transaction - {party_name or ''}"
+                
+                if debit > 0 or credit > 0:
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=int(account_ids[i]),
+                        debit=debit,
+                        credit=credit,
+                    ))
+                    lines_created += 1
+                    total_debit += debit
+                    total_credit += credit
+            
+            # Add bank account line if not already included
+            bank_account = BankAccount.query.get(bank_account_id)
+            if bank_account and lines_created >= 2:
+                # Create contra entry for bank account
+                bank_amount = total_debit if total_debit > total_credit else total_credit
+                if bank_amount > 0:
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=bank_account.account_id if bank_account.account_id else 1,  # Assuming cash account ID 1
+                        debit=bank_amount if transaction_type == "Deposit" else 0,
+                        credit=bank_amount if transaction_type == "Withdrawal" else 0,
+                    ))
+            
+            if lines_created >= 2 and abs(total_debit - total_credit) < 0.01:
+                db.session.commit()
+                flash(f"Bank entry {voucher_no} created successfully!", "success")
+            else:
+                db.session.rollback()
+                flash("Bank entry must be balanced with at least 2 lines", "danger")
         
         return redirect(url_for("banking.accounts"))
+    
+    # Get default bank account (first active bank)
+    default_bank = BankAccount.query.filter_by(company_id=cid, is_active=True).first()
+    
+    # Default date to last used or today
+    default_date = session.get("last_txn_date") or date.today().isoformat()
     
     return render_template("banking/quick_entry.html", 
                          banks=banks,
                          accounts=accounts,
-                         today=date.today().isoformat())
+                         default_bank=default_bank,
+                         today=default_date)

@@ -169,50 +169,96 @@ def quick_entry():
         payment_mode = request.form.get("payment_mode", "Cash")
         reference_no = request.form.get("reference_no", "").strip()
         
-        # Get all form arrays
-        account_ids = request.form.getlist("account_id[]")
-        transaction_types = request.form.getlist("transaction_type[]")
-        amounts = request.form.getlist("amount[]")
-        narrations = request.form.getlist("narration[]")
+        # Update session with last used date
+        session["last_txn_date"] = transaction_date.isoformat()
         
-        entries_created = 0
-        for i in range(len(account_ids)):
-            if not account_ids[i] or not transaction_types[i] or not amounts[i] or not narrations[i]:
-                continue
-            
-            # Generate voucher number for each entry
-            voucher_no = next_voucher_no(cid, fy)
-            
-            # Get account name for party_name field
-            account = Account.query.get(account_ids[i])
-            party_name = account.name if account else ""
-            
-            entry = CashBook(
-                company_id=cid,
-                fin_year=fy,
-                voucher_no=voucher_no,
-                transaction_date=transaction_date,
-                transaction_type=transaction_types[i],
-                amount=float(amounts[i]),
-                narration=narrations[i],
-                party_name=party_name,
-                payment_mode=payment_mode,
-                reference_no=reference_no,
-                account_id=int(account_ids[i]) if account_ids[i] else None
-            )
-            db.session.add(entry)
-            entries_created += 1
+        # Check if this is a single row save or batch save
+        single_save = request.form.get("single_save") == "true"
         
-        if entries_created > 0:
-            db.session.commit()
-            flash(f"{entries_created} cash book entries created successfully!", "success")
+        if single_save:
+            # Single row save - get first row data only
+            account_id = request.form.get("account_id")
+            transaction_type = request.form.get("transaction_type")
+            amount = request.form.get("amount")
+            narration = request.form.get("narration")
+            
+            if account_id and transaction_type and amount and narration:
+                voucher_no = next_voucher_no(cid, fy)
+                account = Account.query.get(account_id)
+                party_name = account.name if account else ""
+                
+                entry = CashBook(
+                    company_id=cid,
+                    fin_year=fy,
+                    voucher_no=voucher_no,
+                    transaction_date=transaction_date,
+                    transaction_type=transaction_type,
+                    amount=float(amount),
+                    narration=narration,
+                    party_name=party_name,
+                    payment_mode=payment_mode,
+                    reference_no=reference_no,
+                    account_id=int(account_id) if account_id else None
+                )
+                db.session.add(entry)
+                db.session.commit()
+                flash("Cash entry saved successfully!", "success")
+            else:
+                flash("Please fill all required fields", "warning")
         else:
-            flash("No valid entries to save", "warning")
+            # Batch save (original logic)
+            account_ids = request.form.getlist("account_id[]")
+            transaction_types = request.form.getlist("transaction_type[]")
+            amounts = request.form.getlist("amount[]")
+            narrations = request.form.getlist("narration[]")
+            
+            entries_created = 0
+            for i in range(len(account_ids)):
+                if not account_ids[i] or not transaction_types[i] or not amounts[i] or not narrations[i]:
+                    continue
+                
+                voucher_no = next_voucher_no(cid, fy)
+                account = Account.query.get(account_ids[i])
+                party_name = account.name if account else ""
+                
+                entry = CashBook(
+                    company_id=cid,
+                    fin_year=fy,
+                    voucher_no=voucher_no,
+                    transaction_date=transaction_date,
+                    transaction_type=transaction_types[i],
+                    amount=float(amounts[i]),
+                    narration=narrations[i],
+                    party_name=party_name,
+                    payment_mode=payment_mode,
+                    reference_no=reference_no,
+                    account_id=int(account_ids[i]) if account_ids[i] else None
+                )
+                db.session.add(entry)
+                entries_created += 1
+            
+            if entries_created > 0:
+                db.session.commit()
+                flash(f"{entries_created} cash book entries created successfully!", "success")
+            else:
+                flash("No valid entries to save", "warning")
         
         return redirect(url_for("cash_book.index"))
     
     # Get accounts for dropdown
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
+    
+    # Get default cash account (first account with 'Cash' in name or ID 1)
+    default_cash = Account.query.filter_by(company_id=cid, is_active=True).filter(
+        Account.name.ilike('%cash%')
+    ).first()
+    if not default_cash and accounts:
+        default_cash = accounts[0]
+    
+    # Default date to last used or today
+    default_date = session.get("last_txn_date") or date.today().isoformat()
+    
     return render_template("cash_book/quick_entry.html", 
                          accounts=accounts,
-                         today=date.today().isoformat())
+                         default_cash=default_cash,
+                         today=default_date)

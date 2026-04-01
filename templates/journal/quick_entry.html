@@ -74,7 +74,8 @@
 
       <div class="d-flex gap-2">
         <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
-        <button type="submit" class="btn btn-success" id="saveBtn">Save Journal</button>
+        <button type="button" class="btn btn-success" onclick="saveSingleRow()">Save Single Row</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save Journal</button>
         <button type="reset" class="btn btn-outline-warning">Reset</button>
         <a href="{{ url_for('journal.index') }}" class="btn btn-outline-secondary">Cancel</a>
       </div>
@@ -83,6 +84,80 @@
 </div>
 
 <script>
+function saveSingleRow() {
+  const firstRow = document.querySelector('#journalBody tr');
+  if (!firstRow) {
+    alert('Please add at least one row');
+    return;
+  }
+  
+  const debitSelect = firstRow.querySelector('select[name="debit_account_id[]"]');
+  const creditSelect = firstRow.querySelector('select[name="credit_account_id[]"]');
+  const debitInput = firstRow.querySelector('input[name="debit_amount[]"]');
+  const creditInput = firstRow.querySelector('input[name="credit_amount[]"]');
+  const narrationInput = firstRow.querySelector('input[name="line_narration[]"]');
+  
+  if (!debitSelect.value || !creditSelect.value || (!debitInput.value && !creditInput.value)) {
+    alert('Please fill all required fields in the first row');
+    return;
+  }
+  
+  // Create hidden form for single row submission
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.style.display = 'none';
+  
+  // Add all existing form fields
+  const mainForm = document.getElementById('quickJournalForm');
+  for (let input of mainForm.querySelectorAll('input, select')) {
+    if (input.type !== 'submit' && input.type !== 'reset') {
+      const clone = input.cloneNode(true);
+      form.appendChild(clone);
+    }
+  }
+  
+  // Add single row indicator
+  const singleInput = document.createElement('input');
+  singleInput.type = 'hidden';
+  singleInput.name = 'single_save';
+  singleInput.value = 'true';
+  form.appendChild(singleInput);
+  
+  // Add first row data with non-array names
+  const debitAccountInput = document.createElement('input');
+  debitAccountInput.type = 'hidden';
+  debitAccountInput.name = 'debit_account_id';
+  debitAccountInput.value = debitSelect.value;
+  form.appendChild(debitAccountInput);
+  
+  const creditAccountInput = document.createElement('input');
+  creditAccountInput.type = 'hidden';
+  creditAccountInput.name = 'credit_account_id';
+  creditAccountInput.value = creditSelect.value;
+  form.appendChild(creditAccountInput);
+  
+  const debitAmountInput = document.createElement('input');
+  debitAmountInput.type = 'hidden';
+  debitAmountInput.name = 'debit_amount';
+  debitAmountInput.value = debitInput.value;
+  form.appendChild(debitAmountInput);
+  
+  const creditAmountInput = document.createElement('input');
+  creditAmountInput.type = 'hidden';
+  creditAmountInput.name = 'credit_amount';
+  creditAmountInput.value = creditInput.value;
+  form.appendChild(creditAmountInput);
+  
+  const narrationInput2 = document.createElement('input');
+  narrationInput2.type = 'hidden';
+  narrationInput2.name = 'line_narration';
+  narrationInput2.value = narrationInput.value;
+  form.appendChild(narrationInput2);
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
 function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `

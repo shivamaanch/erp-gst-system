@@ -51,6 +51,14 @@
     {% endif %}
     {% endif %}
 
+    <div class="sidebar-section">Quick Entry</div>
+    <a href="{{ url_for('cash_book.quick_entry') }}" class="nav-link {{ 'active' if request.endpoint=='cash_book.quick_entry' }}">
+      <i class="bi bi-cash-stack"></i> Quick Cash Entry</a>
+    <a href="{{ url_for('journal.quick_entry') }}" class="nav-link {{ 'active' if request.endpoint=='journal.quick_entry' }}">
+      <i class="bi bi-journal-text"></i> Quick Journal Entry</a>
+    <a href="{{ url_for('banking.quick_entry') }}" class="nav-link {{ 'active' if request.endpoint=='banking.quick_entry' }}">
+      <i class="bi bi-bank"></i> Quick Bank Entry</a>
+
     <div class="sidebar-section">Transactions</div>
     <a href="{{ url_for('clients.index') }}" class="nav-link {{ 'active' if 'clients' in (request.endpoint or '') }}">
       <i class="bi bi-people"></i> Parties / Clients</a>
