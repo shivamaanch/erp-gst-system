@@ -152,12 +152,20 @@ def quick_entry():
             credit_account_ids = request.form.getlist("credit_account_id[]")
             credit_amounts = request.form.getlist("credit_amount[]")
             line_narrations = request.form.getlist("line_narration[]")
+            row_dates = request.form.getlist("row_date[]")
             
             # Create journal lines - each row creates 2 lines (debit and credit)
             lines_created = 0
             for i in range(len(debit_account_ids)):
                 if not debit_account_ids[i] or not credit_account_ids[i]:
                     continue
+                
+                # Use row-specific date if available, otherwise use main date
+                entry_date = voucher_date
+                if i < len(row_dates) and row_dates[i]:
+                    entry_date = datetime.strptime(row_dates[i], "%Y-%m-%d").date()
+                    # Update session with the last used row date
+                    session["last_txn_date"] = entry_date.isoformat()
                 
                 debit_amount = float(debit_amounts[i] or 0)
                 credit_amount = float(credit_amounts[i] or 0)

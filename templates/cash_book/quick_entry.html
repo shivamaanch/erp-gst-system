@@ -57,11 +57,12 @@
         <table class="table table-bordered" id="quickEntriesTable">
           <thead class="table-dark">
             <tr>
-              <th width="25%">Account (Other Side)</th>
-              <th width="15%">Type</th>
-              <th width="15%">Amount</th>
-              <th width="35%">Narration</th>
-              <th width="10%">Action</th>
+              <th width="12%">Date</th>
+              <th width="23%">Account (Other Side)</th>
+              <th width="13%">Type</th>
+              <th width="13%">Amount</th>
+              <th width="33%">Narration</th>
+              <th width="6%">Action</th>
             </tr>
           </thead>
           <tbody id="entriesBody">
@@ -165,6 +166,9 @@ function saveSingleRow() {
 function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
+    <td>
+      <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
+    </td>
     <td>
       <select name="account_id[]" class="form-select account-select" required>
         <option value="">-- Select Account --</option>

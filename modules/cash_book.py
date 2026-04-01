@@ -211,11 +211,19 @@ def quick_entry():
             transaction_types = request.form.getlist("transaction_type[]")
             amounts = request.form.getlist("amount[]")
             narrations = request.form.getlist("narration[]")
+            row_dates = request.form.getlist("row_date[]")
             
             entries_created = 0
             for i in range(len(account_ids)):
                 if not account_ids[i] or not transaction_types[i] or not amounts[i] or not narrations[i]:
                     continue
+                
+                # Use row-specific date if available, otherwise use main date
+                entry_date = transaction_date
+                if i < len(row_dates) and row_dates[i]:
+                    entry_date = datetime.strptime(row_dates[i], "%Y-%m-%d").date()
+                    # Update session with the last used row date
+                    session["last_txn_date"] = entry_date.isoformat()
                 
                 voucher_no = next_voucher_no(cid, fy)
                 account = Account.query.get(account_ids[i])
@@ -225,7 +233,7 @@ def quick_entry():
                     company_id=cid,
                     fin_year=fy,
                     voucher_no=voucher_no,
-                    transaction_date=transaction_date,
+                    transaction_date=entry_date,
                     transaction_type=transaction_types[i],
                     amount=float(amounts[i]),
                     narration=narrations[i],

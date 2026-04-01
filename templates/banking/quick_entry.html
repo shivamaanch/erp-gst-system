@@ -70,10 +70,11 @@
         <table class="table table-bordered" id="quickBankTable">
           <thead class="table-dark">
             <tr>
-              <th width="25%">Account</th>
-              <th width="15%">Debit</th>
-              <th width="15%">Credit</th>
-              <th width="35%">Narration</th>
+              <th width="10%">Date</th>
+              <th width="22%">Account</th>
+              <th width="13%">Debit</th>
+              <th width="13%">Credit</th>
+              <th width="32%">Narration</th>
               <th width="10%">Action</th>
             </tr>
           </thead>
@@ -189,6 +190,9 @@ function saveSingleRow() {
 function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
+    <td>
+      <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
+    </td>
     <td>
       <select name="account_id[]" class="form-select account-select" required>
         <option value="">-- Select Account --</option>

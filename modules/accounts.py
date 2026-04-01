@@ -144,7 +144,6 @@ def quick_add():
             company_id=cid,
             name=request.form["name"].strip(),
             account_type=request.form["account_type"],
-            opening_balance=opening_balance,
             description=request.form.get("description", "").strip(),
             is_active=True,
             created_at=date.today()
