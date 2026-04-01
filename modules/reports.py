@@ -68,11 +68,49 @@ def hub():
     total_sales    = sum(float(b.total_amount or 0) for b in sales)
     total_purchases = sum(float(b.total_amount or 0) for b in purch)
     
+    # Calculate actual financial position from database
+    start, end = fy_dates(fy)
+    
+    # Get all account balances for financial position
+    account_balances = db.session.query(
+        Account.id,
+        Account.name,
+        Account.group_name,
+        func.sum(JournalLine.debit).label("dr"),
+        func.sum(JournalLine.credit).label("cr"),
+    ).join(JournalLine, JournalLine.account_id == Account.id
+    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    ).filter(
+        Account.company_id == cid,
+        JournalHeader.company_id == cid,
+        JournalHeader.voucher_date <= end,
+        JournalHeader.is_cancelled == False,
+        Account.is_active == True
+    ).group_by(Account.id, Account.name, Account.group_name).all()
+    
+    # Calculate financial position
+    financial_position = 0.0
+    for acc in account_balances:
+        balance = float(acc.dr or 0) - float(acc.cr or 0)
+        
+        # Add opening balance if available
+        if hasattr(acc, 'opening_dr') and acc.opening_dr:
+            balance += float(acc.opening_dr)
+        if hasattr(acc, 'opening_cr') and acc.opening_cr:
+            balance -= float(acc.opening_cr)
+        
+        financial_position += balance
+    
+    # Calculate net profit
+    net_profit = total_sales - total_purchases
+    
     return render_template("reports/hub.html", 
                          sales_count=sales_count, 
                          purchase_count=purchase_count,
                          total_sales=total_sales, 
-                         total_purchases=total_purchases, 
+                         total_purchases=total_purchases,
+                         net_profit=net_profit,
+                         financial_position=financial_position,
                          fy=fy,
                          month_options=get_month_options(),
                          current_date=date.today())
@@ -287,8 +325,38 @@ def balance_sheet():
         ).group_by(Account.group_name).all()
         return {r.group_name: money(r.dr) - money(r.cr) for r in rows}
 
+    # Get individual account balances for detailed display
+    def get_account_balances():
+        accounts = db.session.query(
+            Account.id,
+            Account.name,
+            Account.group_name,
+            func.sum(JournalLine.debit).label("dr"),
+            func.sum(JournalLine.credit).label("cr"),
+        ).join(JournalLine, JournalLine.account_id == Account.id
+        ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+        ).filter(
+            Account.company_id == cid,
+            JournalHeader.company_id == cid,
+            JournalHeader.voucher_date <= end,
+            JournalHeader.is_cancelled == False,
+            Account.is_active == True
+        ).group_by(Account.id, Account.name, Account.group_name).all()
+        
+        account_balances = {}
+        for acc in accounts:
+            balance = money(acc.dr) - money(acc.cr)
+            if abs(balance) > 0.01:  # Only include accounts with balance
+                account_balances[acc.id] = {
+                    'name': acc.name,
+                    'group': acc.group_name,
+                    'balance': balance
+                }
+        return account_balances
+
     assets      = grp(ASSET_GROUPS)
     liabilities = grp(LIABILITY_GROUPS)
+    account_balances = get_account_balances()
 
     total_assets      = sum(assets.values())
     total_liabilities = sum(liabilities.values())
@@ -296,11 +364,265 @@ def balance_sheet():
     if export == "excel": return export_bs_excel(assets, liabilities, total_assets, total_liabilities, fy)
     if export == "pdf":   return export_bs_pdf(assets, liabilities, total_assets, total_liabilities, fy)
 
-    return render_template("reports/balance_sheet.html",
+    return render_template("reports/balance_sheet_horizontal.html",
         assets=assets, liabilities=liabilities,
         total_assets=round(total_assets,2),
         total_liabilities=round(total_liabilities,2),
+        account_balances=account_balances,
         fy=fy, current_date=date.today())
+
+@reports_bp.route("/reports/account-ledger/<int:account_id>")
+@login_required
+def account_ledger(account_id):
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    start, end = fy_dates(fy)
+    
+    # Get account details
+    account = Account.query.filter_by(id=account_id, company_id=cid).first_or_404()
+    
+    # Get opening balance
+    opening_balance = 0.0
+    if hasattr(account, 'opening_dr') and account.opening_dr:
+        opening_balance += float(account.opening_dr)
+    if hasattr(account, 'opening_cr') and account.opening_cr:
+        opening_balance -= float(account.opening_cr)
+    
+    # Get all journal lines for this account
+    journal_lines = db.session.query(
+        JournalLine, JournalHeader
+    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    ).filter(
+        JournalLine.account_id == account_id,
+        JournalHeader.company_id == cid,
+        JournalHeader.voucher_date >= start,
+        JournalHeader.voucher_date <= end,
+        JournalHeader.is_cancelled == False
+    ).order_by(JournalHeader.voucher_date, JournalHeader.id).all()
+    
+    # Calculate running balance
+    transactions = []
+    running_balance = opening_balance
+    
+    for line, header in journal_lines:
+        amount = float(line.debit or 0) - float(line.credit or 0)
+        running_balance += amount
+        
+        transactions.append({
+            'date': header.voucher_date,
+            'voucher_no': header.voucher_no,
+            'voucher_type': header.voucher_type,
+            'narration': header.narration,
+            'debit': float(line.debit or 0),
+            'credit': float(line.credit or 0),
+            'balance': running_balance
+        })
+    
+    return render_template("reports/account_ledger.html",
+        account=account,
+        opening_balance=opening_balance,
+        transactions=transactions,
+        closing_balance=running_balance,
+        fy=fy)
+
+@reports_bp.route("/reports/account-ledger/<int:account_id>/pdf")
+@login_required
+def account_ledger_pdf(account_id):
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    start, end = fy_dates(fy)
+    
+    # Get account details and transactions (reuse logic from account_ledger)
+    account = Account.query.filter_by(id=account_id, company_id=cid).first_or_404()
+    
+    opening_balance = 0.0
+    if hasattr(account, 'opening_dr') and account.opening_dr:
+        opening_balance += float(account.opening_dr)
+    if hasattr(account, 'opening_cr') and account.opening_cr:
+        opening_balance -= float(account.opening_cr)
+    
+    journal_lines = db.session.query(
+        JournalLine, JournalHeader
+    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    ).filter(
+        JournalLine.account_id == account_id,
+        JournalHeader.company_id == cid,
+        JournalHeader.voucher_date >= start,
+        JournalHeader.voucher_date <= end,
+        JournalHeader.is_cancelled == False
+    ).order_by(JournalHeader.voucher_date, JournalHeader.id).all()
+    
+    transactions = []
+    running_balance = opening_balance
+    
+    for line, header in journal_lines:
+        amount = float(line.debit or 0) - float(line.credit or 0)
+        running_balance += amount
+        
+        transactions.append({
+            'date': header.voucher_date,
+            'voucher_no': header.voucher_no,
+            'voucher_type': header.voucher_type,
+            'narration': header.narration,
+            'debit': float(line.debit or 0),
+            'credit': float(line.credit or 0),
+            'balance': running_balance
+        })
+    
+    # Generate PDF (simplified version)
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    
+    # Create PDF document
+    doc = SimpleDocTemplate("buffer", pagesize=landscape(A4))
+    styles = getSampleStyleSheet()
+    
+    # Add content
+    story = []
+    
+    # Title
+    styles.add(ParagraphStyle('CustomTitle', fontSize=16, textColor=colors.black, alignment=1))
+    story.append(Paragraph(f"{account.name} - Account Ledger", styles['CustomTitle']))
+    story.append(Spacer(1, 12))
+    
+    # Table data
+    data = [['Date', 'Voucher No', 'Type', 'Narration', 'Debit', 'Credit', 'Balance']]
+    data.append(['Opening Balance', '', '', '', '', '', f"₹{opening_balance:.2f}"])
+    
+    for txn in transactions:
+        data.append([
+            txn.date.strftime('%d-%m-%Y'),
+            txn.voucher_no,
+            txn.voucher_type,
+            txn.narration,
+            f"₹{txn.debit:.2f}" if txn.debit > 0 else '',
+            f"₹{txn.credit:.2f}" if txn.credit > 0 else '',
+            f"₹{txn.balance:.2f}"
+        ])
+    
+    # Create table
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), colors.white),
+        ('TEXTCOLOR', (0, 0), colors.black),
+        ('ALIGN', (0, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), 'Helvetica'),
+        ('FONTSIZE', (0, 0), 8),
+        ('GRID', (0, 0), 1, colors.black),
+    ]))
+    
+    story.append(table)
+    doc.build(story)
+    
+    # Return PDF response
+    from io import BytesIO
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    
+    response = Response(
+        buffer.getvalue(),
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename={account.name}_Ledger.pdf'}
+    )
+    return response
+
+@reports_bp.route("/reports/account-ledger/<int:account_id>/excel")
+@login_required
+def account_ledger_excel(account_id):
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    start, end = fy_dates(fy)
+    
+    # Get account details and transactions (reuse logic from account_ledger)
+    account = Account.query.filter_by(id=account_id, company_id=cid).first_or_404()
+    
+    opening_balance = 0.0
+    if hasattr(account, 'opening_dr') and account.opening_dr:
+        opening_balance += float(account.opening_dr)
+    if hasattr(account, 'opening_cr') and account.opening_cr:
+        opening_balance -= float(account.opening_cr)
+    
+    journal_lines = db.session.query(
+        JournalLine, JournalHeader
+    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    ).filter(
+        JournalLine.account_id == account_id,
+        JournalHeader.company_id == cid,
+        JournalHeader.voucher_date >= start,
+        JournalHeader.voucher_date <= end,
+        JournalHeader.is_cancelled == False
+    ).order_by(JournalHeader.voucher_date, JournalHeader.id).all()
+    
+    transactions = []
+    running_balance = opening_balance
+    
+    for line, header in journal_lines:
+        amount = float(line.debit or 0) - float(line.credit or 0)
+        running_balance += amount
+        
+        transactions.append({
+            'date': header.voucher_date,
+            'voucher_no': header.voucher_no,
+            'voucher_type': header.voucher_type,
+            'narration': header.narration,
+            'debit': float(line.debit or 0),
+            'credit': float(line.credit or 0),
+            'balance': running_balance
+        })
+    
+    # Generate Excel
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from io import BytesIO
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"{account.name} - Account Ledger"
+    
+    # Headers
+    headers = ['Date', 'Voucher No', 'Type', 'Narration', 'Debit', 'Credit', 'Balance']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="1F4E79")
+        cell.alignment = Alignment(horizontal="center")
+    
+    # Opening Balance
+    ws.cell(row=2, column=1, value="Opening Balance")
+    ws.cell(row=2, column=7, value=opening_balance)
+    
+    # Transactions
+    for i, txn in enumerate(transactions, 3):
+        ws.cell(row=i, column=1, value=txn.date.strftime('%d-%m-%Y'))
+        ws.cell(row=i, column=2, value=txn.voucher_no)
+        ws.cell(row=i, column=3, value=txn.voucher_type)
+        ws.cell(row=i, column=4, value=txn.narration)
+        ws.cell(row=i, column=5, value=txn.debit if txn.debit > 0 else 0)
+        ws.cell(row=i, column=6, value=txn.credit if txn.credit > 0 else 0)
+        ws.cell(row=i, column=7, value=txn.balance)
+    
+    # Totals
+    total_row = len(transactions) + 3
+    ws.cell(row=total_row, column=4, value="Totals")
+    ws.cell(row=total_row, column=5, value=sum(t['debit'] for t in transactions))
+    ws.cell(row=total_row, column=6, value=sum(t['credit'] for t in transactions))
+    ws.cell(row=total_row, column=7, value=running_balance)
+    
+    # Save to BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    response = Response(
+        buffer.getvalue(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename={account.name}_Ledger.xlsx'}
+    )
+    return response
 
 # ═══════════════════════════════════════════
 #  6. CASH FLOW

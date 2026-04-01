@@ -2,6 +2,11 @@
 from datetime import datetime, date
 from flask import request
 
+def fy_dates(fy):
+    """Return (start_date, end_date) for FY like '2025-26'"""
+    y1 = int(fy[:4])
+    return date(y1, 4, 1), date(y1+1, 3, 31)
+
 def get_month_options():
     """Generate month options for dropdown"""
     months = [

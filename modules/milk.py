@@ -540,11 +540,20 @@ def add_entry():
     
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
     default_date = session.get("last_txn_date") or date.today().isoformat()
+    last_party_id = session.get("last_milk_party_id")
+    last_party = Party.query.filter_by(id=last_party_id, company_id=cid).first() if last_party_id else None
     
     if request.method == "POST":
         fat=float(request.form["fat"]) 
-        snf=float(request.form.get("snf", request.form.get("snf_auto", 8.5)))
+        if fat > 10:
+            fat = fat / 10.0
         qty=float(request.form["qty_liters"])
+        
+        # Handle CLR conversion
+        clr=float(request.form.get("clr", 0))
+        # If CLR > 100, divide by 10 (289 -> 28.9)
+        if clr > 100:
+            clr = clr / 10.0
         
         # Handle rate chart selection
         chart_id=to_int_or_none(request.form.get("chart_id"))
@@ -555,52 +564,93 @@ def add_entry():
             fat_rate=float(request.form.get("fat_rate", 200))
             snf_rate=float(request.form.get("snf_rate", 100))
         
-        # Prefer front-end calculated amount / rate if provided
-        amount_str = (request.form.get("amount") or "").strip()
-        calc_rate_str = (request.form.get("calc_rate") or "").strip()
-        print(f"DEBUG: Received amount_str={amount_str}, calc_rate_str={calc_rate_str}")
-        if amount_str:
-            amount = float(amount_str)
-            if calc_rate_str:
-                rate = float(calc_rate_str)
-            else:
-                rate = round(amount / qty, 4) if qty else 0
-            print(f"DEBUG: Using frontend amount={amount}, rate={rate}")
+        # Calculate SNF using Richmond's Formula with Milk Chief specific adjustment
+        if clr > 0 and fat > 0:
+            snf = (clr / 4) + (0.20 * fat) + 0.14
+            snf = round(snf, 3) - 0.005
+            snf = round(snf, 3)
+            snf = max(7.0, min(15.0, snf))
         else:
-            # Fallback: use daily rate or traditional component method
-            daily_rate = float(request.form.get("rate_per_liter", 0))
-            if daily_rate > 0:
-                # Derive BF/SNF component rates from base price using 60:40 split
-                fat_share = 0.60
-                snf_share = 0.40
-                std_fat_kg = 6.5
-                std_snf_kg = 8.5
+            snf = float(request.form.get("snf_auto", 8.5))
 
-                bf_rate = (daily_rate * fat_share) / std_fat_kg
-                snf_rate = (daily_rate * snf_share) / std_snf_kg
+        # Always prefer user-entered Daily Rate (per 100kg) for storage & calculation
+        daily_rate = float((request.form.get("rate_per_liter") or 0) or 0)
+        if daily_rate > 0:
+            rate_per_100kg = daily_rate
+            fat_share = 0.60
+            snf_share = 0.40
+            std_fat_kg = 6.5
+            std_snf_kg = 8.5
 
-                bf_kgs = qty * fat / 100.0
-                snf_kgs = qty * snf / 100.0
-                amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
-                rate = round(amount / qty, 4) if qty else 0
+            bf_rate = (rate_per_100kg * fat_share) / std_fat_kg
+            snf_rate = (rate_per_100kg * snf_share) / std_snf_kg
+
+            bf_kgs = qty * fat / 100.0
+            snf_kgs = qty * snf / 100.0
+            bf_kgs = round(bf_kgs, 3)
+            snf_kgs = round(snf_kgs, 3)
+            amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
+            rate = daily_rate
+        else:
+            amount_str = (request.form.get("amount") or "").strip()
+            calc_rate_str = (request.form.get("calc_rate") or "").strip()
+            if amount_str:
+                amount = float(amount_str)
+                if calc_rate_str:
+                    rate = float(calc_rate_str)
+                else:
+                    rate = round((amount / qty) * 100, 2) if qty else 0
             else:
                 rate = calc_rate(fat, snf, fat_rate, snf_rate)
                 amount = round(rate * qty, 2)
         
         txn_type=request.form["txn_type"]; 
-        party_id_str = request.form.get("party_id", "").strip()
-        if not party_id_str:
-            flash("Please select a party", "error")
-            return redirect(url_for('milk.add_entry'))
-        party_id=int(party_id_str)
         txn_date=datetime.strptime(request.form["txn_date"],"%Y-%m-%d").date()
         create_invoice=request.form.get("create_invoice")=="1"
         print(f"DEBUG: create_invoice = {create_invoice}")
         print(f"DEBUG: form data = {dict(request.form)}")
         
+        # Handle cash account or party account logic
+        is_cash_account = request.form.get('is_cash_account') == 'on'
+        
+        if is_cash_account:
+            # Use cash account
+            party_id = None
+            party_name = "Cash Account"
+            print(f"DEBUG: Using cash account mode")
+            
+            # Get or create cash account
+            from models import Account
+            cash_account = Account.query.filter_by(company_id=cid, name="Cash Account", account_type="Cash").first()
+            if not cash_account:
+                cash_account = Account(
+                    company_id=cid,
+                    name="Cash Account",
+                    account_type="Cash",
+                    group_name="Cash-in-Hand",
+                    opening_dr=0.0,
+                    opening_cr=0.0,
+                    is_active=True
+                )
+                db.session.add(cash_account)
+                db.session.flush()
+                print(f"DEBUG: Created cash account: {cash_account.name}")
+        else:
+            # Use party account
+            party_id_str = request.form.get("party_id", "").strip()
+            if not party_id_str or party_id_str == 'cash':
+                flash("Please select a party", "error")
+                return redirect(url_for('milk.add_entry'))
+            party_id=int(party_id_str)
+            party = Party.query.get(party_id)
+            if not party:
+                flash("Invalid party selected", "error")
+                return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party)
+        
         txn=MilkTransaction(company_id=cid,fin_year=fy,party_id=party_id,txn_date=txn_date,
             shift=request.form.get("shift","Morning"),txn_type=txn_type,
-            qty_liters=qty,fat=fat,snf=snf,clr=float(request.form.get("clr",0)),rate=rate,amount=amount,
+            qty_liters=qty,fat=fat,snf=snf,clr=clr,  # Store converted CLR
+            rate=rate,amount=amount,  # Store rate per 100kg (already correct)
             chart_id=chart_id,narration=request.form.get("narration","").strip())
         db.session.add(txn)
         db.session.flush()  # Get the transaction ID
@@ -636,7 +686,7 @@ def add_entry():
             bill=Bill(company_id=cid,fin_year=fy,party_id=party_id,bill_no=bill_no,
                 bill_date=txn_date,bill_type=bill_type,taxable_amount=amount,
                 cgst=gst_amt/2, sgst=gst_amt/2, igst=0, total_amount=total,
-                narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/L",
+                narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg {'(Cash)' if is_cash_account else ''}",
                 is_cancelled=False)
             print(f"DEBUG: Creating bill object...")
             db.session.add(bill)
@@ -655,20 +705,49 @@ def add_entry():
             except Exception as e:
                 print(f"WARNING: Could not set bill_id (column may not exist): {e}")
             print(f"DEBUG: Invoice creation completed")
+            
+            # Create or get party account for ledger (only for non-cash transactions)
+            if not is_cash_account and party_id:
+                from models import Account
+                # Use party name directly for consistency with clients module
+                account_name = party.name
+                party_account = Account.query.filter_by(company_id=cid, name=account_name).first()
+                if not party_account:
+                    # Create automatic party account
+                    party_account = Account(
+                        company_id=cid,
+                        name=account_name,
+                        account_type="Party",
+                        group_name="Sundry Creditors" if txn_type == "Purchase" else "Sundry Debtors",
+                        opening_dr=0.0,
+                        opening_cr=0.0,
+                        is_active=True
+                    )
+                    db.session.add(party_account)
+                    db.session.flush()
+                    print(f"DEBUG: Created party account: {party_account.name}")
+            elif is_cash_account:
+                print(f"DEBUG: Cash account mode - skipping party account creation")
+            
             db.session.commit()
             session["last_txn_date"] = txn_date.isoformat()
-            msg=f"Saved {qty}L @ Rs{rate}/L = Rs{amount}"
+            if party_id:
+                session["last_milk_party_id"] = party_id
+            msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
             if bill_no: msg+=f" | Invoice {bill_no} created"
+            if party_account and not party_account.id: msg+=f" | Party account created"
             flash(msg,"success")
-            return redirect(url_for("milk.entry_list"))
+            return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
 
         db.session.commit()
         session["last_txn_date"] = txn_date.isoformat()
-        msg=f"Saved {qty}L @ Rs{rate}/L = Rs{amount}"
+        if party_id:
+            session["last_milk_party_id"] = party_id
+        msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
         flash(msg,"success")
-        return redirect(url_for("milk.entry_list"))
+        return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
         
-    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False)
+    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party)
 
 @milk_bp.route("/entry/<int:txn_id>/edit", methods=["GET","POST"])
 def edit_entry(txn_id):
@@ -832,9 +911,27 @@ def edit_entry(txn_id):
         actual_txn.txn_type = request.form["txn_type"]
         actual_txn.party_id = int(request.form["party_id"])
         actual_txn.qty_liters = float(request.form["qty_liters"])
-        actual_txn.fat = float(request.form["fat"])
-        actual_txn.clr = float(request.form.get("clr", 0.0))  # CLR might not exist in DB
-        actual_txn.snf = float(request.form.get("snf_auto", 8.5))
+        qty = actual_txn.qty_liters
+
+        fat_val = float(request.form["fat"])
+        if fat_val > 10:
+            fat_val = fat_val / 10.0
+        actual_txn.fat = fat_val
+
+        clr_val = float(request.form.get("clr", 0.0))  # CLR might not exist in DB
+        if clr_val > 100:
+            clr_val = clr_val / 10.0
+        actual_txn.clr = clr_val
+
+        # Always re-calc SNF from CLR/FAT (Milk Chief adjusted Richmond)
+        if actual_txn.clr > 0 and actual_txn.fat > 0:
+            calculated_snf = (actual_txn.clr / 4) + (0.20 * actual_txn.fat) + 0.14
+            calculated_snf = round(calculated_snf, 3) - 0.005
+            calculated_snf = round(calculated_snf, 3)
+            calculated_snf = max(7.0, min(15.0, calculated_snf))
+            actual_txn.snf = calculated_snf
+        else:
+            actual_txn.snf = float(request.form.get("snf_auto", 8.5))
 
         # Traditional Indian Milk Pricing Method (SNF Method)
         daily_rate_str = (request.form.get("rate_per_liter") or "").strip()
@@ -854,28 +951,23 @@ def edit_entry(txn_id):
             ghee_rate = (daily_rate * fat_share) / std_fat_kg  # ≈ ₹415/kg
             powder_rate = (daily_rate * snf_share) / std_snf_kg # ≈ ₹211/kg
             
-            # Calculate component amounts
-            qty = actual_txn.qty_liters
-            fat = actual_txn.fat
-            clr = actual_txn.clr
+            # Use already calculated SNF stored on txn
+            calculated_snf = actual_txn.snf
             
-            # Calculate SNF using Richmond's formula (same as frontend)
-            if clr > 0:
-                calculated_snf = (clr / 4) + (0.20 * fat) + 0.14
-                calculated_snf = max(7.0, min(15.0, calculated_snf))
-            else:
-                calculated_snf = 7.54
-            
-            bf_kgs = qty * fat / 100
+            bf_kgs = qty * actual_txn.fat / 100
             snf_kgs = qty * calculated_snf / 100
+            # Keep 3 decimal places to match Milk Chief exactly
+            bf_kgs = round(bf_kgs, 3)
+            snf_kgs = round(snf_kgs, 3)
             
             print(f"DEBUG: Using calculated SNF: {calculated_snf:.2f} (stored SNF: {actual_txn.snf:.2f})")
             
             ghee_amount = bf_kgs * ghee_rate
             powder_amount = snf_kgs * powder_rate
-            final_amount = ghee_amount + powder_amount
+            final_amount = round(ghee_amount + powder_amount, 2)
 
-            actual_txn.rate = round(final_amount / qty, 4) if qty else 0
+            # Store the daily rate as rate per 100kg (not calculated from amount)
+            actual_txn.rate = daily_rate  # Store as rate per 100kg
             actual_txn.amount = final_amount
             
             print(f"DEBUG: Traditional calculation:")
@@ -885,7 +977,9 @@ def edit_entry(txn_id):
             
         elif amount_str:
             actual_txn.amount = float(amount_str)
-            print(f"DEBUG: Using provided amount: {actual_txn.amount}")
+            # Calculate rate per 100kg from amount
+            actual_txn.rate = round((actual_txn.amount / qty) * 100, 2) if qty else 0
+            print(f"DEBUG: Using provided amount: {actual_txn.amount}, calculated rate: {actual_txn.rate}")
         else:
             actual_txn.amount = 0.0
             print(f"DEBUG: No rate or amount provided")
@@ -952,18 +1046,128 @@ def update_field(txn_id):
         if field == "qty_liters":
             txn.qty_liters = float(value)
         elif field == "fat":
-            txn.fat = float(value)
+            # Convert fat input (user enters 44 → 4.4)
+            fat_value = float(value)
+            if fat_value > 10:
+                fat_value = fat_value / 10.0
+            txn.fat = fat_value
         elif field == "snf":
             txn.snf = float(value)
         elif field == "rate":
-            txn.rate = float(value)
-            txn.rate_per_liter = float(value)
+            # Rate should be stored as per 100kg
+            rate_value = float(value)
+            # If user entered rate per litre (small number), convert to per 100kg
+            if rate_value < 100:
+                rate_value = rate_value * 100
+            txn.rate = rate_value
+        elif field == "clr":
+            # Convert CLR input (user enters 295 → 29.5)
+            clr_value = float(value)
+            if clr_value > 100:
+                clr_value = clr_value / 10.0
+            txn.clr = clr_value
         
-        # Recalculate amount
-        txn.amount = txn.qty_liters * txn.rate
+        # Recalculate SNF using Richmond's formula if CLR and FAT are available
+        if hasattr(txn, 'clr') and hasattr(txn, 'fat') and txn.clr > 0 and txn.fat > 0:
+            calculated_snf = (txn.clr / 4) + (0.20 * txn.fat) + 0.14
+            # Milk Chief appears to use a slightly different rounding or precision
+            # Let's adjust to match their pattern: 8.375% → 8.370%
+            calculated_snf = round(calculated_snf, 3) - 0.005
+            calculated_snf = round(calculated_snf, 3)  # Ensure proper rounding
+            txn.snf = calculated_snf
+        
+        # Recalculate amount using component method if daily rate is available
+        if hasattr(txn, 'rate') and txn.rate > 0 and txn.qty_liters > 0:
+            # Use Milk Chief compatible component calculation
+            daily_rate = txn.rate  # This should be rate per 100kg
+            fat_share = 0.60
+            snf_share = 0.40
+            std_fat_kg = 6.5
+            std_snf_kg = 8.5
+            
+            bf_rate = (daily_rate * fat_share) / std_fat_kg
+            snf_rate = (daily_rate * snf_share) / std_snf_kg
+            
+            bf_kgs = txn.qty_liters * txn.fat / 100.0
+            snf_kgs = txn.qty_liters * txn.snf / 100.0
+            bf_kgs = round(bf_kgs, 3)
+            snf_kgs = round(snf_kgs, 3)
+            
+            txn.amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
         
         db.session.commit()
         return jsonify({"success": True, "message": "Updated successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)})
+
+@milk_bp.route("/admin/update-all-milk-calculations")
+@login_required
+def update_all_milk_calculations():
+    """Update all existing milk transactions to use Milk Chief compatible formula"""
+    try:
+        cid = session.get("company_id"); fy = session.get("fin_year")
+        
+        # Get all milk transactions
+        txns = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).all()
+        
+        updated_count = 0
+        for txn in txns:
+            # Normalize fat (handle old double-divided values like 0.43 instead of 4.3)
+            if txn.fat and txn.fat > 10:
+                txn.fat = txn.fat / 10.0
+            elif txn.fat and 0 < txn.fat < 1:
+                txn.fat = txn.fat * 10.0
+
+            # Normalize CLR
+            if hasattr(txn, 'clr') and txn.clr:
+                if txn.clr > 100:
+                    txn.clr = txn.clr / 10.0
+                elif 0 < txn.clr < 10:
+                    txn.clr = txn.clr * 10.0
+            
+            # Recalculate SNF using Richmond's formula with Milk Chief adjustment
+            if hasattr(txn, 'clr') and txn.clr > 0 and txn.fat > 0:
+                calculated_snf = (txn.clr / 4) + (0.20 * txn.fat) + 0.14
+                calculated_snf = round(calculated_snf, 3) - 0.005
+                calculated_snf = round(calculated_snf, 3)
+                txn.snf = calculated_snf
+
+            # Fix stored daily rate (per 100kg)
+            if txn.qty_liters and txn.qty_liters > 0:
+                if txn.amount and txn.amount > 0 and txn.fat and txn.fat > 0 and txn.snf and txn.snf > 0:
+                    bf_kgs = round(txn.qty_liters * txn.fat / 100.0, 3)
+                    snf_kgs = round(txn.qty_liters * txn.snf / 100.0, 3)
+                    denom = (bf_kgs * (0.60 / 6.5)) + (snf_kgs * (0.40 / 8.5))
+                    if denom > 0:
+                        txn.rate = round(float(txn.amount) / denom, 2)
+                elif txn.rate and 0 < txn.rate < 100:
+                    txn.rate = txn.rate * 100
+            
+            # Recalculate amount using component method if rate is available
+            if txn.rate > 0 and txn.qty_liters > 0:
+                daily_rate = txn.rate  # Should be rate per 100kg
+                fat_share = 0.60
+                snf_share = 0.40
+                std_fat_kg = 6.5
+                std_snf_kg = 8.5
+                
+                bf_rate = (daily_rate * fat_share) / std_fat_kg
+                snf_rate = (daily_rate * snf_share) / std_snf_kg
+                
+                bf_kgs = txn.qty_liters * txn.fat / 100.0
+                snf_kgs = txn.qty_liters * txn.snf / 100.0
+                bf_kgs = round(bf_kgs, 3)
+                snf_kgs = round(snf_kgs, 3)
+                
+                txn.amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
+            
+            updated_count += 1
+        
+        db.session.commit()
+        flash(f"Updated {updated_count} milk transactions with Milk Chief compatible calculations", "success")
+        return jsonify({"success": True, "updated": updated_count})
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)})
@@ -1053,9 +1257,70 @@ def summary():
 def test_route():
     return "Milk module is working!"
 
+@milk_bp.route("/parties/search", methods=["GET"])
+def search_parties():
+    """Search parties with ledger and balance information for autocomplete"""
+    try:
+        cid = session.get("company_id", 1)
+        search_term = request.args.get("q", "").strip()
+        
+        # Get parties matching search term
+        query = Party.query.filter_by(company_id=cid, is_active=True)
+        
+        if search_term:
+            query = query.filter(Party.name.ilike(f"%{search_term}%"))
+        
+        parties = query.order_by(Party.name).limit(50).all()
+        
+        # Format results with balance information
+        results = []
+        for party in parties:
+            # Calculate current balance (opening + transactions)
+            opening_balance = float(party.opening_balance or 0)
+            balance_type = party.balance_type or 'Dr'
+            
+            # Get transaction totals for this party
+            from models import Bill
+            bills = Bill.query.filter_by(
+                party_id=party.id,
+                company_id=cid,
+                is_cancelled=False
+            ).all()
+            
+            transaction_total = sum(float(bill.total_amount or 0) for bill in bills)
+            
+            # Calculate current balance
+            if balance_type == 'Dr':
+                current_balance = opening_balance + transaction_total
+            else:
+                current_balance = -opening_balance + transaction_total
+            
+            results.append({
+                'id': party.id,
+                'name': party.name,
+                'phone': party.phone or '',
+                'gstin': party.gstin or '',
+                'opening_balance': opening_balance,
+                'balance_type': balance_type,
+                'current_balance': current_balance,
+                'balance_display': f"₹{abs(current_balance):,.2f} {'Dr' if current_balance >= 0 else 'Cr'}"
+            })
+        
+        return jsonify({
+            'success': True,
+            'parties': results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'parties': []
+        })
+
 @milk_bp.route("/parties/add", methods=["POST"])
 def add_party():
-    """Add a new party via AJAX"""
+    """Add a new party via AJAX - consistent with clients module"""
     try:
         cid = session.get("company_id", 1)
         name = request.form.get("name", "").strip()
@@ -1071,24 +1336,51 @@ def add_party():
         if existing:
             return jsonify({"success": False, "message": f"Party '{name}' already exists. Please use a different name."})
         
+        # Determine party type - default to "Both" for milk suppliers (can be both debtor and creditor)
+        party_type = "Both"  # Milk parties can both supply milk (creditor) and purchase goods (debtor)
+        
         party = Party(
             company_id=cid,
             name=name,
-            phone=request.form.get("phone"),
-            email=request.form.get("email"),
-            gstin=request.form.get("gst_number"),
-            address=request.form.get("address"),
-            state_code=request.form.get("state_code"),
+            phone=request.form.get("phone", "").strip() or None,
+            email=request.form.get("email", "").strip() or None,
+            gstin=request.form.get("gst_number", "").strip().upper() or None,
+            address=request.form.get("address", "").strip() or None,
+            state_code=request.form.get("state_code", "").strip() or None,
+            party_type=party_type,
+            balance_type="Dr",  # Default balance type
+            opening_balance=0.0,  # Default opening balance
             is_active=True
         )
         
         db.session.add(party)
+        db.session.flush()  # Get the party ID
+        
+        # Also create corresponding account for ledger consistency
+        from models import Account
+        existing_account = Account.query.filter_by(company_id=cid, name=name).first()
+        if not existing_account:
+            party_account = Account(
+                company_id=cid,
+                name=name,  # Same name as party - no suffix
+                account_type="Party",
+                group_name="Sundry Creditors",  # Default for milk suppliers
+                opening_dr=0.0,
+                opening_cr=0.0,
+                is_active=True
+            )
+            db.session.add(party_account)
+            print(f"DEBUG: Created corresponding account for party: {name}")
+        
         db.session.commit()
         
         return jsonify({
             "success": True,
             "id": party.id,
             "name": party.name,
+            "party_type": party.party_type,
+            "phone": party.phone or "",
+            "gstin": party.gstin or "",
             "message": "Party added successfully"
         })
         

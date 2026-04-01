@@ -17,13 +17,17 @@
   <div class="col-md-3">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Avg BF Rate</div>
-      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(sum(c.fat_rate for c in charts) / len(charts) if charts else 0) }}</div>
+      {% set total_fat = charts|sum(attribute='fat_rate') %}
+      {% set avg_fat = (total_fat / charts|length) if charts else 0 %}
+      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(avg_fat) }}</div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Avg SNF Rate</div>
-      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(sum(c.snf_rate for c in charts) / len(charts) if charts else 0) }}</div>
+      {% set total_snf = charts|sum(attribute='snf_rate') %}
+      {% set avg_snf = (total_snf / charts|length) if charts else 0 %}
+      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(avg_snf) }}</div>
     </div>
   </div>
   <div class="col-md-3">

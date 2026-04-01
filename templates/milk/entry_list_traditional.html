@@ -135,7 +135,7 @@
           <th class="text-end">BF Kgs</th>
           <th class="text-end">SNF Kgs</th>
           <th class="text-center">Ratio</th>
-          <th class="text-end">Rate/L</th>
+          <th class="text-end">Daily Rate</th>
           <th class="text-end">Amount</th>
         </tr>
       </thead>
@@ -152,7 +152,7 @@
                 <i class="fas fa-file-invoice"></i>
               </a>
               {% endif %}
-              <button onclick="event.preventDefault(); event.stopPropagation(); deleteEntry({{ t.id }})" class="btn btn-outline-danger btn-sm" title="Delete Entry">
+              <button type="button" class="btn btn-outline-danger btn-sm delete-entry-btn" data-txn-id="{{ t.id }}" title="Delete Entry">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -175,18 +175,18 @@
             <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.qty_liters }}" style="display: none;">
           </td>
           <td class="text-center editable-cell" data-field="fat" data-id="{{ t.id }}">
-            <span class="display-value">{{ t.fat }}%</span>
+            <span class="display-value">{{ "{:.2f}".format(t.fat) }}%</span>
             <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.fat }}" style="display: none;">
           </td>
           <td class="text-center editable-cell" data-field="snf" data-id="{{ t.id }}">
-            <span class="display-value">{{ t.snf }}%</span>
+            <span class="display-value">{{ "{:.3f}".format(t.snf) }}%</span>
             <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.snf }}" style="display: none;">
           </td>
           <td class="text-end" data-bf-kgs="{{ t.qty_liters * t.fat / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.fat / 100) }}</td>
           <td class="text-end" data-snf-kgs="{{ t.qty_liters * t.snf / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.snf / 100) }}</td>
           <td class="text-center" data-ratio="{{ (t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0 }}">{{ "{:,.2f}".format((t.qty_liters * t.snf / 100) / (t.qty_liters * t.fat / 100) if t.fat > 0 else 0) }}</td>
           <td class="text-end editable-cell" data-field="rate" data-id="{{ t.id }}">
-            <span class="display-value">₹{{ "{:,.4f}".format(t.rate) }}</span>
+            <span class="display-value">₹{{ "{:,.2f}".format(t.rate) }}</span>
             <input type="number" class="form-control form-control-sm edit-input" step="0.0001" value="{{ t.rate }}" style="display: none;">
           </td>
           <td class="text-end fw-bold" data-amount="{{ t.amount }}">₹{{ "{:,.2f}".format(t.amount) }}</td>
@@ -563,7 +563,13 @@ function recalculateRow(row) {
   ratioCell.dataset.ratio = ratio;
   
   // Recalculate Amount
-  const amount = qty * rate;
+  const fatShare = 0.60;
+  const snfShare = 0.40;
+  const stdFatKg = 6.5;
+  const stdSnfKg = 8.5;
+  const bfRate = (rate * fatShare) / stdFatKg;
+  const snfRate = (rate * snfShare) / stdSnfKg;
+  const amount = (bfKgs * bfRate) + (snfKgs * snfRate);
   const amountCell = row.querySelector('[data-amount]');
   amountCell.textContent = '₹' + amount.toFixed(2);
   amountCell.dataset.amount = amount;
@@ -571,25 +577,29 @@ function recalculateRow(row) {
 
 // Delete milk entry
 function deleteEntry(txnId) {
-  if (confirm('Are you sure you want to delete this milk entry? This action cannot be undone.')) {
-    // Create a form and submit it
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `/milk/entry/${txnId}/delete`;
-    
-    // Add CSRF token if available
-    const csrfToken = document.querySelector('meta[name="csrf-token"]');
-    if (csrfToken) {
-      const csrfInput = document.createElement('input');
-      csrfInput.type = 'hidden';
-      csrfInput.name = 'csrf_token';
-      csrfInput.value = csrfToken.getAttribute('content');
-      form.appendChild(csrfInput);
-    }
-    
-    document.body.appendChild(form);
-    form.submit();
-  }
+  if (!confirm('Are you sure you want to delete this milk entry? This action cannot be undone.')) return;
+
+  fetch(`/milk/entry/${txnId}/delete`, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.success) {
+        window.location.reload();
+      } else {
+        alert((data && data.error) ? data.error : 'Delete failed');
+      }
+    })
+    .catch(() => alert('Delete failed'));
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.delete-entry-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = this.getAttribute('data-txn-id');
+      deleteEntry(id);
+    });
+  });
+});
 </script>
 {% endblock %}

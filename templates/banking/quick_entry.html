@@ -17,7 +17,7 @@
   <div class="card-body">
     <form method="POST" id="quickBankForm">
       <div class="row g-3 mb-3">
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label class="form-label">Bank Account *</label>
           <select name="bank_account_id" class="form-select" required>
             <option value="">-- Select Bank Account --</option>
@@ -26,11 +26,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-3">
-          <label class="form-label">Transaction Date *</label>
-          <input type="date" name="transaction_date" class="form-control" value="{{ today }}" required>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label class="form-label">Transaction Type</label>
           <select name="transaction_type" class="form-select">
             <option value="Deposit">Deposit</option>
@@ -38,7 +34,7 @@
             <option value="Transfer">Transfer</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label class="form-label">Payment Mode</label>
           <select name="payment_mode" class="form-select">
             <option value="Cash">Cash</option>
@@ -50,6 +46,19 @@
             <option value="Other">Other</option>
           </select>
         </div>
+      </div>
+
+      <!-- Bank Balance Summary -->
+      <div class="alert alert-info">
+        <h6 class="alert-heading">🏦 Bank Balances (as of today)</h6>
+        <div class="row">
+          {% for bank in banks %}
+          <div class="col-md-6">
+            <small><strong>{{ bank.bank_name }}:</strong> ₹{{ '%.2f'|format(bank_balances.get(bank.id, 0)) }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <small class="text-muted">Balances include opening balance + all transactions till date.</small>
       </div>
 
       <!-- Fixed Bank Account Display -->

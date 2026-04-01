@@ -63,7 +63,7 @@ function saveNewParty() {
   const form = document.getElementById('addPartyForm');
   const formData = new FormData(form);
   
-  // Simple party creation using form submission
+  // Get party name
   const partyName = formData.get('name');
   
   if (!partyName || partyName.trim() === '') {
@@ -71,40 +71,33 @@ function saveNewParty() {
     return;
   }
   
-  // Check for duplicate name (case-insensitive)
-  const existingParties = ['SHIVAM', 'Raaina', 'Test Party', 'Office Party'];
-  if (existingParties.some(p => p.toLowerCase() === partyName.toLowerCase())) {
-    alert(`Party '${partyName}' already exists. Please use a different name.`);
-    return;
-  }
-  
-  // Create party via simple form submission
+  // Create party via API
   fetch('/milk/parties/add', {
     method: 'POST',
     body: formData
   })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    return response.json();
-  })
+  .then(response => response.json())
   .then(data => {
     if (data.success) {
       // Close modal
       const modal = bootstrap.Modal.getInstance(document.getElementById('addPartyModal'));
       modal.hide();
       
-      // Add new party to datalist
-      const datalist = document.getElementById('partyList');
-      const option = document.createElement('option');
-      option.value = data.name;
-      option.setAttribute('data-id', data.id);
-      datalist.appendChild(option);
+      // Add new party to hidden lookup select
+      const lookup = document.getElementById('partyLookup');
+      if (lookup) {
+        const option = document.createElement('option');
+        option.value = data.name;
+        option.setAttribute('data-id', data.id);
+        lookup.appendChild(option);
+      }
       
       // Select the new party
       document.getElementById('partyName').value = data.name;
-      selectParty();
+      document.getElementById('partyId').value = data.id;
+      
+      // Hide search results
+      document.getElementById('partySearchResults').style.display = 'none';
       
       // Show success message
       alert('Party "' + data.name + '" added successfully!');

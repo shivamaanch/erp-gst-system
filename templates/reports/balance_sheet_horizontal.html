@@ -49,54 +49,135 @@
             </td>
             <td></td>
           </tr>
+          
+          <!-- Capital & Fixed Assets Section -->
+          {% set capital_balance = 0 %}
+          {% set reserves_balance = 0 %}
+          
+          <!-- Collect Capital accounts -->
+          {% set capital_accounts = [] %}
+          {% set reserves_accounts = [] %}
+          
+          {% for acc_id, acc_data in account_balances.items() %}
+            {% if acc_data.group == 'Capital Account' or acc_data.group == 'Share Capital' %}
+              {% set capital_balance = capital_balance + acc_data.balance %}
+              {% set _ = capital_accounts.append(acc_data) %}
+            {% endif %}
+            {% if acc_data.group == 'Reserves & Surplus' %}
+              {% set reserves_balance = reserves_balance + acc_data.balance %}
+              {% set _ = reserves_accounts.append(acc_data) %}
+            {% endif %}
+          {% endfor %}
+          
+          <!-- Add default accounts if none found -->
+          {% if not capital_accounts %}
+            {% set _ = capital_accounts.append({'id': 0, 'name': 'Capital Account', 'balance': 0.0}) %}
+          {% endif %}
+          {% if not reserves_accounts %}
+            {% set _ = reserves_accounts.append({'id': 0, 'name': 'General Reserve', 'balance': 0.0}) %}
+          {% endif %}
+          
+          <!-- Display Capital and Fixed Assets in aligned rows -->
+          {% set capital_reserves_total = capital_accounts|length + reserves_accounts|length %}
+          {% set max_rows = capital_reserves_total %}
+          {% if max_rows == 0 %}
+            {% set max_rows = 1 %}
+          {% endif %}
+          
+          <!-- Capital Account -->
+          {% if capital_accounts %}
+            {% for acc_data in capital_accounts %}
           <tr>
-            <td width="3%"></td>
-            <td><a href="#" class="ledger-link" data-ledger="Share Capital">Share Capital</a></td>
-            <td class="text-end">{{ "{:,.2f}".format(capital) }}</td>
-            <td width="3%"></td>
-            <td>Land & Building</td>
-            <td class="text-end">0.00</td>
+            <td></td>
+            <td><a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a></td>
+            <td class="text-end {{ 'text-success' if acc_data.balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+            {% endfor %}
+          {% endif %}
+          
+          <!-- Reserves & Surplus -->
+          {% if reserves_accounts %}
+            {% for acc_data in reserves_accounts %}
+          <tr>
+            <td></td>
+            <td><a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a></td>
+            <td class="text-end {{ 'text-success' if acc_data.balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+            {% endfor %}
+          {% endif %}
+          
+          <!-- Fixed Assets with depreciation details -->
+          {% if fixed_assets_schedule and fixed_assets_schedule.assets %}
+            <!-- Show Fixed Assets Total first -->
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td><strong>Fixed Assets (All)</strong></td>
+            <td class="text-end">
+              <div class="small">₹{{ "{:,.2f}".format(fixed_assets_schedule.total_opening_wdv) }}</div>
+            </td>
           </tr>
           <tr>
             <td></td>
-            <td><a href="#" class="ledger-link" data-ledger="Reserves & Surplus">Reserves & Surplus</a></td>
-            <td class="text-end">{{ "{:,.2f}".format(retained_earnings) }}</td>
             <td></td>
-            <td>Plant & Machinery</td>
-            <td class="text-end">0.00</td>
-          </tr>
-          <tr>
             <td></td>
-            <td>Profit & Loss A/c</td>
-            <td class="text-end">0.00</td>
             <td></td>
-            <td>Furniture & Fixtures</td>
-            <td class="text-end">0.00</td>
+            <td><strong>Less: Depreciation (All)</strong></td>
+            <td class="text-end">
+              <div class="text-danger small">₹{{ "{:,.2f}".format(fixed_assets_schedule.total_depreciation) }}</div>
+            </td>
           </tr>
           <tr>
             <td></td>
             <td></td>
             <td></td>
             <td></td>
-            <td>Vehicles</td>
-            <td class="text-end">0.00</td>
+            <td><strong>Balance (WDV)</strong></td>
+            <td class="text-end">
+              <div class="text-success small fw-bold">₹{{ "{:,.2f}".format(fixed_assets_schedule.total_closing_wdv) }}</div>
+            </td>
+          </tr>
+          {% else %}
+          <!-- Default assets when no data -->
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td><strong>Fixed Assets (All)</strong></td>
+            <td class="text-end">
+              <div class="small">₹0.00</div>
+            </td>
           </tr>
           <tr>
             <td></td>
             <td></td>
             <td></td>
             <td></td>
-            <td>Office Equipment</td>
-            <td class="text-end">0.00</td>
+            <td><strong>Less: Depreciation (All)</strong></td>
+            <td class="text-end">
+              <div class="text-danger small">₹0.00</div>
+            </td>
           </tr>
           <tr>
             <td></td>
             <td></td>
             <td></td>
             <td></td>
-            <td>Computers</td>
-            <td class="text-end">0.00</td>
+            <td><strong>Balance (WDV)</strong></td>
+            <td class="text-end">
+              <div class="text-success small fw-bold">₹0.00</div>
+            </td>
           </tr>
+          {% endif %}
           
           <!-- Secured Loans -->
           <tr class="table-secondary">
@@ -105,22 +186,64 @@
             <td colspan="2"><strong>INVESTMENTS</strong></td>
             <td></td>
           </tr>
+          
+          <!-- Secured Loans -->
+          {% set secured_loans_accounts = [] %}
+          {% set investments_accounts = [] %}
+          
+          {% for acc_id, acc_data in account_balances.items() %}
+            {% if acc_data.group == 'Secured Loans' or 'Bank Loan' in acc_data.name %}
+              {% set _ = secured_loans_accounts.append(acc_data) %}
+            {% endif %}
+            {% if acc_data.group == 'Investments' %}
+              {% set _ = investments_accounts.append(acc_data) %}
+            {% endif %}
+          {% endfor %}
+          
+          <!-- Add default accounts if none found -->
+          {% if not secured_loans_accounts %}
+            {% set _ = secured_loans_accounts.append({'id': 0, 'name': 'Bank Loan', 'balance': 0.0}) %}
+          {% endif %}
+          {% if not investments_accounts %}
+            {% set _ = investments_accounts.append({'id': 0, 'name': 'Investments', 'balance': 0.0}) %}
+          {% endif %}
+          
+          <!-- Display aligned rows -->
+          {% set max_rows = secured_loans_accounts|length %}
+          {% if investments_accounts|length > max_rows %}
+            {% set max_rows = investments_accounts|length %}
+          {% endif %}
+          
+          {% for i in range(max_rows) %}
           <tr>
             <td></td>
-            <td>Bank Loans</td>
-            <td class="text-end">0.00</td>
+            <td>
+              {% if i < secured_loans_accounts|length %}
+                {% set acc_data = secured_loans_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < secured_loans_accounts|length %}
+                {% set acc_data = secured_loans_accounts[i] %}
+                <span class="{{ 'text-danger' if acc_data.balance > 0 else 'text-success' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
             <td></td>
-            <td>Long Term Investments</td>
-            <td class="text-end">0.00</td>
+            <td>
+              {% if i < investments_accounts|length %}
+                {% set acc_data = investments_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < investments_accounts|length %}
+                {% set acc_data = investments_accounts[i] %}
+                <span class="{{ 'text-success' if acc_data.balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
           </tr>
-          <tr>
-            <td></td>
-            <td>Term Loans</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td>Short Term Investments</td>
-            <td class="text-end">0.00</td>
-          </tr>
+          {% endfor %}
           
           <!-- Unsecured Loans -->
           <tr class="table-secondary">
@@ -129,38 +252,68 @@
             <td colspan="2"><strong>CURRENT ASSETS</strong></td>
             <td></td>
           </tr>
+          
+          <!-- Collect all accounts for this section -->
+          {% set unsecured_loans_accounts = [] %}
+          {% set current_assets_accounts = [] %}
+          
+          {% for acc_id, acc_data in account_balances.items() %}
+            {% if acc_data.group == 'Unsecured Loans' or 'Directors Loan' in acc_data.name %}
+              {% set _ = unsecured_loans_accounts.append(acc_data) %}
+            {% endif %}
+            {% if acc_data.group == 'Sundry Debtors' or 'Debtors' in acc_data.name %}
+              {% set _ = current_assets_accounts.append(acc_data) %}
+            {% endif %}
+          {% endfor %}
+          
+          <!-- Add default accounts if none found -->
+          {% if not unsecured_loans_accounts %}
+            {% set _ = unsecured_loans_accounts.append({'id': 0, 'name': 'Directors Loan', 'balance': 0.0}) %}
+            {% set _ = unsecured_loans_accounts.append({'id': 0, 'name': 'Other Loans', 'balance': 0.0}) %}
+          {% endif %}
+          {% if not current_assets_accounts %}
+            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Sundry Debtors', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Stock in Hand', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Cash in Hand', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Bank Balance', 'balance': 0.0}) %}
+          {% endif %}
+          
+          <!-- Display aligned rows -->
+          {% set max_rows = unsecured_loans_accounts|length %}
+          {% if current_assets_accounts|length > max_rows %}
+            {% set max_rows = current_assets_accounts|length %}
+          {% endif %}
+          
+          {% for i in range(max_rows) %}
           <tr>
             <td></td>
-            <td><a href="#" class="ledger-link" data-ledger="Directors Loan">Directors Loan</a></td>
-            <td class="text-end">0.00</td>
+            <td>
+              {% if i < unsecured_loans_accounts|length %}
+                {% set acc_data = unsecured_loans_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < unsecured_loans_accounts|length %}
+                {% set acc_data = unsecured_loans_accounts[i] %}
+                <span class="{{ 'text-danger' if acc_data.balance > 0 else 'text-success' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
             <td></td>
-            <td><a href="#" class="ledger-link" data-ledger="Sundry Debtors">Sundry Debtors</a></td>
-            <td class="text-end">{{ "{:,.2f}".format(debtors) }}</td>
+            <td>
+              {% if i < current_assets_accounts|length %}
+                {% set acc_data = current_assets_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < current_assets_accounts|length %}
+                {% set acc_data = current_assets_accounts[i] %}
+                <span class="{{ 'text-success' if acc_data.balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
           </tr>
-          <tr>
-            <td></td>
-            <td>Other Loans</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td>Stock in Hand</td>
-            <td class="text-end">0.00</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td>Cash in Hand</td>
-            <td class="text-end">25000.00</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td>Bank Balance</td>
-            <td class="text-end">25000.00</td>
-          </tr>
+          {% endfor %}
           
           <!-- Current Liabilities -->
           <tr class="table-secondary">
@@ -169,46 +322,70 @@
             <td colspan="2"><strong>LOANS & ADVANCES</strong></td>
             <td></td>
           </tr>
+          
+          <!-- Collect all accounts for this section -->
+          {% set current_liabilities_accounts = [] %}
+          {% set loans_advances_accounts = [] %}
+          
+          {% for acc_id, acc_data in account_balances.items() %}
+            {% if acc_data.group == 'Sundry Creditors' or 'Creditors' in acc_data.name or acc_data.group == 'Outstanding Expenses' or acc_data.group == 'TDS Payable' or acc_data.group == 'GST Payable' or acc_data.group == 'Other Liabilities' %}
+              {% set _ = current_liabilities_accounts.append(acc_data) %}
+            {% endif %}
+            {% if 'Advances' in acc_data.name and acc_data.group == 'Current Assets' or acc_data.group == 'Prepaid Expenses' %}
+              {% set _ = loans_advances_accounts.append(acc_data) %}
+            {% endif %}
+          {% endfor %}
+          
+          <!-- Add default accounts if none found -->
+          {% if not current_liabilities_accounts %}
+            {% set _ = current_liabilities_accounts.append({'id': 0, 'name': 'Sundry Creditors', 'balance': 0.0}) %}
+            {% set _ = current_liabilities_accounts.append({'id': 0, 'name': 'Outstanding Expenses', 'balance': 0.0}) %}
+            {% set _ = current_liabilities_accounts.append({'id': 0, 'name': 'TDS Payable', 'balance': 0.0}) %}
+            {% set _ = current_liabilities_accounts.append({'id': 0, 'name': 'GST Payable', 'balance': 0.0}) %}
+            {% set _ = current_liabilities_accounts.append({'id': 0, 'name': 'Other Liabilities', 'balance': 0.0}) %}
+          {% endif %}
+          {% if not loans_advances_accounts %}
+            {% set _ = loans_advances_accounts.append({'id': 0, 'name': 'Advances to Suppliers', 'balance': 0.0}) %}
+            {% set _ = loans_advances_accounts.append({'id': 0, 'name': 'Deposits', 'balance': 0.0}) %}
+            {% set _ = loans_advances_accounts.append({'id': 0, 'name': 'Prepaid Expenses', 'balance': 0.0}) %}
+          {% endif %}
+          
+          <!-- Display aligned rows -->
+          {% set max_rows = current_liabilities_accounts|length %}
+          {% if loans_advances_accounts|length > max_rows %}
+            {% set max_rows = loans_advances_accounts|length %}
+          {% endif %}
+          
+          {% for i in range(max_rows) %}
           <tr>
             <td></td>
-            <td><a href="#" class="ledger-link" data-ledger="Sundry Creditors">Sundry Creditors</a></td>
-            <td class="text-end">{{ "{:,.2f}".format(creditors) }}</td>
+            <td>
+              {% if i < current_liabilities_accounts|length %}
+                {% set acc_data = current_liabilities_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < current_liabilities_accounts|length %}
+                {% set acc_data = current_liabilities_accounts[i] %}
+                <span class="{{ 'text-danger' if acc_data.balance > 0 else 'text-success' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
             <td></td>
-            <td>Advances to Suppliers</td>
-            <td class="text-end">0.00</td>
+            <td>
+              {% if i < loans_advances_accounts|length %}
+                {% set acc_data = loans_advances_accounts[i] %}
+                <a href="{{ url_for('reports.account_ledger', account_id=acc_data.id) }}" class="ledger-link" data-ledger="{{ acc_data.name }}">{{ acc_data.name }}</a>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if i < loans_advances_accounts|length %}
+                {% set acc_data = loans_advances_accounts[i] %}
+                <span class="{{ 'text-success' if acc_data.balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(acc_data.balance) }}</span>
+              {% endif %}
+            </td>
           </tr>
-          <tr>
-            <td></td>
-            <td>Outstanding Expenses</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td>Prepaid Expenses</td>
-            <td class="text-end">0.00</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td>TDS Payable</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td>Deposits</td>
-            <td class="text-end">0.00</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td>GST Payable</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td></td>
-            <td>Other Liabilities</td>
-            <td class="text-end">0.00</td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
+          {% endfor %}
           
           <!-- Totals -->
           <tr class="table-dark fw-bold">
@@ -233,6 +410,26 @@
     </div>
     {% endif %}
   </div>
+
+  <!-- Proprietor Stamp -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p class="mb-1"><strong>For {{ company.name if company else 'Company Name' }}</strong></p>
+          <div class="mt-5 pt-3">
+            <p class="mb-0">_______________________</p>
+            <p class="mb-0"><strong>Proprietor / Authorized Signatory</strong></p>
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <p class="mb-1"><strong>Date:</strong></p>
+          <input type="date" id="reportDate" class="form-control form-control-sm d-inline-block w-auto no-print" value="{{ current_date.strftime('%Y-%m-%d') }}" onchange="updatePrintDate(this.value)">
+          <span id="printDate" class="d-none print-only">{{ current_date.strftime('%d-%b-%Y') }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -240,35 +437,35 @@
 .balance-sheet-table {
   border: 3px solid #000 !important;
 }
-.balance-sheet-table thead th {
-  border: 2px solid #000 !important;
-  background-color: #f8f9fa !important;
-  font-weight: bold;
-}
-.balance-sheet-table tbody td {
-  border: 1px solid #666 !important;
+.balance-sheet-table th,
+.balance-sheet-table td {
+  border: 1px solid #000 !important;
 }
 .balance-sheet-table .table-secondary td {
-  border: 2px solid #000 !important;
   background-color: #e9ecef !important;
+  font-weight: bold;
 }
 .balance-sheet-table .table-dark td {
-  border: 3px solid #000 !important;
+  background-color: #343a40 !important;
+  color: white !important;
+  font-weight: bold;
 }
 
-/* Clickable ledger links */
+/* Clickable ledger links - BLACK color */
 .ledger-link {
-  color: #0d6efd;
+  color: #000000 !important;
   text-decoration: none;
   cursor: pointer;
+  font-weight: normal;
 }
 .ledger-link:hover {
   text-decoration: underline;
-  color: #0a58ca;
+  color: #000000 !important;
 }
 
 @media print {
   .no-print { display: none !important; }
+  .print-only { display: inline !important; }
   .card { box-shadow: none !important; border: 3px solid #000 !important; }
   table { page-break-inside: avoid; }
   .balance-sheet-table { border: 3px solid #000 !important; }
@@ -279,17 +476,25 @@
 </style>
 
 <script>
+function updatePrintDate(dateValue) {
+  const date = new Date(dateValue);
+  const formatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  document.getElementById('printDate').textContent = formatted;
+}
+
 // Handle ledger link clicks
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.ledger-link').forEach(link => {
     link.addEventListener('click', function(e) {
       e.preventDefault();
       const ledgerName = this.dataset.ledger;
-      alert('Opening ledger: ' + ledgerName + '\n\nThis will show all vouchers for this account.');
-      // TODO: Implement ledger view with vouchers
-      // window.location.href = '/reports/ledger?account=' + encodeURIComponent(ledgerName);
+      const accountId = this.href.match(/account_id=(\d+)/)[1];
+      
+      // Open ledger in new tab
+      window.open(this.href, '_blank');
     });
   });
 });
 </script>
+
 {% endblock %}

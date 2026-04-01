@@ -34,7 +34,11 @@ def emergency_database_fix():
     
     # Only run on PostgreSQL, not SQLite
     if not (db_url.startswith('postgresql://') or db_url.startswith('postgres://')):
-        print("🔄 SQLite detected - skipping emergency fix")
+        print("🔄 SQLite detected - running SQLite table creation")
+        # For SQLite, we need to create the tables differently
+        create_sqlite_tables()
+        # Add missing fin_year column if table exists but column doesn't
+        add_missing_sqlite_columns()
         return True
     
     try:
@@ -184,7 +188,132 @@ def emergency_database_fix():
         print(f"🚨 Emergency fix failed: {e}")
         return False
 
-# Add database connection reset function
+def create_sqlite_tables():
+    """Create Fixed Assets and Depreciation Blocks tables for SQLite"""
+    try:
+        # Import here to avoid circular imports
+        from sqlalchemy import text, create_engine
+        from datetime import datetime
+        
+        db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'erp.db')}")
+        engine = create_engine(db_url)
+        
+        # Create tables using raw SQL for better compatibility
+        with engine.connect() as conn:
+            # Create fixed_assets table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS fixed_assets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_id INTEGER NOT NULL,
+                    fin_year VARCHAR(10) NOT NULL,
+                    asset_name VARCHAR(200) NOT NULL,
+                    asset_category VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    opening_wdv FLOAT DEFAULT 0.0,
+                    purchase_date DATE,
+                    purchase_cost FLOAT DEFAULT 0.0,
+                    depreciation_method VARCHAR(20) DEFAULT 'WDV',
+                    depreciation_rate FLOAT DEFAULT 15.0,
+                    depreciation_block VARCHAR(50) DEFAULT 'General',
+                    additions FLOAT DEFAULT 0.0,
+                    sales FLOAT DEFAULT 0.0,
+                    annual_depreciation FLOAT DEFAULT 0.0,
+                    closing_wdv FLOAT DEFAULT 0.0,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            # Create depreciation_blocks table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS depreciation_blocks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_id INTEGER NOT NULL,
+                    block_name VARCHAR(50) NOT NULL,
+                    description TEXT,
+                    default_rate FLOAT NOT NULL,
+                    it_act_rate FLOAT,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            # Verify tables were created
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fixed_assets', 'depreciation_blocks')"))
+            tables = result.fetchall()
+            
+        print(f"✅ Fixed Assets tables created for SQLite: {[table[0] for table in tables]}")
+        return True
+        
+    except Exception as e:
+        print(f"🚨 Failed to create SQLite tables: {e}")
+        return False
+
+def add_missing_sqlite_columns():
+    """Add missing columns to existing SQLite tables"""
+    try:
+        # Import here to avoid circular imports
+        from sqlalchemy import text, create_engine
+        
+        db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'erp.db')}")
+        engine = create_engine(db_url)
+        
+        with engine.connect() as conn:
+            # Check if fixed_assets table exists
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='fixed_assets'"))
+            if result.fetchall():
+                print("🔍 Checking fixed_assets table schema...")
+                columns = conn.execute(text("PRAGMA table_info(fixed_assets)")).fetchall()
+                column_names = [col[1] for col in columns]
+                print(f"📋 Current columns: {column_names}")
+                
+                if 'fin_year' not in column_names:
+                    print("🔧 Adding missing fin_year column to fixed_assets table")
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN fin_year VARCHAR(10) NOT NULL DEFAULT '2025-26'"))
+                    print("✅ Added fin_year column to fixed_assets table")
+                else:
+                    print("✅ fin_year column already exists")
+                
+                # Check if other required columns exist
+                if 'asset_name' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN asset_name VARCHAR(200) NOT NULL DEFAULT ''"))
+                if 'asset_category' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN asset_category VARCHAR(100) NOT NULL DEFAULT 'General'"))
+                if 'opening_wdv' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN opening_wdv FLOAT DEFAULT 0.0"))
+                if 'depreciation_rate' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN depreciation_rate FLOAT DEFAULT 15.0"))
+                if 'annual_depreciation' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN annual_depreciation FLOAT DEFAULT 0.0"))
+                if 'closing_wdv' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN closing_wdv FLOAT DEFAULT 0.0"))
+                if 'is_active' not in column_names:
+                    conn.execute(text("ALTER TABLE fixed_assets ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+                
+                print("✅ Fixed Assets table updated with missing columns")
+            else:
+                print("ℹ️ fixed_assets table doesn't exist yet")
+            
+            # Check depreciation_blocks table
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='depreciation_blocks'"))
+            if result.fetchall():
+                columns = conn.execute(text("PRAGMA table_info(depreciation_blocks)")).fetchall()
+                column_names = [col[1] for col in columns]
+                
+                if 'block_name' not in column_names:
+                    conn.execute(text("ALTER TABLE depreciation_blocks ADD COLUMN block_name VARCHAR(50) NOT NULL DEFAULT 'General'"))
+                if 'default_rate' not in column_names:
+                    conn.execute(text("ALTER TABLE depreciation_blocks ADD COLUMN default_rate FLOAT NOT NULL DEFAULT 15.0"))
+                
+                print("✅ Depreciation Blocks table updated with missing columns")
+        
+        return True
+        
+    except Exception as e:
+        print(f"🚨 Failed to add missing columns: {e}")
+        return False
+
 def reset_database_connection():
     """Reset database connection and clear any failed transactions"""
     try:

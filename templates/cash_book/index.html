@@ -1,72 +1,336 @@
 {% extends "base.html" %}
 {% block title %}Cash Book{% endblock %}
+
+{% block head %}
+<style>
+  @media print {
+    body {
+      font-family: 'Arial', sans-serif;
+      font-size: 10pt;
+      line-height: 1.2;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .no-print {
+      display: none !important;
+    }
+    
+    .print-only {
+      display: block !important;
+    }
+    
+    .card {
+      border: 1px solid #000 !important;
+      box-shadow: none !important;
+      margin-bottom: 10px !important;
+    }
+    
+    .card-header {
+      background: white !important;
+      color: black !important;
+      border-bottom: 1px solid #000 !important;
+      text-align: center !important;
+      font-weight: bold !important;
+    }
+    
+    .table {
+      border-collapse: collapse !important;
+      width: 100% !important;
+    }
+    
+    .table th,
+    .table td {
+      border: 1px solid #000 !important;
+      padding: 4px !important;
+      font-size: 9pt !important;
+    }
+    
+    .table th {
+      background: white !important;
+      color: black !important;
+      font-weight: bold !important;
+      text-align: center !important;
+    }
+    
+    .table td {
+      vertical-align: top !important;
+    }
+    
+    .text-right {
+      text-align: right !important;
+    }
+    
+    .text-center {
+      text-align: center !important;
+    }
+    
+    .fw-bold {
+      font-weight: bold !important;
+    }
+    
+    .mb-0 {
+      margin-bottom: 0 !important;
+    }
+    
+    .mt-3 {
+      margin-top: 15px !important;
+    }
+    
+    .mb-3 {
+      margin-bottom: 15px !important;
+    }
+    
+    .btn-group {
+      display: none !important;
+    }
+    
+    .d-flex {
+      display: block !important;
+    }
+    
+    .container-fluid {
+      max-width: 100% !important;
+      padding: 0 !important;
+    }
+    
+    /* Hide navigation and sidebars */
+    .sidebar,
+    .navbar,
+    .footer,
+    .alert,
+    .modal,
+    .dropdown {
+      display: none !important;
+    }
+    
+    /* Professional cash book styling */
+    .cash-book-header {
+      text-align: center;
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+    
+    .cash-book-summary {
+      margin-bottom: 20px;
+    }
+    
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    
+    .summary-label {
+      font-weight: bold;
+    }
+    
+    .summary-value {
+      text-align: right;
+      font-weight: bold;
+    }
+    
+    .opening-balance-row {
+      background: #f0f0f0;
+      font-weight: bold;
+    }
+    
+    .totals-row {
+      background: #f0f0f0;
+      font-weight: bold;
+      border-top: 2px solid #000;
+    }
+    
+    .balance-column {
+      text-align: right;
+      font-weight: bold;
+    }
+    
+    @page {
+      margin: 1cm;
+      size: A4;
+    }
+    
+    @page :header {
+      display: none;
+    }
+    
+    @page :footer {
+      display: none;
+    }
+  }
+  
+  .print-only {
+    display: none;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold">📒 Cash Book</h4>
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('cash_book.quick_entry') }}" class="btn btn-success">
-      <i class="bi bi-lightning"></i> Quick Entry
-    </a>
-    <a href="{{ url_for('cash_book.add') }}" class="btn btn-primary">
-      <i class="bi bi-plus-circle"></i> Add Entry
-    </a>
+<div class="no-print">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold">📒 Cash Book</h4>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('cash_book.quick_entry') }}" class="btn btn-success">
+        <i class="bi bi-lightning"></i> Quick Entry
+      </a>
+      <a href="{{ url_for('cash_book.add') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Entry
+      </a>
+    </div>
   </div>
 </div>
 
-<!-- Filters -->
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="GET" class="row g-3">
-      <div class="col-md-3">
-        <label class="form-label">From Date</label>
-        <input type="date" name="from_date" class="form-control" value="{{ from_date or '' }}">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">To Date</label>
-        <input type="date" name="to_date" class="form-control" value="{{ to_date or '' }}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Narration Filter</label>
-        <input type="text" name="narration" class="form-control" placeholder="Search narration..." value="{{ narration_filter or '' }}">
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">&nbsp;</label>
+<!-- Professional Print Header -->
+<div class="print-only cash-book-header">
+  CASH BOOK STATEMENT
+</div>
+
+<div class="no-print">
+  <!-- Filters with Search -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="GET" class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">From Date</label>
+          <input type="date" name="from_date" class="form-control" value="{{ from_date or '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">To Date</label>
+          <input type="date" name="to_date" class="form-control" value="{{ to_date or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Search Transactions</label>
+          <input type="text" name="search" class="form-control" placeholder="Search voucher, party, narration..." value="{{ search_term or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Narration Filter</label>
+          <input type="text" name="narration" class="form-control" placeholder="Search narration..." value="{{ narration_filter or '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">&nbsp;</label>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary">Filter</button>
+            <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Export Options -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0">📊 Export Options</h5>
+          <small class="text-muted">Download cash book statement in different formats</small>
+        </div>
         <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-outline-primary">Filter</button>
-          <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Reset</a>
+          <button onclick="window.print()" class="btn btn-outline-primary">
+            <i class="bi bi-printer"></i> Print
+          </button>
+          <a href="{{ url_for('cash_book.export_cash_book', export='pdf') }}{{ '?from_date=' + from_date if from_date else '' }}{{ '&to_date=' + to_date if to_date else '' }}{{ '&narration=' + narration_filter if narration_filter else '' }}{{ '&search=' + search_term if search_term else '' }}" class="btn btn-outline-danger">
+            <i class="bi bi-file-pdf"></i> PDF
+          </a>
+          <a href="{{ url_for('cash_book.export_cash_book', export='excel') }}{{ '?from_date=' + from_date if from_date else '' }}{{ '&to_date=' + to_date if to_date else '' }}{{ '&narration=' + narration_filter if narration_filter else '' }}{{ '&search=' + search_term if search_term else '' }}" class="btn btn-outline-success">
+            <i class="bi bi-file-excel"></i> Excel
+          </a>
         </div>
       </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<!-- Summary Cards -->
+<!-- Simple Flash Cards in Row -->
 <div class="row mb-3">
-  <div class="col-md-4">
-    <div class="card border-success">
-      <div class="card-body">
-        <h6 class="card-title text-success">Total Receipts</h6>
-        <h3 class="mb-0">₹{{ "{:,.2f}".format(total_receipts) }}</h3>
+  <div class="col-md-2">
+    <div class="card bg-light text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1 text-info">Opening</h6>
+        <h5 class="mb-0">₹{{ "{:,.2f}".format(opening_balance) }}</h5>
+        <small>{{ from_date or '01-04-26' }}</small>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card border-danger">
-      <div class="card-body">
-        <h6 class="card-title text-danger">Total Payments</h6>
-        <h3 class="mb-0">₹{{ "{:,.2f}".format(total_payments) }}</h3>
+  <div class="col-md-2">
+    <div class="card bg-light text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1 text-success">Receipts</h6>
+        <h5 class="mb-0">₹{{ "{:,.2f}".format(total_receipts) }}</h5>
+        <small>Total</small>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card {{ 'border-success' if balance >= 0 else 'border-danger' }}">
-      <div class="card-body">
-        <h6 class="card-title {{ 'text-success' if balance >= 0 else 'text-danger' }}">Balance</h6>
-        <h3 class="mb-0">₹{{ "{:,.2f}".format(balance) }}</h3>
+  <div class="col-md-2">
+    <div class="card bg-light text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1 text-danger">Payments</h6>
+        <h5 class="mb-0">₹{{ "{:,.2f}".format(total_payments) }}</h5>
+        <small>Total</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card bg-light text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1 {{ 'text-success' if cash_negative == 0 else 'text-danger' }}">Net Flow</h6>
+        <h5 class="mb-0 {{ 'text-success' if cash_negative == 0 else 'text-danger' }}">
+          ₹{{ "{:,.2f}".format(total_receipts - total_payments) }}
+        </h5>
+        <small>{{ 'Positive' if cash_negative == 0 else 'Negative' }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card bg-light text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1 {{ 'text-success' if balance >= 0 else 'text-danger' }}">Balance</h6>
+        <h5 class="mb-0 {{ 'text-success' if balance >= 0 else 'text-danger' }}">
+          ₹{{ "{:,.2f}".format(balance) }}
+        </h5>
+        <small>{{ 'Positive' if balance >= 0 else 'Negative' }}</small>
+      </div>
+    </div>
+  </div>
+  {% if cash_negative > 0 %}
+  <div class="col-md-2">
+    <div class="card bg-danger text-white text-center">
+      <div class="card-body p-2">
+        <h6 class="mb-1">⚠️ Cash Neg</h6>
+        <h5 class="mb-0">₹{{ "{:,.2f}".format(cash_negative) }}</h5>
+        <small>Outflow</small>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Additional Cash Analysis Flash Cards -->
+{% if max_negative_cash > 0 %}
+<div class="row mb-3">
+  <div class="col-md-6">
+    <div class="card bg-danger text-white text-center">
+      <div class="card-body p-3">
+        <h5 class="mb-0">🚨 Maximum Negative Cash</h5>
+        <div class="display-6">₹{{ "{:,.2f}".format(max_negative_cash) }}</div>
+        <small>Highest negative balance during the period</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card bg-warning text-dark text-center">
+      <div class="card-body p-3">
+        <h5 class="mb-0">📅 Cash Negative Started</h5>
+        <div class="display-6">{{ cash_negative_start_date.strftime('%d-%m-%Y') if cash_negative_start_date else 'N/A' }}</div>
+        <small>Date when cash first went negative</small>
       </div>
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- Transactions Table -->
 <div class="card">
@@ -75,43 +339,73 @@
       <table class="table table-striped">
         <thead>
           <tr>
-            <th>Voucher No</th>
             <th>Date</th>
+            <th>Voucher No</th>
             <th>Type</th>
             <th>Party Name</th>
             <th>Narration</th>
             <th>Payment Mode</th>
-            <th>Amount</th>
+            <th class="text-end">Cash Received</th>
+            <th class="text-end">Cash Paid</th>
+            <th class="text-end">Balance</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {% for entry in transactions %}
-          <tr>
-            <td>{{ entry.voucher_no }}</td>
+          <!-- Opening Balance -->
+          <tr class="table-secondary">
+            <td>{{ from_date or '01-04-2026' }}</td>
+            <td></td>
+            <td>Opening Balance</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="text-end"></td>
+            <td class="text-end"></td>
+            <td class="text-end fw-bold">₹{{ "{:,.2f}".format(opening_balance) }}</td>
+            <td></td>
+          </tr>
+          
+          <!-- Transactions -->
+          {% for item in entries_with_balances %}
+          {% set entry = item.entry %}
+          {% set running_balance = item.cumulative_balance %}
+          {% set cash_received = item.cash_received %}
+          {% set cash_paid = item.cash_paid %}
+          
+          <tr class="{{ 'table-danger' if running_balance < 0 else '' }}">
             <td>{{ entry.transaction_date.strftime('%d-%m-%Y') }}</td>
-            <td>
-              <span class="badge {{ 'bg-success' if entry.transaction_type == 'Receipt' else 'bg-danger' }}">
-                {{ entry.transaction_type }}
-              </span>
-            </td>
-            <td>{{ entry.party_name or '-' }}</td>
-            <td>{{ entry.narration[:50] }}{% if entry.narration|length > 50 %}...{% endif %}</td>
+            <td>{{ entry.voucher_no }}</td>
+            <td>{{ entry.transaction_type }}</td>
+            <td>{{ entry.party_name or '' }}</td>
+            <td>{{ entry.narration }}</td>
             <td>{{ entry.payment_mode }}</td>
-            <td class="{{ 'text-success' if entry.transaction_type == 'Receipt' else 'text-danger' }}">
-              ₹{{ "{:,.2f}".format(entry.amount) }}
-            </td>
-            <td>
-              <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('cash_book.view', entry_id=entry.id) }}" class="btn btn-outline-primary" title="View">
+            <td class="text-end {% if cash_received > 0 %}text-success fw-bold{% endif %}">
+            {% if cash_received > 0 %}₹{{ "{:,.2f}".format(cash_received) }}{% endif %}
+          </td>
+            <td class="text-end {% if cash_paid > 0 %}text-danger fw-bold{% endif %} pe-3">
+            {% if cash_paid > 0 %}₹{{ "{:,.2f}".format(cash_paid) }}{% endif %}
+          </td>
+            <td class="text-end fw-bold {{ 'text-danger' if running_balance < 0 else 'text-success' }} pe-4">₹{{ "{:,.2f}".format(running_balance) }}</td>
+            <td class="text-end ps-2">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{{ url_for('cash_book.view', entry_id=entry.id) }}" class="btn btn-primary btn-sm" title="View" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a href="{{ url_for('cash_book.edit', entry_id=entry.id) }}" class="btn btn-outline-warning" title="Edit">
+                <a href="{{ url_for('cash_book.edit', entry_id=entry.id) }}" class="btn btn-warning btn-sm" title="Edit" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
                   <i class="bi bi-pencil"></i>
                 </a>
+                {% if entry.id in client_mobiles %}
+                <a href="{{ url_for('cash_book.share_entry', entry_id=entry.id) }}" class="btn btn-success btn-sm" title="Share on WhatsApp" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
+                  <i class="bi bi-whatsapp"></i>
+                </a>
+                <a href="{{ url_for('cash_book.share_entry_pdf', entry_id=entry.id) }}" class="btn btn-info btn-sm" title="Share PDF" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
+                  <i class="bi bi-file-pdf"></i>
+                </a>
+                {% endif %}
                 <form method="POST" action="{{ url_for('cash_book.delete', entry_id=entry.id) }}" class="d-inline" 
                       onsubmit="return confirm('Are you sure you want to delete this entry?')">
-                  <button type="submit" class="btn btn-outline-danger" title="Delete">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Delete" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
                     <i class="bi bi-trash"></i>
                   </button>
                 </form>
@@ -120,12 +414,36 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted">No cash book entries found</td>
+            <td colspan="10" class="text-center text-muted">No cash book entries found</td>
           </tr>
           {% endfor %}
+          
+          <!-- Totals -->
+          {% set total_received = entries|selectattr('transaction_type', 'equalto', 'Receipt')|map(attribute='amount')|sum %}
+          {% set total_paid = entries|selectattr('transaction_type', 'equalto', 'Payment')|map(attribute='amount')|sum %}
+          
+          <tr class="table-info fw-bold">
+            <td colspan="6">Totals</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(total_received) }}</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(total_paid) }}</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(balance) }}</td>
+            <td></td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<script>
+// Add print-specific JavaScript if needed
+window.addEventListener('beforeprint', function() {
+  document.body.classList.add('printing');
+});
+
+window.addEventListener('afterprint', function() {
+  document.body.classList.remove('printing');
+});
+</script>
+
 {% endblock %}

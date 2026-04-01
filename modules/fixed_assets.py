@@ -1,61 +1,52 @@
 """
 Fixed Assets Schedule Module
-Manage fixed assets with depreciation calculation and posting
+Manage fixed assets with custom depreciation calculation and posting
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_login import login_required
 from extensions import db
-from models import Account, JournalHeader, JournalLine
+from models import Account, JournalHeader, JournalLine, FixedAsset, DepreciationBlock
 from datetime import datetime, date
 from decimal import Decimal
 
 fixed_assets_bp = Blueprint("fixed_assets", __name__)
 
-@fixed_assets_bp.route("/fixed-assets/schedule")
-@login_required
-def schedule():
-    """Fixed Assets Schedule with depreciation"""
-    cid = session.get("company_id")
-    fy = session.get("fin_year")
-    
-    # Get all fixed asset accounts (using group_name since Account model doesn't have groups)
-    assets = Account.query.filter_by(
-        company_id=cid, group_name="Fixed Assets", is_active=True
+def get_fixed_assets_schedule(company_id, fin_year):
+    """Get fixed assets schedule data for Balance Sheet"""
+    # Get all fixed assets for the company (temporarily removing fin_year filter due to schema issue)
+    assets = FixedAsset.query.filter_by(
+        company_id=company_id, is_active=True
     ).all()
     
     if not assets:
-        flash("No fixed assets found. Please add fixed assets first.", "info")
-        # Return empty schedule
-        assets = []
+        return {
+            'assets': [],
+            'total_opening_wdv': 0.0,
+            'total_additions': 0.0,
+            'total_sales': 0.0,
+            'total_depreciation': 0.0,
+            'total_closing_wdv': 0.0
+        }
     
-    # Calculate depreciation for each asset as per Income Tax Act
+    # Calculate depreciation for each asset
     asset_schedule = []
     for asset in assets:
-        # Get asset details
-        opening_wdv = float(asset.opening_dr or 0)  # Written Down Value at start of year
-        additions = 0  # New additions during the year
-        sales = 0  # Sales/disposals during the year
-        
-        # Determine depreciation rate based on asset category (as per IT Act)
-        depreciation_rate = get_it_act_depreciation_rate(asset.name)
-        
-        # Calculate depreciation as per IT Act (on WDV basis)
-        # For new assets, half rate if purchased after 180 days from year end
-        depreciation_base = opening_wdv + additions - sales
-        annual_depreciation = depreciation_base * (depreciation_rate / 100)
-        closing_wdv = depreciation_base - annual_depreciation
+        # Calculate depreciation
+        asset.calculate_depreciation()
+        db.session.commit()
         
         asset_schedule.append({
             'id': asset.id,
-            'name': asset.name,
-            'category': get_asset_category(asset.name),
-            'opening_wdv': opening_wdv,
-            'additions': additions,
-            'sales': sales,
-            'depreciation_rate': depreciation_rate,
-            'annual_depreciation': annual_depreciation,
-            'closing_wdv': closing_wdv
+            'name': asset.asset_name,
+            'category': asset.asset_category,
+            'depreciation_block': asset.depreciation_block,
+            'depreciation_rate': asset.depreciation_rate,
+            'opening_wdv': asset.opening_wdv,
+            'additions': asset.additions,
+            'sales': asset.sales,
+            'annual_depreciation': asset.annual_depreciation,
+            'closing_wdv': asset.closing_wdv
         })
     
     total_opening_wdv = sum(a['opening_wdv'] for a in asset_schedule)
@@ -64,14 +55,219 @@ def schedule():
     total_depreciation = sum(a['annual_depreciation'] for a in asset_schedule)
     total_closing_wdv = sum(a['closing_wdv'] for a in asset_schedule)
     
+    return {
+        'assets': asset_schedule,
+        'total_opening_wdv': total_opening_wdv,
+        'total_additions': total_additions,
+        'total_sales': total_sales,
+        'total_depreciation': total_depreciation,
+        'total_closing_wdv': total_closing_wdv
+    }
+
+@fixed_assets_bp.route("/fixed-assets/schedule")
+@login_required
+def schedule():
+    """Fixed Assets Schedule with depreciation"""
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    # Get fixed assets from database (temporarily removing fin_year filter due to schema issue)
+    assets = FixedAsset.query.filter_by(
+        company_id=cid, is_active=True
+    ).all()
+    
+    # Get depreciation blocks
+    depreciation_blocks = DepreciationBlock.query.filter_by(
+        company_id=cid, is_active=True
+    ).all()
+    
+    # Calculate depreciation for each asset
+    for asset in assets:
+        asset.calculate_depreciation()
+    
+    total_opening_wdv = sum(asset.opening_wdv for asset in assets)
+    total_additions = sum(asset.additions for asset in assets)
+    total_sales = sum(asset.sales for asset in assets)
+    total_depreciation = sum(asset.annual_depreciation for asset in assets)
+    total_closing_wdv = sum(asset.closing_wdv for asset in assets)
+    
     return render_template("fixed_assets/schedule_it_act.html",
-                         assets=asset_schedule,
+                         assets=assets,
+                         depreciation_blocks=depreciation_blocks,
                          total_opening_wdv=total_opening_wdv,
                          total_additions=total_additions,
                          total_sales=total_sales,
                          total_depreciation=total_depreciation,
                          total_closing_wdv=total_closing_wdv,
                          fy=fy)
+
+@fixed_assets_bp.route("/fixed-assets/add", methods=["GET", "POST"])
+@login_required
+def add_asset():
+    """Add new fixed asset"""
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    if request.method == "POST":
+        try:
+            asset = FixedAsset(
+                company_id=cid,
+                # fin_year=fy,  # Temporarily commented out due to schema issue
+                asset_name=request.form.get("asset_name"),
+                asset_category=request.form.get("asset_category"),
+                description=request.form.get("description"),
+                opening_wdv=float(request.form.get("opening_wdv", 0)),
+                purchase_date=datetime.strptime(request.form.get("purchase_date"), "%Y-%m-%d").date() if request.form.get("purchase_date") else None,
+                purchase_cost=float(request.form.get("purchase_cost", 0)),
+                depreciation_method=request.form.get("depreciation_method", "WDV"),
+                depreciation_rate=float(request.form.get("depreciation_rate", 15.0)),
+                depreciation_block=request.form.get("depreciation_block", "General"),
+                is_active=True
+            )
+            
+            # Calculate depreciation
+            asset.calculate_depreciation()
+            
+            db.session.add(asset)
+            db.session.commit()
+            
+            flash("Fixed asset added successfully!", "success")
+            return redirect(url_for("fixed_assets.schedule"))
+            
+        except Exception as e:
+            flash(f"Error adding asset: {str(e)}", "error")
+            return redirect(url_for("fixed_assets.add"))
+    
+    # Get depreciation blocks for dropdown
+    depreciation_blocks = DepreciationBlock.query.filter_by(company_id=cid, is_active=True).all()
+    
+    return render_template("fixed_assets/add_asset.html",
+                         depreciation_blocks=depreciation_blocks,
+                         fy=fy)
+
+@fixed_assets_bp.route("/fixed-assets/edit/<int:asset_id>", methods=["GET", "POST"])
+@login_required
+def edit_asset(asset_id):
+    """Edit existing fixed asset"""
+    cid = session.get("company_id")
+    
+    asset = FixedAsset.query.get_or_404(asset_id)
+    
+    if asset.company_id != cid:
+        flash("Access denied!", "error")
+        return redirect(url_for("fixed_assets.schedule"))
+    
+    if request.method == "POST":
+        try:
+            asset.asset_name = request.form.get("asset_name")
+            asset.asset_category = request.form.get("asset_category")
+            asset.description = request.form.get("description")
+            asset.opening_wdv = float(request.form.get("opening_wdv", 0))
+            asset.purchase_cost = float(request.form.get("purchase_cost", 0))
+            asset.depreciation_method = request.form.get("depreciation_method", "WDV")
+            asset.depreciation_rate = float(request.form.get("depreciation_rate", 15.0))
+            asset.depreciation_block = request.form.get("depreciation_block", "General")
+            
+            # Recalculate depreciation
+            asset.calculate_depreciation()
+            
+            db.session.commit()
+            
+            flash("Fixed asset updated successfully!", "success")
+            return redirect(url_for("fixed_assets.schedule"))
+            
+        except Exception as e:
+            flash(f"Error updating asset: {str(e)}", "error")
+            return redirect(url_for("fixed_assets.edit", asset_id=asset_id))
+    
+    # Get depreciation blocks for dropdown
+    depreciation_blocks = DepreciationBlock.query.filter_by(company_id=cid, is_active=True).all()
+    
+    return render_template("fixed_assets/edit_asset.html",
+                         asset=asset,
+                         depreciation_blocks=depreciation_blocks)
+
+@fixed_assets_bp.route("/fixed-assets/delete/<int:asset_id>", methods=["POST"])
+@login_required
+def delete_asset(asset_id):
+    """Delete fixed asset"""
+    cid = session.get("company_id")
+    
+    asset = FixedAsset.query.get_or_404(asset_id)
+    
+    if asset.company_id != cid:
+        flash("Access denied!", "error")
+        return redirect(url_for("fixed_assets.schedule"))
+    
+    try:
+        asset.is_active = False
+        db.session.commit()
+        flash("Fixed asset deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error deleting asset: {str(e)}", "error")
+    
+    return redirect(url_for("fixed_assets.schedule"))
+
+@fixed_assets_bp.route("/depreciation-blocks", methods=["GET", "POST"])
+@login_required
+def depreciation_blocks():
+    """Manage depreciation blocks"""
+    cid = session.get("company_id")
+    
+    if request.method == "POST":
+        try:
+            block = DepreciationBlock(
+                company_id=cid,
+                block_name=request.form.get("block_name"),
+                description=request.form.get("description"),
+                default_rate=float(request.form.get("default_rate", 15.0)),
+                it_act_rate=float(request.form.get("it_act_rate")) if request.form.get("it_act_rate") else None,
+                is_active=True
+            )
+            
+            db.session.add(block)
+            db.session.commit()
+            
+            flash("Depreciation block added successfully!", "success")
+            return redirect(url_for("fixed_assets.depreciation_blocks"))
+            
+        except Exception as e:
+            flash(f"Error adding block: {str(e)}", "error")
+            return redirect(url_for("fixed_assets.depreciation_blocks"))
+    
+    blocks = DepreciationBlock.query.filter_by(company_id=cid, is_active=True).all()
+    
+    return render_template("fixed_assets/depreciation_blocks.html", blocks=blocks)
+
+@fixed_assets_bp.route("/depreciation-blocks/edit/<int:block_id>", methods=["GET", "POST"])
+@login_required
+def edit_depreciation_block(block_id):
+    """Edit depreciation block"""
+    cid = session.get("company_id")
+    
+    block = DepreciationBlock.query.get_or_404(block_id)
+    
+    if block.company_id != cid:
+        flash("Access denied!", "error")
+        return redirect(url_for("fixed_assets.depreciation_blocks"))
+    
+    if request.method == "POST":
+        try:
+            block.block_name = request.form.get("block_name")
+            block.description = request.form.get("description")
+            block.default_rate = float(request.form.get("default_rate", 15.0))
+            block.it_act_rate = float(request.form.get("it_act_rate")) if request.form.get("it_act_rate") else None
+            
+            db.session.commit()
+            
+            flash("Depreciation block updated successfully!", "success")
+            return redirect(url_for("fixed_assets.depreciation_blocks"))
+            
+        except Exception as e:
+            flash(f"Error updating block: {str(e)}", "error")
+            return redirect(url_for("fixed_assets.edit_depreciation_block", block_id=block_id))
+    
+    return render_template("fixed_assets/edit_depreciation_block.html", block=block)
 
 def get_it_act_depreciation_rate(asset_name):
     """Get depreciation rate as per Income Tax Act based on asset name"""
@@ -188,33 +384,3 @@ def post_depreciation():
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)})
-
-@fixed_assets_bp.route("/fixed-assets/add", methods=["GET", "POST"])
-@login_required
-def add_asset():
-    """Add new fixed asset"""
-    cid = session.get("company_id")
-    
-    if request.method == "POST":
-        try:
-            # Create new asset account (using group_name)
-            asset = Account(
-                company_id=cid,
-                name=request.form.get("asset_name"),
-                group_name="Fixed Assets",
-                account_type="Asset",
-                is_active=True,
-                opening_dr=float(request.form.get("opening_value", 0)),
-                opening_cr=0
-            )
-            db.session.add(asset)
-            db.session.commit()
-            
-            flash(f"✅ Fixed asset '{asset.name}' added successfully!", "success")
-            return redirect(url_for('fixed_assets.schedule'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f"❌ Error adding asset: {str(e)}", "error")
-    
-    return render_template("fixed_assets/add.html")

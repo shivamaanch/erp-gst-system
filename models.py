@@ -4,6 +4,100 @@ from flask_login import UserMixin
 from datetime import datetime, date
 from sqlalchemy import Numeric
 
+class FixedAsset(db.Model):
+    """Fixed Assets Model with custom depreciation rates and calculations"""
+    __tablename__ = 'fixed_assets'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
+    fin_year = db.Column(db.String(10), nullable=True)  # e.g., '2025-26' - temporarily nullable due to schema issue
+    
+    # Asset Details
+    asset_name = db.Column(db.String(200), nullable=False)
+    asset_category = db.Column(db.String(100), nullable=False)  # Building, Plant, Furniture, etc.
+    description = db.Column(db.Text)
+    
+    # Financial Details
+    opening_wdv = db.Column(db.Float, default=0.0)  # Opening Written Down Value
+    purchase_date = db.Column(db.Date)
+    purchase_cost = db.Column(db.Float, default=0.0)
+    
+    # Depreciation Settings
+    depreciation_method = db.Column(db.String(20), default='WDV')  # WDV or SLM
+    depreciation_rate = db.Column(db.Float, default=15.0)  # Custom rate %
+    depreciation_block = db.Column(db.String(50), default='General')  # Block-wise classification
+    
+    # Current Year Transactions
+    additions = db.Column(db.Float, default=0.0)
+    sales = db.Column(db.Float, default=0.0)
+    
+    # Calculated Fields
+    annual_depreciation = db.Column(db.Float, default=0.0)
+    closing_wdv = db.Column(db.Float, default=0.0)
+    
+    # Metadata
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def calculate_depreciation(self):
+        """Calculate depreciation based on method and rate"""
+        if self.depreciation_method == 'WDV':
+            # Written Down Value method
+            depreciation_base = self.opening_wdv + self.additions - self.sales
+            self.annual_depreciation = depreciation_base * (self.depreciation_rate / 100)
+        else:  # SLM - Straight Line Method
+            depreciation_base = self.purchase_cost + self.additions - self.sales
+            self.annual_depreciation = depreciation_base * (self.depreciation_rate / 100)
+        
+        self.closing_wdv = depreciation_base - self.annual_depreciation
+        return self.annual_depreciation
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON responses"""
+        return {
+            'id': self.id,
+            'asset_name': self.asset_name,
+            'asset_category': self.asset_category,
+            'description': self.description,
+            'opening_wdv': self.opening_wdv,
+            'purchase_date': self.purchase_date.isoformat() if self.purchase_date else None,
+            'purchase_cost': self.purchase_cost,
+            'depreciation_method': self.depreciation_method,
+            'depreciation_rate': self.depreciation_rate,
+            'depreciation_block': self.depreciation_block,
+            'additions': self.additions,
+            'sales': self.sales,
+            'annual_depreciation': self.annual_depreciation,
+            'closing_wdv': self.closing_wdv,
+            'is_active': self.is_active
+        }
+
+class DepreciationBlock(db.Model):
+    """Depreciation blocks with predefined rates"""
+    __tablename__ = 'depreciation_blocks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
+    
+    block_name = db.Column(db.String(50), nullable=False, unique=True)  # e.g., 'General', 'Building', 'Plant'
+    description = db.Column(db.Text)
+    default_rate = db.Column(db.Float, nullable=False)  # Default rate for this block
+    it_act_rate = db.Column(db.Float)  # IT Act rate if different
+    
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'block_name': self.block_name,
+            'description': self.description,
+            'default_rate': self.default_rate,
+            'it_act_rate': self.it_act_rate,
+            'is_active': self.is_active
+        }
+
 class Company(db.Model):
     """Company model for multi-company support"""
     
@@ -279,18 +373,6 @@ class ComplianceAlert(db.Model):
     priority = db.Column(db.String(10), default="Medium")
     status = db.Column(db.String(20), default="pending")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class FixedAsset(db.Model):
-    __tablename__ = "fixed_assets"
-    id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey("companies.id"))
-    asset_name = db.Column(db.String(200))
-    asset_category = db.Column(db.String(100))
-    purchase_date = db.Column(db.Date)
-    purchase_amount = db.Column(Numeric(18,2), default=0)
-    dep_rate = db.Column(Numeric(5,2), default=15)
-    current_value = db.Column(Numeric(18,2), default=0)
-    is_disposed = db.Column(db.Boolean, default=False)
 
 class AuditTrail(db.Model):
     __tablename__ = "audit_trails"

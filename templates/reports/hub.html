@@ -52,7 +52,6 @@
         <h5 class="mb-0">Profitability</h5>
       </div>
       <div class="card-body text-center">
-        {% set net_profit = total_sales - total_purchases %}
         <div class="display-4 text-{{ 'success' if net_profit>=0 else 'danger' }}">
           ₹{{ "{:,.2f}".format(net_profit) }}
         </div>
@@ -67,9 +66,9 @@
       </div>
       <div class="card-body text-center">
         <div class="display-4">
-          ₹{{ "{:,.2f}".format(total_sales - total_purchases + 100000) }}
+          ₹{{ "{:,.2f}".format(financial_position) }}
         </div>
-        <p class="text-muted">Estimated Capital</p>
+        <p class="text-muted">Total Assets</p>
       </div>
     </div>
   </div>

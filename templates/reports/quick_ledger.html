@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Quick Ledger Search{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+ <h4 class="fw-bold">🔍 Quick Ledger Search</h4>
+ <div class="d-flex gap-2">
+    <a href="{{ url_for('reports.hub') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0">📊 Search Account Ledger</h5>
+    <p class="mb-0 small">Quick search and view any account ledger with milk details</p>
+  </div>
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-12">
+        <label class="form-label">Search Account or Party</label>
+        <input type="text" id="accountSearch" class="form-control" placeholder="Type account or party name to search..." onkeyup="searchAccounts()">
+      </div>
+    </div>
+    
+    <div id="searchResults" style="max-height: 500px; overflow-y: auto;">
+      <!-- Show all accounts and parties by default -->
+      <div class="list-group">
+        {% for acc in accounts %}
+        <a href="/reports/account-ledger/{{ acc.id }}?entity={{ acc.entity }}" target="_blank" class="list-group-item list-group-item-action account-item" data-name="{{ acc.name|lower }}" data-type="{{ acc.type|lower }}">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <h6 class="mb-0">{{ acc.name }}</h6>
+                <span class="badge bg-{{ 'success' if acc.type == 'Party' else 'primary' }}">{{ acc.type }}</span>
+              </div>
+              <small class="text-muted">{{ acc.group_name if acc.group_name else acc.party_type }}</small>
+            </div>
+            <div class="text-end">
+              <div class="fw-bold text-{{ 'success' if acc.balance >= 0 else 'danger' }}">
+                ₹{{ "{:,.2f}".format(acc.balance if acc.balance >= 0 else -acc.balance) }} {{ 'Dr' if acc.balance >= 0 else 'Cr' }}
+              </div>
+              <button class="btn btn-sm btn-outline-primary mt-1">
+                <i class="bi bi-eye"></i> View Ledger
+              </button>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function searchAccounts() {
+  const searchTerm = document.getElementById('accountSearch').value.toLowerCase();
+  const items = document.querySelectorAll('.account-item');
+  let visibleCount = 0;
+  
+  items.forEach(item => {
+    const name = item.getAttribute('data-name');
+    const type = item.getAttribute('data-type');
+    
+    if (searchTerm.length < 2 || name.includes(searchTerm) || type.includes(searchTerm)) {
+      item.style.display = '';
+      visibleCount++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+  
+  if (visibleCount === 0 && searchTerm.length >= 2) {
+    document.getElementById('searchResults').innerHTML = `
+      <div class="text-muted text-center p-4">
+        <i class="bi bi-exclamation-circle display-4"></i>
+        <p>No accounts or parties found matching "${searchTerm}"</p>
+      </div>
+    `;
+  }
+}
+</script>
+
+<style>
+  .list-group-item:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+  }
+  
+  .list-group-item-action {
+    transition: all 0.2s ease;
+  }
+  
+  .list-group-item-action:hover {
+    transform: translateX(5px);
+  }
+</style>
+{% endblock %}

@@ -44,6 +44,11 @@
           </select>
         </div>
         <div class="col-md-6">
+          <label class="form-label">Amount (₹) *</label>
+          <input type="number" name="amount" class="form-control" 
+                 value="{{ entry.amount if entry else '' }}" step="0.01" min="0" required>
+        </div>
+        <div class="col-md-6">
           <label class="form-label">Party Name</label>
           <input type="text" name="party_name" class="form-control" 
                  value="{{ entry.party_name if entry else '' }}" placeholder="Optional">

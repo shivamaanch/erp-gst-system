@@ -16,84 +16,102 @@
 <div class="card">
   <div class="card-body">
     <form method="POST" id="quickCashForm">
-      <div class="row g-3 mb-3">
-        <div class="col-md-3">
-          <label class="form-label">Date *</label>
-          <input type="date" name="transaction_date" class="form-control" value="{{ today }}" required>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Payment Mode</label>
-          <select name="payment_mode" class="form-select">
-            <option value="Cash">Cash</option>
-            <option value="Bank">Bank</option>
-            <option value="Online">Online</option>
-            <option value="Cheque">Cheque</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Reference No</label>
-          <input type="text" name="reference_no" class="form-control" placeholder="Cheque no, transaction ID, etc.">
-        </div>
-      </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <label class="form-label">Cash Account *</label>
+              <div class="input-group">
+                <select name="cash_account_id" id="cashAccountId" class="form-select" required>
+                  <option value="">-- Select Cash Account --</option>
+                  {% for acc in accounts %}
+                  <option value="{{ acc.id }}" {% if acc.name.lower().find('cash') != -1 %}selected{% endif %}>{{ acc.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" class="btn btn-outline-secondary" onclick="refreshAccounts()">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Payment Mode</label>
+              <select name="payment_mode" class="form-select">
+                <option value="Cash">Cash</option>
+                <option value="Bank">Bank</option>
+                <option value="Online">Online</option>
+                <option value="Cheque">Cheque</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Reference No</label>
+              <input type="text" name="reference_no" class="form-control" placeholder="Cheque no, transaction ID, etc.">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Previous Balance (Till Date)</label>
+              <input type="number" id="previousBalance" class="form-control bg-light" value="{{ '%.2f'|format(previous_balance) }}" readonly>
+              <small class="text-muted">Cash balance as of today</small>
+            </div>
+          </div>
 
-      <!-- Fixed Cash Account Display -->
-      <div class="alert alert-success d-flex align-items-center mb-3">
-        <div class="me-3">
-          <i class="bi bi-cash-stack"></i>
-          <strong>Fixed Cash Account:</strong>
-          {% if default_cash %}
-            {{ default_cash.name }}
-            <input type="hidden" name="cash_account_id" value="{{ default_cash.id }}">
-          {% else %}
-            No cash account found
-          {% endif %}
-        </div>
-        <div class="ms-auto">
-          <small class="text-muted">All entries will be posted to this cash account</small>
-        </div>
-      </div>
+          <!-- Cash Account Display -->
+          <div class="alert alert-success d-flex align-items-center mb-3">
+            <div class="me-3">
+              <i class="bi bi-cash-stack"></i>
+              <strong>Recording entries for:</strong>
+              <span id="selectedCashAccount">Select cash account above</span>
+            </div>
+            <div class="ms-auto">
+              <small class="text-muted">All entries will be posted to this cash account</small>
+            </div>
+          </div>
 
-      <div class="table-responsive mb-3">
-        <table class="table table-bordered" id="quickEntriesTable">
-          <thead class="table-dark">
-            <tr>
-              <th width="12%">Date</th>
-              <th width="23%">Account (Other Side)</th>
-              <th width="13%">Type</th>
-              <th width="13%">Amount</th>
-              <th width="33%">Narration</th>
-              <th width="6%">Action</th>
-            </tr>
-          </thead>
-          <tbody id="entriesBody">
-            <!-- 20 default rows will be added by JavaScript -->
-          </tbody>
-          <tfoot>
-            <tr class="table-info fw-bold">
-              <td>Total</td>
-              <td></td>
-              <td id="totalAmount">0.00</td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle"></i> 
-          <strong>Cash Book Entry:</strong> Cash account is fixed on the other side. Select the account you’re dealing with.
-        </div>
-      </div>
+          <div class="table-responsive mb-3">
+            <table class="table table-bordered" id="quickEntriesTable">
+              <thead class="table-dark">
+                <tr>
+                  <th width="8%">Date</th>
+                  <th width="22%">Account (Other Side)</th>
+                  <th width="12%">Cash Received</th>
+                  <th width="12%">Cash Payment</th>
+                  <th width="30%">Narration</th>
+                  <th width="8%">Balance</th>
+                  <th width="8%">Action</th>
+                </tr>
+              </thead>
+              <tbody id="entriesBody">
+                <!-- 20 default rows will be added by JavaScript -->
+              </tbody>
+              <tfoot>
+                <tr class="table-info fw-bold">
+                  <td>Total</td>
+                  <td></td>
+                  <td id="totalReceived">0.00</td>
+                  <td id="totalPaid">0.00</td>
+                  <td></td>
+                  <td id="finalBalance">0.00</td>
+                  <td></td>
+                </tr>
+                <tr class="table-success fw-bold">
+                  <td colspan="2">Net Cash Flow</td>
+                  <td id="netCashFlow">0.00</td>
+                  <td colspan="4"></td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i> 
+              <strong>Cash Book Entry:</strong> Cash account is fixed on the other side. Select the account you’re dealing with.
+            </div>
+          </div>
 
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
-        <button type="button" class="btn btn-success" onclick="saveSingleRow()">Save Single Row</button>
-        <button type="submit" class="btn btn-primary">Save All Entries</button>
-        <button type="reset" class="btn btn-outline-warning">Reset</button>
-        <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Cancel</a>
-      </div>
-    </form>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
+            <button type="button" class="btn btn-success" onclick="saveSingleRow()">Save Single Row</button>
+            <button type="button" class="btn btn-primary" onclick="validateAndSubmit()">Save All Entries</button>
+            <button type="reset" class="btn btn-outline-warning">Reset</button>
+            <a href="{{ url_for('cash_book.index') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+    </div>
   </div>
-</div>
 
 <script>
 function saveSingleRow() {
@@ -108,69 +126,135 @@ function saveSingleRow() {
   const amountInput = firstRow.querySelector('input[name="amount[]"]');
   const narrationInput = firstRow.querySelector('input[name="narration[]"]');
   
-  if (!accountSelect.value || !typeSelect.value || !amountInput.value || !narrationInput.value) {
-    alert('Please fill all fields in the first row');
+  if (!accountId || (received <= 0 && paid <= 0) || !narrationText || !date) {
+    alert('Please fill all required fields in the first row');
     return;
   }
   
-  // Create hidden form for single row submission
+  // Create form for single row submission
   const form = document.createElement('form');
   form.method = 'POST';
-  form.style.display = 'none';
+  form.action = window.location.href;
   
-  // Add all existing form fields
-  const mainForm = document.getElementById('quickCashForm');
-  for (let input of mainForm.querySelectorAll('input, select')) {
-    if (input.type !== 'submit' && input.type !== 'reset') {
-      const clone = input.cloneNode(true);
-      form.appendChild(clone);
-    }
-  }
+  // Add cash account and payment mode
+  const cashAccountInput = document.createElement('input');
+  cashAccountInput.type = 'hidden';
+  cashAccountInput.name = 'cash_account_id';
+  cashAccountInput.value = cashAccountId;
+  form.appendChild(cashAccountInput);
   
-  // Add single row indicator
-  const singleInput = document.createElement('input');
-  singleInput.type = 'hidden';
-  singleInput.name = 'single_save';
-  singleInput.value = 'true';
-  form.appendChild(singleInput);
+  const paymentModeInput = document.createElement('input');
+  paymentModeInput.type = 'hidden';
+  paymentModeInput.name = 'payment_mode';
+  paymentModeInput.value = document.querySelector('select[name="payment_mode"]').value;
+  form.appendChild(paymentModeInput);
   
-  // Add first row data with non-array names
+  const referenceInput = document.createElement('input');
+  referenceInput.type = 'hidden';
+  referenceInput.name = 'reference_no';
+  referenceInput.value = document.querySelector('input[name="reference_no"]').value;
+  form.appendChild(referenceInput);
+  
+  // Add single row flag
+  const singleSaveInput = document.createElement('input');
+  singleSaveInput.type = 'hidden';
+  singleSaveInput.name = 'single_save';
+  singleSaveInput.value = 'true';
+  form.appendChild(singleSaveInput);
+  
+  // Add first row data
   const accountInput = document.createElement('input');
   accountInput.type = 'hidden';
   accountInput.name = 'account_id';
-  accountInput.value = accountSelect.value;
+  accountInput.value = accountId;
   form.appendChild(accountInput);
   
-  const typeInput = document.createElement('input');
-  typeInput.type = 'hidden';
-  typeInput.name = 'transaction_type';
-  typeInput.value = typeSelect.value;
-  form.appendChild(typeInput);
+  const dateInput = document.createElement('input');
+  dateInput.type = 'hidden';
+  dateInput.name = 'row_date';
+  dateInput.value = date;
+  form.appendChild(dateInput);
   
-  const amountInput2 = document.createElement('input');
-  amountInput2.type = 'hidden';
-  amountInput2.name = 'amount';
-  amountInput2.value = amountInput.value;
-  form.appendChild(amountInput2);
+  if (received > 0) {
+    const receivedHiddenInput = document.createElement('input');
+    receivedHiddenInput.type = 'hidden';
+    receivedHiddenInput.name = 'cash_received';
+    receivedHiddenInput.value = received;
+    form.appendChild(receivedHiddenInput);
+  } else {
+    const paidHiddenInput = document.createElement('input');
+    paidHiddenInput.type = 'hidden';
+    paidHiddenInput.name = 'cash_paid';
+    paidHiddenInput.value = paid;
+    form.appendChild(paidHiddenInput);
+  }
   
-  const narrationInput2 = document.createElement('input');
-  narrationInput2.type = 'hidden';
-  narrationInput2.name = 'narration';
-  narrationInput2.value = narrationInput.value;
-  form.appendChild(narrationInput2);
+  const narrationHiddenInput = document.createElement('input');
+  narrationHiddenInput.type = 'hidden';
+  narrationHiddenInput.name = 'narration';
+  narrationHiddenInput.value = narrationText;
+  form.appendChild(narrationHiddenInput);
   
   document.body.appendChild(form);
   form.submit();
 }
 
+function validateAndSubmit() {
+  const cashAccountId = document.getElementById('cashAccountId').value;
+  if (!cashAccountId) {
+    alert('Please select a cash account');
+    return;
+  }
+  
+  // Check if at least one row has valid data
+  const rows = document.querySelectorAll('#entriesBody tr');
+  let hasValidRow = false;
+  
+  for (let row of rows) {
+    const accountId = row.querySelector('.account-select').value;
+    const received = parseFloat(row.querySelector('.received-input').value) || 0;
+    const paid = parseFloat(row.querySelector('.paid-input').value) || 0;
+    const narrationText = row.querySelector('.narration-input').value.trim();
+    
+    if (accountId && (received > 0 || paid > 0) && narrationText) {
+      hasValidRow = true;
+      break;
+    }
+  }
+  
+  if (!hasValidRow) {
+    alert('Please fill at least one complete row with Account, Amount, and Narration');
+    return;
+  }
+  
+  // If validation passes, submit the form
+  document.getElementById('quickCashForm').submit();
+}
+
 function createRow() {
   const newRow = document.createElement('tr');
+  const lastRow = document.querySelector('#entriesBody tr:last-of-type');
+  let lastDate = "{{ today }}";
+  let lastNarration = "";
+  
+  // Get date and narration from previous row
+  if (lastRow) {
+    const lastDateInput = lastRow.querySelector('.date-input');
+    const lastNarrationInput = lastRow.querySelector('.narration-input');
+    if (lastDateInput && lastDateInput.value) {
+      lastDate = lastDateInput.value;
+    }
+    if (lastNarrationInput && lastNarrationInput.value) {
+      lastNarration = lastNarrationInput.value;
+    }
+  }
+  
   newRow.innerHTML = `
     <td>
-      <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
+      <input type="date" name="row_date[]" class="form-control date-input" value="${lastDate}" onchange="updateNextRows(this)">
     </td>
     <td>
-      <select name="account_id[]" class="form-select account-select" required>
+      <select name="account_id[]" class="form-select account-select" onchange="updateNarrationOnAccountChange(this)">
         <option value="">-- Select Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -178,23 +262,112 @@ function createRow() {
       </select>
     </td>
     <td>
-      <select name="transaction_type[]" class="form-select type-select" required>
-        <option value="">Select</option>
-        <option value="Receipt">Receipt (Cash In)</option>
-        <option value="Payment">Payment (Cash Out)</option>
-      </select>
+      <input type="number" name="cash_received[]" class="form-control received-input" step="0.01" min="0" placeholder="0.00" onchange="updateAmountFields(this)">
     </td>
     <td>
-      <input type="number" name="amount[]" class="form-control amount-input" step="0.01" min="0" required>
+      <input type="number" name="cash_paid[]" class="form-control paid-input" step="0.01" min="0" placeholder="0.00" onchange="updateAmountFields(this)">
     </td>
     <td>
-      <input type="text" name="narration[]" class="form-control narration-input" required>
+      <input type="text" name="narration[]" class="form-control narration-input" placeholder="${lastNarration}" onchange="updateNextRows(this)">
+    </td>
+    <td>
+      <input type="number" class="form-control balance-input bg-light" value="0.00" readonly>
     </td>
     <td>
       <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button>
     </td>
   `;
   return newRow;
+}
+
+function updateAmountFields(input) {
+  const row = input.closest('tr');
+  const receivedInput = row.querySelector('.received-input');
+  const paidInput = row.querySelector('.paid-input');
+  const accountSelect = row.querySelector('.account-select');
+  const narrationInput = row.querySelector('.narration-input');
+  
+  if (input.classList.contains('received-input')) {
+    if (parseFloat(input.value) > 0) {
+      paidInput.value = '';
+      paidInput.disabled = true;
+      receivedInput.disabled = false;
+      
+      // Auto-generate narration for cash received
+      if (accountSelect.value && !narrationInput.value) {
+        const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+          narrationInput.value = `Cash received from ${selectedOption.text}`;
+        }
+      }
+    } else {
+      paidInput.disabled = false;
+    }
+  } else if (input.classList.contains('paid-input')) {
+    if (parseFloat(input.value) > 0) {
+      receivedInput.value = '';
+      receivedInput.disabled = true;
+      paidInput.disabled = false;
+      
+      // Auto-generate narration for cash paid
+      if (accountSelect.value && !narrationInput.value) {
+        const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+          narrationInput.value = `Cash paid to ${selectedOption.text}`;
+        }
+      }
+    } else {
+      receivedInput.disabled = false;
+    }
+  }
+  
+  calculateTotals();
+}
+
+function updateNarrationOnAccountChange(select) {
+  const row = select.closest('tr');
+  const receivedInput = row.querySelector('.received-input');
+  const paidInput = row.querySelector('.paid-input');
+  const narrationInput = row.querySelector('.narration-input');
+  
+  const selectedOption = select.options[select.selectedIndex];
+  if (selectedOption && selectedOption.value) {
+    const accountName = selectedOption.text;
+    
+    // Update narration based on amount type
+    if (parseFloat(receivedInput.value) > 0) {
+      narrationInput.value = `Cash received from ${accountName}`;
+    } else if (parseFloat(paidInput.value) > 0) {
+      narrationInput.value = `Cash paid to ${accountName}`;
+    }
+  }
+}
+
+function updateNextRows(changedInput) {
+  const currentRow = changedInput.closest('tr');
+  const allRows = Array.from(document.querySelectorAll('#entriesBody tr'));
+  const currentIndex = allRows.indexOf(currentRow);
+  
+  // Update all subsequent rows
+  for (let i = currentIndex + 1; i < allRows.length; i++) {
+    const nextRow = allRows[i];
+    
+    // Update date
+    if (changedInput.classList.contains('date-input')) {
+      const nextDateInput = nextRow.querySelector('.date-input');
+      if (nextDateInput && !nextDateInput.value) {
+        nextDateInput.value = changedInput.value;
+      }
+    }
+    
+    // Update narration
+    if (changedInput.classList.contains('narration-input')) {
+      const nextNarrationInput = nextRow.querySelector('.narration-input');
+      if (nextNarrationInput && !nextNarrationInput.value && changedInput.value) {
+        nextNarrationInput.placeholder = changedInput.value;
+      }
+    }
+  }
 }
 
 function addRow() {
@@ -209,30 +382,62 @@ function removeRow(btn) {
   const tbody = row.parentNode;
   if (tbody.children.length > 1) {
     row.remove();
-    calculateTotal();
+    calculateTotals();
   } else {
     alert('At least one row is required');
   }
 }
 
-function calculateTotal() {
-  let total = 0;
-  document.querySelectorAll('.amount-input').forEach(input => {
-    const value = parseFloat(input.value) || 0;
-    total += value;
+function calculateTotals() {
+  let totalReceived = 0;
+  let totalPaid = 0;
+  let runningBalance = parseFloat(document.getElementById('previousBalance').value) || 0;
+  
+  const rows = document.querySelectorAll('#entriesBody tr');
+  rows.forEach((row, index) => {
+    const received = parseFloat(row.querySelector('.received-input').value) || 0;
+    const paid = parseFloat(row.querySelector('.paid-input').value) || 0;
+    const balanceInput = row.querySelector('.balance-input');
+    
+    totalReceived += received;
+    totalPaid += paid;
+    
+    // Calculate running balance for this row
+    runningBalance += received - paid;
+    balanceInput.value = runningBalance.toFixed(2);
   });
-  document.getElementById('totalAmount').textContent = total.toFixed(2);
+  
+  document.getElementById('totalReceived').textContent = totalReceived.toFixed(2);
+  document.getElementById('totalPaid').textContent = totalPaid.toFixed(2);
+  document.getElementById('netCashFlow').textContent = (totalReceived - totalPaid).toFixed(2);
+  document.getElementById('finalBalance').textContent = runningBalance.toFixed(2);
 }
 
 function attachEventListeners() {
-  document.querySelectorAll('.amount-input').forEach(input => {
-    input.addEventListener('input', calculateTotal);
+  document.querySelectorAll('.received-input, .paid-input').forEach(input => {
+    input.addEventListener('input', calculateTotals);
   });
   
   // Add Enter key navigation
-  document.querySelectorAll('.account-select, .type-select, .amount-input, .narration-input').forEach(input => {
+  document.querySelectorAll('.account-select, .received-input, .paid-input, .narration-input').forEach(input => {
     input.addEventListener('keydown', handleEnterKey);
   });
+  
+  // Update cash account display
+  document.getElementById('cashAccountId').addEventListener('change', updateCashAccountDisplay);
+}
+
+function updateCashAccountDisplay() {
+  const select = document.getElementById('cashAccountId');
+  const display = document.getElementById('selectedCashAccount');
+  const selectedOption = select.options[select.selectedIndex];
+  display.textContent = selectedOption ? selectedOption.text : 'Select cash account above';
+}
+
+function refreshAccounts() {
+  // This would typically make an AJAX call to refresh accounts
+  // For now, just reload the page
+  window.location.reload();
 }
 
 function handleEnterKey(e) {
@@ -269,15 +474,35 @@ function handleEnterKey(e) {
   }
 }
 
-// Initialize with 20 rows
+// Initialize with 20 rows and setup
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('Initializing quick cash entry...');
   const tbody = document.getElementById('entriesBody');
-  for (let i = 0; i < 20; i++) {
-    tbody.appendChild(createRow());
+  console.log('Found tbody:', tbody);
+  
+  if (tbody) {
+    for (let i = 0; i < 20; i++) {
+      const newRow = createRow();
+      tbody.appendChild(newRow);
+      console.log(`Added row ${i + 1}`);
+    }
+    attachEventListeners();
+    calculateTotals();
+    updateCashAccountDisplay();
+    
+    // Load previous balance (this would typically come from backend)
+    loadPreviousBalance();
+    console.log('Initialization complete');
+  } else {
+    console.error('Could not find entriesBody tbody');
   }
-  attachEventListeners();
-  calculateTotal();
 });
+
+function loadPreviousBalance() {
+  // Previous balance is already set from backend in the HTML input
+  // Just recalculate totals to update running balance
+  calculateTotals();
+}
 </script>
 
 <!-- Include Quick Add Ledger Modal -->

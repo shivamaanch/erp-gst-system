@@ -17,11 +17,7 @@
   <div class="card-body">
     <form method="POST" id="quickJournalForm">
       <div class="row g-3 mb-3">
-        <div class="col-md-3">
-          <label class="form-label">Date *</label>
-          <input type="date" name="voucher_date" class="form-control" value="{{ today }}" required>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
           <label class="form-label">Voucher Type</label>
           <select name="voucher_type" class="form-select">
             <option value="Journal">Journal</option>
@@ -34,6 +30,19 @@
           <label class="form-label">Narration</label>
           <input type="text" name="narration" class="form-control" placeholder="Overall journal narration">
         </div>
+      </div>
+
+      <!-- Account Balance Summary -->
+      <div class="alert alert-info">
+        <h6 class="alert-heading">📊 Account Balances (as of today)</h6>
+        <div class="row">
+          {% for acc in accounts[:6] %}
+          <div class="col-md-4">
+            <small><strong>{{ acc.name }}:</strong> ₹{{ '%.2f'|format(account_balances.get(acc.id, 0)) }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <small class="text-muted">Showing first 6 accounts. Balances include opening balance + all transactions till date.</small>
       </div>
 
       <div class="table-responsive mb-3">
@@ -166,7 +175,7 @@ function createRow() {
       <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
     </td>
     <td>
-      <select name="debit_account_id[]" class="form-select account-select" required>
+      <select name="debit_account_id[]" class="form-select account-select debit-select" required onchange="autoFillCredit(this)">
         <option value="">-- Select Debit Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -174,10 +183,10 @@ function createRow() {
       </select>
     </td>
     <td>
-      <input type="number" name="debit_amount[]" class="form-control debit-input" step="0.01" min="0" value="0">
+      <input type="number" name="debit_amount[]" class="form-control debit-input" step="0.01" min="0" value="0" onchange="autoFillCredit(this)">
     </td>
     <td>
-      <select name="credit_account_id[]" class="form-select account-select" required>
+      <select name="credit_account_id[]" class="form-select account-select credit-select" required>
         <option value="">-- Select Credit Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -185,7 +194,7 @@ function createRow() {
       </select>
     </td>
     <td>
-      <input type="number" name="credit_amount[]" class="form-control credit-input" step="0.01" min="0" value="0">
+      <input type="number" name="credit_amount[]" class="form-control credit-input" step="0.01" min="0" value="0" onchange="autoFillDebit(this)">
     </td>
     <td>
       <input type="text" name="line_narration[]" class="form-control narration-input" placeholder="Line narration">
@@ -195,6 +204,72 @@ function createRow() {
     </td>
   `;
   return newRow;
+}
+
+function autoFillCredit(element) {
+  const row = element.closest('tr');
+  const debitAmount = parseFloat(element.value) || 0;
+  const creditAmountInput = row.querySelector('.credit-input');
+  const creditAccountSelect = row.querySelector('.credit-select');
+  const narrationInput = row.querySelector('.narration-input');
+  const debitAccountSelect = row.querySelector('.debit-select');
+  
+  if (debitAmount > 0) {
+    // Auto-fill credit amount
+    creditAmountInput.value = debitAmount;
+    
+    // Auto-select default credit account (first non-debit account)
+    if (!creditAccountSelect.value && debitAccountSelect.value) {
+      const selectedOption = debitAccountSelect.options[debitAccountSelect.selectedIndex];
+      if (selectedOption) {
+        // Find first account that's not the same as debit account
+        for (let option of creditAccountSelect.options) {
+          if (option.value !== debitAccountSelect.value && option.value !== '') {
+            creditAccountSelect.value = option.value;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Auto-fill narration
+    if (!narrationInput.value && selectedOption) {
+      narrationInput.value = `Payment to ${selectedOption.text}`;
+    }
+  }
+}
+
+function autoFillDebit(element) {
+  const row = element.closest('tr');
+  const creditAmount = parseFloat(element.value) || 0;
+  const debitAmountInput = row.querySelector('.debit-input');
+  const debitAccountSelect = row.querySelector('.debit-select');
+  const narrationInput = row.querySelector('.narration-input');
+  const creditAccountSelect = row.querySelector('.credit-select');
+  
+  if (creditAmount > 0) {
+    // Auto-fill debit amount
+    debitAmountInput.value = creditAmount;
+    
+    // Auto-select default debit account (first non-credit account)
+    if (!debitAccountSelect.value && creditAccountSelect.value) {
+      const selectedOption = creditAccountSelect.options[creditAccountSelect.selectedIndex];
+      if (selectedOption) {
+        // Find first account that's not the same as credit account
+        for (let option of debitAccountSelect.options) {
+          if (option.value !== creditAccountSelect.value && option.value !== '') {
+            debitAccountSelect.value = option.value;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Auto-fill narration
+    if (!narrationInput.value && selectedOption) {
+      narrationInput.value = `Receipt from ${selectedOption.text}`;
+    }
+  }
 }
 
 function addRow() {

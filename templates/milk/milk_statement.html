@@ -113,24 +113,27 @@
             <th>BF Kgs</th>
             <th>SNF Kgs</th>
             <th>Ratio</th>
-            <th>Rate/L</th>
+            <th>Daily Rate</th>
             <th>Amount</th>
           </tr>
         </thead>
         <tbody id="purchaseBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Purchase' %}
-          <tr data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
+          <tr data-transaction-id="{{ txn.id }}" data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </a>
                 {% if txn.bill %}
-                <a href="{{ url_for('enhanced_invoice.print_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
+                <a href="{{ url_for('milk.view_invoice', bill_id=txn.bill.id) }}" class="btn btn-outline-info" title="View Bill">
                   <i class="bi bi-receipt"></i>
                 </a>
                 {% endif %}
+                <button type="button" class="btn btn-outline-danger delete-transaction-btn" data-txn-id="{{ txn.id }}" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
               </div>
             </td>
             <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
@@ -143,7 +146,7 @@
             <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
             <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
-            <td>₹{{ "%.4f"|format(txn.rate) }}</td>
+            <td>₹{{ "%.2f"|format(txn.rate) }}</td>
             <td class="fw-bold">₹{{ "%.2f"|format(txn.amount) }}</td>
           </tr>
           {% endif %}
@@ -226,7 +229,7 @@
             <th>BF Kgs</th>
             <th>SNF Kgs</th>
             <th>Ratio</th>
-            <th>Rate/L</th>
+            <th>Daily Rate</th>
             <th>Amount</th>
           </tr>
         </thead>
@@ -256,7 +259,7 @@
             <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
             <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
-            <td>₹{{ "%.4f"|format(txn.rate) }}</td>
+            <td>₹{{ "%.2f"|format(txn.rate) }}</td>
             <td class="fw-bold">₹{{ "%.2f"|format(txn.amount) }}</td>
           </tr>
           {% endif %}
@@ -379,6 +382,31 @@ function exportData(format) {
   
   window.open(`/milk/milk-statement/export?${params.toString()}`, '_blank');
 }
+
+function deleteTransaction(transactionId) {
+  if (!confirm('Are you sure you want to delete this milk transaction? This action cannot be undone.')) return;
+
+  fetch(`/milk/entry/${transactionId}/delete`, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.success) {
+        window.location.reload();
+      } else {
+        alert((data && data.error) ? data.error : 'Delete failed');
+      }
+    })
+    .catch(() => alert('Delete failed'));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.delete-transaction-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const id = this.getAttribute('data-txn-id');
+      deleteTransaction(id);
+    });
+  });
+});
 
 // Real-time search
 document.getElementById('partySearch').addEventListener('input', applyFilters);

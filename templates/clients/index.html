@@ -7,69 +7,536 @@
     <i class="bi bi-plus-circle"></i> Add Party
   </a>
 </div>
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-body py-2">
-    <form class="row g-2" method="GET">
-      <div class="col-md-5">
-        <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by name..." value="{{ search }}">
-      </div>
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-light">
+    <div class="row g-2">
       <div class="col-md-3">
-        <select name="type" class="form-select form-select-sm">
+        <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search by name..." value="{{ search }}">
+      </div>
+      <div class="col-md-2">
+        <select id="typeFilter" class="form-select form-select-sm">
           <option value="">All Types</option>
-          {% for pt in party_types %}
-          <option value="{{ pt }}" {{ 'selected' if ptype==pt }}>{{ pt }}</option>
-          {% endfor %}
+          <option value="Debtor" {% if ptype=='Debtor' %}selected{% endif %}>Debtors</option>
+          <option value="Creditor" {% if ptype=='Creditor' %}selected{% endif %}>Creditors</option>
+          <option value="Cash" {% if ptype=='Cash' %}selected{% endif %}>Cash</option>
+          <option value="Supplier" {% if ptype=='Supplier' %}selected{% endif %}>Suppliers</option>
+          <option value="Both" {% if ptype=='Both' %}selected{% endif %}>Both</option>
         </select>
       </div>
       <div class="col-md-2">
-        <button class="btn btn-sm btn-outline-primary w-100">🔍 Search</button>
+        <select id="groupFilter" class="form-select form-select-sm">
+          <option value="">All Groups</option>
+          <option value="Current Assets">Current Assets</option>
+          <option value="Fixed Assets">Fixed Assets</option>
+          <option value="Current Liabilities">Current Liabilities</option>
+          <option value="Sundry Debtors">Sundry Debtors</option>
+          <option value="Sundry Creditors">Sundry Creditors</option>
+          <option value="Cash-in-Hand">Cash-in-Hand</option>
+          <option value="Bank Accounts">Bank Accounts</option>
+          <option value="Capital Accounts">Capital Accounts</option>
+          <option value="Income">Income</option>
+          <option value="Expenses">Expenses</option>
+        </select>
       </div>
       <div class="col-md-2">
-        <a href="{{ url_for('clients.index') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+        <select id="fyFilter" class="form-select form-select-sm">
+          <option value="">All Years</option>
+          <option value="2025-26">2025-26</option>
+          <option value="2024-25">2024-25</option>
+          <option value="2023-24">2023-24</option>
+        </select>
       </div>
-    </form>
+      <div class="col-md-3">
+        <div class="btn-group w-100">
+          <button class="btn btn-sm btn-primary" onclick="applyFilters()">
+            <i class="bi bi-search"></i> Search
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="clearFilters()">
+            <i class="bi bi-x-circle"></i> Clear
+          </button>
+          <button class="btn btn-sm btn-success" onclick="showBalanceSheetModal()">
+            <i class="bi bi-balance-scale"></i> Balance Sheet
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
-<div class="card border-0 shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover table-sm align-middle mb-0">
+    <table class="table table-hover table-sm align-middle mb-0" id="mastersTable">
       <thead class="table-dark">
         <tr>
-          <th>#</th><th>Name</th><th>Type</th><th>GSTIN</th><th>Phone</th>
-          <th>Opening Bal.</th><th>Actions</th>
+          <th>#</th><th>Name</th><th>Type</th><th>Group/Category</th><th>Contact</th>
+          <th>Opening Dr</th><th>Opening Cr</th><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        {% for p in parties %}
-        <tr>
+        {% for entity in entities %}
+        <tr data-id="{{ entity.id }}" data-type="{{ entity.type }}">
           <td class="text-muted">{{ loop.index }}</td>
-          <td><strong>{{ p.name }}</strong></td>
           <td>
-            {% if p.party_type == "Debtor" %}<span class="badge bg-success">Debtor</span>
-            {% elif p.party_type == "Creditor" %}<span class="badge bg-danger">Creditor</span>
-            {% elif p.party_type == "Supplier" %}<span class="badge bg-warning text-dark">Supplier</span>
-            {% else %}<span class="badge bg-secondary">{{ p.party_type }}</span>{% endif %}
+            <strong>{{ entity.name }}</strong>
+            {% if entity.type == 'Account' %}
+            <br><small class="text-muted">System Account</small>
+            {% endif %}
           </td>
-          <td><code>{{ p.gstin or "—" }}</code></td>
-          <td>{{ p.phone or "—" }}</td>
+          <td>
+            {% if entity.party_type == "Debtor" %}<span class="badge bg-success">Debtor</span>
+            {% elif entity.party_type == "Creditor" %}<span class="badge bg-danger">Creditor</span>
+            {% elif entity.party_type == "Cash" %}<span class="badge bg-primary">Cash</span>
+            {% elif entity.party_type == "Supplier" %}<span class="badge bg-warning text-dark">Supplier</span>
+            {% else %}<span class="badge bg-secondary">{{ entity.party_type }}</span>{% endif %}
+          </td>
+          <td>
+            {% if entity.type == 'Party' %}
+              <span class="badge bg-light text-dark">Party</span>
+            {% else %}
+              <span class="badge bg-info text-dark">{{ entity.group_name or 'Default' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if entity.is_party %}
+              {% if entity.phone %}{{ entity.phone }}<br>{% endif %}
+              {% if entity.email %}<small class="text-muted">{{ entity.email }}</small>{% endif %}
+            {% else %}
+              <small class="text-muted">—</small>
+            {% endif %}
+          </td>
           <td class="text-end">
-            ₹{{ "{:,.2f}".format(p.opening_balance or 0) }}
-            <small class="text-muted">{{ p.balance_type or "Dr" }}</small>
+            <span class="balance-editable" data-field="opening_dr" data-entity-id="{{ entity.id }}" data-entity-type="{{ entity.type }}" onclick="editBalance(this)">
+              ₹{{ "{:,.2f}".format(entity.opening_balance if entity.opening_balance >= 0 else 0) }}
+            </span>
+          </td>
+          <td class="text-end">
+            <span class="balance-editable" data-field="opening_cr" data-entity-id="{{ entity.id }}" data-entity-type="{{ entity.type }}" onclick="editBalance(this)">
+              ₹{{ "{:,.2f}".format(-entity.opening_balance if entity.opening_balance < 0 else 0) }}
+            </span>
           </td>
           <td>
-            <a href="{{ url_for('clients.view', pid=p.id) }}" class="btn btn-xs btn-outline-info btn-sm py-0">View</a>
-            <a href="{{ url_for('clients.edit', pid=p.id) }}" class="btn btn-xs btn-outline-warning btn-sm py-0">Edit</a>
-            <form action="{{ url_for('clients.delete', pid=p.id) }}" method="POST" class="d-inline"
-                  onsubmit="return confirm('Deactivate {{ p.name }}?')">
-              <button class="btn btn-xs btn-outline-danger btn-sm py-0">Del</button>
-            </form>
+            {% if entity.is_party %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-info">System</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              {% if entity.is_party %}
+                <a href="{{ url_for('clients.view', pid=entity.id) }}" class="btn btn-outline-info" title="View Details">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{{ url_for('clients.edit', pid=entity.id) }}" class="btn btn-outline-warning" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form action="{{ url_for('clients.delete', pid=entity.id) }}" method="POST" class="d-inline"
+                      onsubmit="return confirm('Deactivate {{ entity.name }}?')">
+                  <button class="btn btn-outline-danger" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              {% else %}
+                <a href="{{ url_for('reports.account_ledger', account_id=entity.id) }}" class="btn btn-outline-primary" title="View Ledger">
+                  <i class="bi bi-book"></i>
+                </a>
+                {% if entity.account_type != 'Cash' %}
+                <button class="btn btn-outline-warning" title="Edit Account" 
+                        data-account-id="{{ entity.id }}" 
+                        data-account-name="{{ entity.name }}" 
+                        data-account-group="{{ entity.group_name }}" 
+                        onclick="editAccount(this)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                {% endif %}
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No parties found. <a href="{{ url_for('clients.add') }}">Add one now!</a></td></tr>
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          <i class="bi bi-people fs-1 d-block mb-2"></i>
+          No parties or accounts found. 
+          <a href="{{ url_for('clients.add') }}" class="btn btn-sm btn-primary mt-2">Add Party Now</a>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- Balance Sheet Modal -->
+<div class="modal fade" id="balanceSheetModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Opening Balance Sheet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Financial Year</label>
+            <select class="form-select" id="balanceSheetYear">
+              <option value="2025-26">2025-26</option>
+              <option value="2024-25">2024-25</option>
+              <option value="2023-24">2023-24</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">As on Date</label>
+            <input type="date" class="form-control" id="balanceSheetDate" value="2025-04-01">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">&nbsp;</label>
+            <div>
+              <button class="btn btn-primary" onclick="loadBalanceSheet()">
+                <i class="bi bi-arrow-clockwise"></i> Load
+              </button>
+              <button class="btn btn-success" onclick="saveBalanceSheet()">
+                <i class="bi bi-save"></i> Save All
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <h6 class="text-primary">ASSETS</h6>
+            <div id="assetsSection" class="table-responsive">
+              <!-- Assets will be loaded here -->
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-danger">LIABILITIES & CAPITAL</h6>
+            <div id="liabilitiesSection" class="table-responsive">
+              <!-- Liabilities will be loaded here -->
+            </div>
+          </div>
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6>Total Assets</h6>
+                <h4 class="text-primary" id="totalAssets">₹0.00</h4>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6>Total Liabilities & Capital</h6>
+                <h4 class="text-danger" id="totalLiabilities">₹0.00</h4>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Account Modal -->
+<div class="modal fade" id="editAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editAccountForm">
+          <input type="hidden" id="editAccountId">
+          <div class="mb-3">
+            <label class="form-label">Account Name</label>
+            <input type="text" class="form-control" id="editAccountName" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Group Name</label>
+            <select class="form-select" id="editAccountGroup" required>
+              <option value="Cash-in-Hand">Cash-in-Hand</option>
+              <option value="Bank Accounts">Bank Accounts</option>
+              <option value="Sundry Debtors">Sundry Debtors</option>
+              <option value="Sundry Creditors">Sundry Creditors</option>
+              <option value="Current Assets">Current Assets</option>
+              <option value="Fixed Assets">Fixed Assets</option>
+              <option value="Current Liabilities">Current Liabilities</option>
+              <option value="Capital Accounts">Capital Accounts</option>
+              <option value="Income">Income</option>
+              <option value="Expenses">Expenses</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveAccount()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.balance-editable {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.balance-editable:hover {
+  background-color: #e9ecef;
+}
+
+.balance-editable.editing {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+}
+
+.balance-input {
+  width: 100px;
+  text-align: right;
+  border: 1px solid #007bff;
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.balance-section table {
+  font-size: 0.9rem;
+}
+
+.balance-section .account-name {
+  font-weight: 500;
+}
+
+.balance-section .account-group {
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+</style>
+
+<script>
+// Filter functions
+function applyFilters() {
+  const search = document.getElementById('searchInput').value;
+  const type = document.getElementById('typeFilter').value;
+  const group = document.getElementById('groupFilter').value;
+  const fy = document.getElementById('fyFilter').value;
+  
+  const params = new URLSearchParams();
+  if (search) params.append('q', search);
+  if (type) params.append('type', type);
+  if (group) params.append('group', group);
+  if (fy) params.append('fy', fy);
+  
+  window.location.href = '/clients?' + params.toString();
+}
+
+function clearFilters() {
+  window.location.href = '/clients';
+}
+
+// Edit balance inline
+function editBalance(element) {
+  if (element.classList.contains('editing')) return;
+  
+  const currentValue = element.textContent.replace('₹', '').replace(/,/g, '');
+  const entityId = element.dataset.entityId;
+  const entityType = element.dataset.entityType;
+  const field = element.dataset.field;
+  
+  element.classList.add('editing');
+  element.innerHTML = `<input type="number" class="balance-input" value="${currentValue}" step="0.01" onblur="saveBalance(this, ${entityId}, '${entityType}', '${field}')" onkeypress="if(event.key==='Enter') this.blur()">`;
+  element.querySelector('input').focus();
+}
+
+function saveBalance(input, entityId, entityType, field) {
+  const newValue = parseFloat(input.value) || 0;
+  const element = input.parentElement;
+  
+  element.classList.remove('editing');
+  element.textContent = '₹' + newValue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  
+  // Save to backend
+  fetch(`/api/${entityType.toLowerCase()}/${entityId}/balance`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({field: field, value: newValue})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (!data.success) {
+      alert('Error saving balance: ' + data.message);
+      location.reload();
+    }
+  })
+  .catch(error => {
+    alert('Error saving balance: ' + error);
+    location.reload();
+  });
+}
+
+// Balance Sheet Modal
+function showBalanceSheetModal() {
+  new bootstrap.Modal(document.getElementById('balanceSheetModal')).show();
+  loadBalanceSheet();
+}
+
+function loadBalanceSheet() {
+  const year = document.getElementById('balanceSheetYear').value;
+  const date = document.getElementById('balanceSheetDate').value;
+  
+  fetch(`/api/balance-sheet?year=${year}&date=${date}`)
+  .then(response => response.json())
+  .then(data => {
+    renderBalanceSheet(data);
+  })
+  .catch(error => {
+    console.error('Error loading balance sheet:', error);
+  });
+}
+
+function renderBalanceSheet(data) {
+  const assetsSection = document.getElementById('assetsSection');
+  const liabilitiesSection = document.getElementById('liabilitiesSection');
+  
+  assetsSection.innerHTML = generateBalanceSheetTable(data.assets, 'Assets');
+  liabilitiesSection.innerHTML = generateBalanceSheetTable(data.liabilities, 'Liabilities');
+  
+  document.getElementById('totalAssets').textContent = '₹' + data.totalAssets.toLocaleString('en-IN', {minimumFractionDigits: 2});
+  document.getElementById('totalLiabilities').textContent = '₹' + data.totalLiabilities.toLocaleString('en-IN', {minimumFractionDigits: 2});
+}
+
+function generateBalanceSheetTable(accounts, title) {
+  let html = `
+    <table class="table table-sm balance-section">
+      <thead class="table-light">
+        <tr>
+          <th>Account</th>
+          <th>Group</th>
+          <th class="text-end">Opening Dr</th>
+          <th class="text-end">Opening Cr</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  
+  accounts.forEach(account => {
+    html += `
+      <tr>
+        <td>
+          <div class="account-name">${account.name}</div>
+          <div class="account-group">${account.group_name}</div>
+        </td>
+        <td>${account.group_name}</td>
+        <td class="text-end">
+          <input type="number" class="form-control form-control-sm text-end" 
+                 value="${account.opening_dr || 0}" step="0.01" 
+                 data-account-id="${account.id}" data-field="opening_dr"
+                 onchange="updateBalanceSheetTotal()">
+        </td>
+        <td class="text-end">
+          <input type="number" class="form-control form-control-sm text-end" 
+                 value="${account.opening_cr || 0}" step="0.01"
+                 data-account-id="${account.id}" data-field="opening_cr"
+                 onchange="updateBalanceSheetTotal()">
+        </td>
+      </tr>
+    `;
+  });
+  
+  html += '</tbody></table>';
+  return html;
+}
+
+function updateBalanceSheetTotal() {
+  // Recalculate totals when values change
+  let totalAssets = 0;
+  let totalLiabilities = 0;
+  
+  document.querySelectorAll('#assetsSection input').forEach(input => {
+    totalAssets += parseFloat(input.value) || 0;
+  });
+  
+  document.querySelectorAll('#liabilitiesSection input').forEach(input => {
+    totalLiabilities += parseFloat(input.value) || 0;
+  });
+  
+  document.getElementById('totalAssets').textContent = '₹' + totalAssets.toLocaleString('en-IN', {minimumFractionDigits: 2});
+  document.getElementById('totalLiabilities').textContent = '₹' + totalLiabilities.toLocaleString('en-IN', {minimumFractionDigits: 2});
+}
+
+function saveBalanceSheet() {
+  const year = document.getElementById('balanceSheetYear').value;
+  const updates = [];
+  
+  // Collect all balance updates
+  document.querySelectorAll('#assetsSection input, #liabilitiesSection input').forEach(input => {
+    updates.push({
+      account_id: parseInt(input.dataset.accountId),
+      field: input.dataset.field,
+      value: parseFloat(input.value) || 0
+    });
+  });
+  
+  fetch(`/api/balance-sheet/${year}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({updates: updates})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Balance sheet saved successfully!');
+      location.reload();
+    } else {
+      alert('Error saving balance sheet: ' + data.message);
+    }
+  })
+  .catch(error => {
+    alert('Error saving balance sheet: ' + error);
+  });
+}
+
+// Edit account function
+function editAccount(element) {
+  const accountId = element.dataset.accountId;
+  const accountName = element.dataset.accountName;
+  const accountGroup = element.dataset.accountGroup;
+  
+  document.getElementById('editAccountId').value = accountId;
+  document.getElementById('editAccountName').value = accountName;
+  document.getElementById('editAccountGroup').value = accountGroup || 'Current Assets';
+  new bootstrap.Modal(document.getElementById('editAccountModal')).show();
+}
+
+function saveAccount() {
+  const id = document.getElementById('editAccountId').value;
+  const name = document.getElementById('editAccountName').value;
+  const group = document.getElementById('editAccountGroup').value;
+  
+  fetch(`/api/accounts/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: name, group_name: group})
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Add enter key support for search
+  document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      applyFilters();
+    }
+  });
+});
+</script>
 {% endblock %}

@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from extensions import db
-from models import Party, Bill
+from models import Party, Bill, Account
 clients_bp = Blueprint("clients", __name__)
 
 PARTY_TYPES = ["Debtor", "Creditor", "Supplier", "Both"]
@@ -25,13 +25,95 @@ def index():
     cid  = session.get("company_id")
     ptype = request.args.get("type", "")
     search = request.args.get("q", "")
+    group = request.args.get("group", "")
+    fy = request.args.get("fy", "")
+    
+    # Get all parties
     q = Party.query.filter_by(company_id=cid, is_active=True)
     if ptype:
         q = q.filter_by(party_type=ptype)
     if search:
         q = q.filter(Party.name.ilike(f"%{search}%"))
     parties = q.order_by(Party.name).all()
-    return render_template("clients/index.html", parties=parties, ptype=ptype, search=search, party_types=PARTY_TYPES)
+    
+    # Get all accounts (including default system accounts)
+    from models import Account
+    account_query = Account.query.filter_by(company_id=cid, is_active=True)
+    if search:
+        account_query = account_query.filter(Account.name.ilike(f"%{search}%"))
+    
+    # Filter by account type if specified
+    if ptype:
+        if ptype == "Debtor":
+            account_query = account_query.filter(Account.group_name.like("%Debtor%"))
+        elif ptype == "Creditor":
+            account_query = account_query.filter(Account.group_name.like("%Creditor%"))
+        elif ptype == "Cash":
+            account_query = account_query.filter(Account.account_type == "Cash")
+    
+    # Filter by group if specified
+    if group:
+        account_query = account_query.filter(Account.group_name == group)
+    
+    accounts = account_query.order_by(Account.name).all()
+    
+    # Combine parties and accounts for display
+    all_entities = []
+    
+    # Add parties
+    for party in parties:
+        all_entities.append({
+            'id': party.id,
+            'name': party.name,
+            'type': 'Party',
+            'party_type': party.party_type or 'Both',
+            'gstin': party.gstin,
+            'phone': party.phone,
+            'email': party.email,
+            'address': party.address,
+            'opening_balance': party.opening_balance or 0,
+            'balance_type': party.balance_type or 'Dr',
+            'is_party': True
+        })
+    
+    # Add accounts
+    for account in accounts:
+        # Show all accounts (no party_id filtering since it doesn't exist)
+        all_entities.append({
+            'id': account.id,
+            'name': account.name,
+            'type': 'Account',
+            'party_type': get_account_party_type(account.group_name),
+            'gstin': None,
+            'phone': None,
+            'email': None,
+            'address': None,
+            'opening_balance': float(account.opening_dr or 0) - float(account.opening_cr or 0),
+            'balance_type': 'Dr' if (float(account.opening_dr or 0) - float(account.opening_cr or 0)) >= 0 else 'Cr',
+            'is_party': False,
+            'account_type': account.account_type,
+            'group_name': account.group_name
+        })
+    
+    # Sort by name
+    all_entities.sort(key=lambda x: x['name'])
+    
+    return render_template("clients/index.html", entities=all_entities, ptype=ptype, search=search, party_types=PARTY_TYPES)
+
+def get_account_party_type(group_name):
+    """Determine party type based on account group name"""
+    if not group_name:
+        return 'Both'
+    
+    group_lower = group_name.lower()
+    if 'debtor' in group_lower or 'sundry debtor' in group_lower or 'customer' in group_lower:
+        return 'Debtor'
+    elif 'creditor' in group_lower or 'sundry creditor' in group_lower or 'supplier' in group_lower:
+        return 'Creditor'
+    elif 'cash' in group_lower:
+        return 'Cash'
+    else:
+        return 'Both'
 
 @clients_bp.route("/clients/add", methods=["GET","POST"])
 @login_required
@@ -163,6 +245,174 @@ def quick_add():
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
+
+@clients_bp.route("/api/accounts/<int:account_id>", methods=["PUT"])
+@login_required
+def update_account(account_id):
+    """Update account details via API"""
+    try:
+        cid = session.get("company_id")
+        account = Account.query.filter_by(id=account_id, company_id=cid).first()
+        
+        if not account:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+            
+        data = request.get_json()
+        if 'name' in data:
+            account.name = data['name'].strip()
+        if 'group_name' in data:
+            account.group_name = data['group_name'].strip()
+            
+        db.session.commit()
+        return jsonify({"success": True, "message": "Account updated successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@clients_bp.route("/api/account/<int:account_id>/balance", methods=["PUT"])
+@login_required
+def update_account_balance(account_id):
+    """Update account opening balance via API"""
+    try:
+        cid = session.get("company_id")
+        account = Account.query.filter_by(id=account_id, company_id=cid).first()
+        
+        if not account:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+            
+        data = request.get_json()
+        field = data.get('field')
+        value = data.get('value', 0)
+        
+        if field == 'opening_dr':
+            account.opening_dr = value
+        elif field == 'opening_cr':
+            account.opening_cr = value
+        else:
+            return jsonify({"success": False, "message": "Invalid field"}), 400
+            
+        db.session.commit()
+        return jsonify({"success": True, "message": "Balance updated successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@clients_bp.route("/api/party/<int:party_id>/balance", methods=["PUT"])
+@login_required
+def update_party_balance(party_id):
+    """Update party opening balance via API"""
+    try:
+        cid = session.get("company_id")
+        party = Party.query.filter_by(id=party_id, company_id=cid).first()
+        
+        if not party:
+            return jsonify({"success": False, "message": "Party not found"}), 404
+            
+        data = request.get_json()
+        field = data.get('field')
+        value = data.get('value', 0)
+        
+        # Update party opening balance based on field
+        if field == 'opening_dr':
+            party.opening_balance = abs(value)
+            party.balance_type = 'Dr'
+        elif field == 'opening_cr':
+            party.opening_balance = abs(value)
+            party.balance_type = 'Cr'
+        else:
+            return jsonify({"success": False, "message": "Invalid field"}), 400
+            
+        db.session.commit()
+        return jsonify({"success": True, "message": "Balance updated successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@clients_bp.route("/api/balance-sheet")
+@login_required
+def get_balance_sheet():
+    """Get balance sheet data for opening balances"""
+    try:
+        cid = session.get("company_id")
+        year = request.args.get("year", "2025-26")
+        date = request.args.get("date", "2025-04-01")
+        
+        # Get all accounts for the company
+        accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.group_name, Account.name).all()
+        
+        # Categorize accounts
+        assets = []
+        liabilities = []
+        
+        for account in accounts:
+            account_data = {
+                'id': account.id,
+                'name': account.name,
+                'group_name': account.group_name,
+                'account_type': account.account_type,
+                'opening_dr': float(account.opening_dr or 0),
+                'opening_cr': float(account.opening_cr or 0)
+            }
+            
+            # Determine if asset or liability based on group name
+            group_lower = (account.group_name or "").lower()
+            if any(keyword in group_lower for keyword in ['asset', 'cash', 'bank', 'debtor', 'stock', 'investment']):
+                assets.append(account_data)
+            elif any(keyword in group_lower for keyword in ['liability', 'creditor', 'capital', 'loan', 'provision']):
+                liabilities.append(account_data)
+            elif account.account_type and 'asset' in account.account_type.lower():
+                assets.append(account_data)
+            else:
+                # Default to liability if unsure
+                liabilities.append(account_data)
+        
+        # Calculate totals
+        total_assets = sum(acc['opening_dr'] for acc in assets) - sum(acc['opening_cr'] for acc in assets)
+        total_liabilities = sum(acc['opening_cr'] for acc in liabilities) - sum(acc['opening_dr'] for acc in liabilities)
+        
+        return jsonify({
+            'success': True,
+            'assets': assets,
+            'liabilities': liabilities,
+            'totalAssets': total_assets,
+            'totalLiabilities': total_liabilities,
+            'year': year,
+            'date': date
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@clients_bp.route("/api/balance-sheet/<year>", methods=["PUT"])
+@login_required
+def save_balance_sheet(year):
+    """Save balance sheet opening balances"""
+    try:
+        cid = session.get("company_id")
+        data = request.get_json()
+        updates = data.get('updates', [])
+        
+        for update in updates:
+            account_id = update.get('account_id')
+            field = update.get('field')
+            value = update.get('value', 0)
+            
+            account = Account.query.filter_by(id=account_id, company_id=cid).first()
+            if account:
+                if field == 'opening_dr':
+                    account.opening_dr = value
+                elif field == 'opening_cr':
+                    account.opening_cr = value
+        
+        db.session.commit()
+        return jsonify({"success": True, "message": "Balance sheet saved successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @clients_bp.route("/clients/quick-add-item", methods=["POST"])
 @login_required

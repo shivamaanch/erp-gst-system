@@ -65,7 +65,7 @@
                   <th class="text-end">Qty (L)</th>
                   <th class="text-end">Fat %</th>
                   <th class="text-end">SNF %</th>
-                  <th class="text-end">Rate/L</th>
+                  <th class="text-end">Daily Rate</th>
                   <th class="text-end">Amount</th>
                 </tr>
               </thead>
@@ -80,7 +80,7 @@
                   <td class="text-end">{{ milk_transaction.qty_liters }}</td>
                   <td class="text-end">{{ milk_transaction.fat }}%</td>
                   <td class="text-end">{{ milk_transaction.snf }}%</td>
-                  <td class="text-end">₹{{ "%.4f"|format(milk_transaction.rate) }}</td>
+                  <td class="text-end">₹{{ "%.2f"|format(milk_transaction.rate) }}</td>
                   <td class="text-end fw-bold">₹{{ "%.2f"|format(milk_transaction.amount) }}</td>
                 </tr>
               </tbody>

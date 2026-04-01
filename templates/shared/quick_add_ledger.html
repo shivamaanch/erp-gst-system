@@ -16,11 +16,115 @@
             <label class="form-label">Account Type *</label>
             <select name="account_type" class="form-select" required>
               <option value="">Select Type</option>
-              <option value="Asset">Asset</option>
-              <option value="Liability">Liability</option>
-              <option value="Equity">Equity</option>
-              <option value="Income">Income</option>
-              <option value="Expense">Expense</option>
+              
+              <!-- Asset Accounts -->
+              <optgroup label="ASSET ACCOUNTS">
+                <option value="Cash Account">Cash Account</option>
+                <option value="Bank Account">Bank Account</option>
+                <option value="Current Account">Current Account</option>
+                <option value="Savings Account">Savings Account</option>
+                <option value="Fixed Deposit">Fixed Deposit</option>
+                <option value="Stock in Hand">Stock in Hand</option>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Finished Goods">Finished Goods</option>
+                <option value="Work in Progress">Work in Progress</option>
+                <option value="Sundry Debtors">Sundry Debtors</option>
+                <option value="Accounts Receivable">Accounts Receivable</option>
+                <option value="Loans & Advances">Loans & Advances</option>
+                <option value="Furniture & Fixtures">Furniture & Fixtures</option>
+                <option value="Office Equipment">Office Equipment</option>
+                <option value="Computers">Computers</option>
+                <option value="Vehicles">Vehicles</option>
+                <option value="Buildings">Buildings</option>
+                <option value="Land">Land</option>
+                <option value="Plant & Machinery">Plant & Machinery</option>
+                <option value="Investments">Investments</option>
+                <option value="Prepaid Expenses">Prepaid Expenses</option>
+                <option value="Accrued Income">Accrued Income</option>
+              </optgroup>
+              
+              <!-- Liability Accounts -->
+              <optgroup label="LIABILITY ACCOUNTS">
+                <option value="Sundry Creditors">Sundry Creditors</option>
+                <option value="Accounts Payable">Accounts Payable</option>
+                <option value="Bank Loan">Bank Loan</option>
+                <option value="Term Loan">Term Loan</option>
+                <option value="Working Capital Loan">Working Capital Loan</option>
+                <option value="Cash Credit">Cash Credit</option>
+                <option value="Overdraft">Overdraft</option>
+                <option value="GST Payable">GST Payable</option>
+                <option value="TDS Payable">TDS Payable</option>
+                <option value="TCS Payable">TCS Payable</option>
+                <option value="Provident Fund Payable">Provident Fund Payable</option>
+                <option value="ESI Payable">ESI Payable</option>
+                <option value="Salary Payable">Salary Payable</option>
+                <option value="Rent Payable">Rent Payable</option>
+                <option value="Interest Payable">Interest Payable</option>
+                <option value="Dividend Payable">Dividend Payable</option>
+                <option value="Unearned Revenue">Unearned Revenue</option>
+                <option value="Secured Loans">Secured Loans</option>
+                <option value="Unsecured Loans">Unsecured Loans</option>
+              </optgroup>
+              
+              <!-- Equity Accounts -->
+              <optgroup label="EQUITY ACCOUNTS">
+                <option value="Share Capital">Share Capital</option>
+                <option value="Proprietor Capital">Proprietor Capital</option>
+                <option value="Partner Capital">Partner Capital</option>
+                <option value="Partners Current Account">Partners Current Account</option>
+                <option value="General Reserve">General Reserve</option>
+                <option value="Specific Reserve">Specific Reserve</option>
+                <option value="Profit & Loss Account">Profit & Loss Account</option>
+                <option value="Retained Earnings">Retained Earnings</option>
+                <option value="Capital Reserve">Capital Reserve</option>
+                <option value="Securities Premium">Securities Premium</option>
+              </optgroup>
+              
+              <!-- Income Accounts -->
+              <optgroup label="INCOME ACCOUNTS">
+                <option value="Sales">Sales</option>
+                <option value="Service Income">Service Income</option>
+                <option value="Interest Income">Interest Income</option>
+                <option value="Discount Received">Discount Received</option>
+                <option value="Commission Received">Commission Received</option>
+                <option value="Rent Received">Rent Received</option>
+                <option value="Dividend Income">Dividend Income</option>
+                <option value="Other Income">Other Income</option>
+                <option value="Sale of Fixed Assets">Sale of Fixed Assets</option>
+                <option value="Bad Debts Recovered">Bad Debts Recovered</option>
+              </optgroup>
+              
+              <!-- Expense Accounts -->
+              <optgroup label="EXPENSE ACCOUNTS">
+                <option value="Purchase">Purchase</option>
+                <option value="Raw Material Purchase">Raw Material Purchase</option>
+                <option value="Cost of Goods Sold">Cost of Goods Sold</option>
+                <option value="Salaries & Wages">Salaries & Wages</option>
+                <option value="Rent Expenses">Rent Expenses</option>
+                <option value="Electricity Charges">Electricity Charges</option>
+                <option value="Water Charges">Water Charges</option>
+                <option value="Telephone & Internet">Telephone & Internet</option>
+                <option value="Office Expenses">Office Expenses</option>
+                <option value="Printing & Stationery">Printing & Stationery</option>
+                <option value="Travel Expenses">Travel Expenses</option>
+                <option value="Vehicle Expenses">Vehicle Expenses</option>
+                <option value="Repairs & Maintenance">Repairs & Maintenance</option>
+                <option value="Depreciation">Depreciation</option>
+                <option value="Interest Paid">Interest Paid</option>
+                <option value="Bank Charges">Bank Charges</option>
+                <option value="Insurance Expenses">Insurance Expenses</option>
+                <option value="Legal Expenses">Legal Expenses</option>
+                <option value="Audit Fees">Audit Fees</option>
+                <option value="Professional Fees">Professional Fees</option>
+                <option value="Advertising Expenses">Advertising Expenses</option>
+                <option value="Bad Debts">Bad Debts</option>
+                <option value="Discount Allowed">Discount Allowed</option>
+                <option value="GST Expenses">GST Expenses</option>
+                <option value="TDS Expenses">TDS Expenses</option>
+                <option value="Freight & Transport">Freight & Transport</option>
+                <option value="Packaging Expenses">Packaging Expenses</option>
+                <option value="Miscellaneous Expenses">Miscellaneous Expenses</option>
+              </optgroup>
             </select>
           </div>
           <div class="mb-3">
@@ -33,10 +137,6 @@
               <option value="debit">Debit</option>
               <option value="credit">Credit</option>
             </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Description</label>
-            <textarea name="description" class="form-control" rows="2"></textarea>
           </div>
         </form>
       </div>

@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% block title %}{{ entity_name }} - Ledger{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <h4 class="fw-bold">📖 {{ entity_name }} - Ledger</h4>
+    <div class="d-flex gap-2">
+      <button onclick="window.print()" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-printer"></i> Print
+      </button>
+      <a href="{{ url_for('reports.account_ledger_pdf', account_id=(account.id if account else party.id if party else 0)) }}?entity={{ entity_type|lower }}" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-file-pdf"></i> PDF
+      </a>
+      <a href="{{ url_for('reports.account_ledger_excel', account_id=(account.id if account else party.id if party else 0)) }}?entity={{ entity_type|lower }}" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-file-excel"></i> Excel
+      </a>
+      <a href="{{ url_for('reports.balance_sheet') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Balance Sheet
+      </a>
+    </div>
+  </div>
+
+  <!-- Company Header with Stamp Area -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-primary text-white text-center">
+      <h5 class="mb-0">{{ company.name if company else 'Company Name' }}</h5>
+      <p class="mb-0">{{ company.address if company else 'Company Address' }}</p>
+      <p class="mb-0 small">{{ company.phone if company else 'Phone: Not Available' }}</p>
+      <p class="mb-0 small">{{ company.email if company else 'Email: Not Available' }}</p>
+    </div>
+    <div class="card-body text-center">
+      <!-- Stamp Area -->
+      <div class="stamp-area d-flex justify-content-center align-items-center">
+        <div class="stamp text-center">
+          <div class="stamp-border">
+            <div class="stamp-text">ORIGINAL</div>
+            <div class="stamp-text">COPY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Summary -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-info text-white">
+      <h5 class="mb-0">{{ entity_name }} - {{ entity_type }} Ledger</h5>
+      <p class="mb-0">Financial Year: {{ fy }} | Account Group: {{ entity_group }}</p>
+    </div>
+    <div class="card-body">
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <div class="card bg-light">
+            <div class="card-body text-center">
+              <h6 class="card-title">Opening Balance</h6>
+              <h4 class="text-{{ 'success' if opening_balance >= 0 else 'danger' }}">
+                ₹{{ "{:,.2f}".format(opening_balance) }}
+              </h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-light">
+            <div class="card-body text-center">
+              <h6 class="card-title">Closing Balance</h6>
+              <h4 class="text-{{ 'success' if closing_balance >= 0 else 'danger' }}">
+                ₹{{ "{:,.2f}".format(closing_balance) }}
+              </h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-light">
+            <div class="card-body text-center">
+              <h6 class="card-title">Net Change</h6>
+              <h4 class="text-{{ 'success' if (closing_balance - opening_balance) >= 0 else 'danger' }}">
+                ₹{{ "{:,.2f}".format(closing_balance - opening_balance) }}
+              </h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-light">
+            <div class="card-body text-center">
+              <h6 class="card-title">Total Transactions</h6>
+              <h4 class="text-primary">
+                {{ transactions|length }}
+              </h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Milk Statement Toggle Button -->
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Account Ledger</h5>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="milkStatementToggle" onchange="toggleMilkStatement()">
+              <label class="form-check-label" for="milkStatementToggle">
+                <i class="bi bi-cup-hot"></i> Show Milk Statement View
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Milk Statement View (Hidden by default) -->
+      <div id="milkStatementView" style="display: none;">
+        <div class="card shadow-sm mb-3">
+          <div class="card-header bg-success text-white">
+            <h6 class="mb-0"><i class="bi bi-cup-hot"></i> Milk Statement - Rate Calculation Details</h6>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                  <tr>
+                    <th width="5%" class="text-center">Sr No</th>
+                    <th width="8%" class="text-center">Date</th>
+                    <th width="6%" class="text-center">Shift</th>
+                    <th width="8%" class="text-center">Qty (L)</th>
+                    <th width="6%" class="text-center">Fat %</th>
+                    <th width="6%" class="text-center">SNF %</th>
+                    <th width="8%" class="text-center">Rate/L</th>
+                    <th width="10%" class="text-end">Basic Amount</th>
+                    <th width="8%" class="text-end">Fat Value</th>
+                    <th width="8%" class="text-end">SNF Value</th>
+                    <th width="10%" class="text-end">Total Amount</th>
+                    <th width="8%" class="text-center">BF/CLR</th>
+                    <th width="10%" class="text-end">Debit</th>
+                    <th width="10%" class="text-end">Credit</th>
+                    <th width="7%" class="text-end">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for txn in transactions %}
+                  {% if txn.qty_liters %}
+                  <tr>
+                    <td class="text-center">{{ loop.index }}</td>
+                    <td class="text-center">{{ txn.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="text-center">{{ txn.shift or '-' }}</td>
+                    <td class="text-center">{{ "{:,.2f}".format(txn.qty_liters) }}</td>
+                    <td class="text-center">{{ "{:,.1f}".format(txn.fat_percentage) if txn.fat_percentage else '-' }}</td>
+                    <td class="text-center">{{ "{:,.1f}".format(txn.snf_percentage) if txn.snf_percentage else '-' }}</td>
+                    <td class="text-center">{{ "{:,.2f}".format(txn.rate) if txn.rate else '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(txn.basic_amount) if txn.basic_amount else '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(txn.fat_value) if txn.fat_value else '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(txn.snf_value) if txn.snf_value else '-' }}</td>
+                    <td class="text-end fw-bold">{{ "{:,.2f}".format(txn.total_amount) if txn.total_amount else '-' }}</td>
+                    <td class="text-center">{{ txn.bf_clr or '-' }}</td>
+                    <td class="text-end fw-bold {{ 'text-danger' if txn.debit and txn.debit > 0 else '' }}">
+                      ₹{{ "{:,.2f}".format(txn.debit) if txn.debit and txn.debit > 0 else '' }}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-success' if txn.credit and txn.credit > 0 else '' }}">
+                      ₹{{ "{:,.2f}".format(txn.credit) if txn.credit and txn.credit > 0 else '' }}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-success' if txn.balance >= 0 else 'text-danger' }}">
+                      ₹{{ "{:,.2f}".format(txn.balance) }}
+                    </td>
+                  </tr>
+                  {% endif %}
+                  {% endfor %}
+                </tbody>
+                <tfoot class="table-secondary fw-bold">
+                  <tr>
+                    <td colspan="7" class="text-end">Grand Totals:</td>
+                    <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('basic_amount')|sum(attribute='basic_amount')|default(0)) }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('fat_value')|sum(attribute='fat_value')|default(0)) }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('snf_value')|sum(attribute='snf_value')|default(0)) }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('total_amount')|sum(attribute='total_amount')|default(0)) }}</td>
+                    <td></td>
+                    <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='debit')) }}</td>
+                    <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='credit')) }}</td>
+                    <td class="text-end {{ 'text-success' if closing_balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(closing_balance) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Standard Ledger View -->
+      <div id="standardLedgerView">
+        <table class="table table-bordered table-striped">
+          <thead class="table-dark">
+            <tr>
+              <th width="6%" class="text-center">Sr No</th>
+              <th width="10%" class="text-center">Date</th>
+              <th width="8%" class="text-center">Type</th>
+              <th width="42%">Description</th>
+              <th width="12%" class="text-end">Debit Amount</th>
+              <th width="12%" class="text-end">Credit Amount</th>
+              <th width="10%" class="text-end">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fw-bold bg-light">
+              <td colspan="4" class="text-end">Opening Balance as of {{ transactions[0].date.strftime('%d-%m-%Y') if transactions else 'N/A' }}</td>
+              <td class="text-end {{ 'text-success' if opening_balance >= 0 else 'text-danger' }}">
+                ₹{{ "{:,.2f}".format(opening_balance) }}
+              </td>
+              <td></td>
+              <td></td>
+            </tr>
+            {% for txn in transactions %}
+            <tr>
+              <td class="text-center">{{ loop.index }}</td>
+              <td class="text-center">{{ txn.date.strftime('%d-%m-%Y') }}</td>
+              <td class="text-center"><span class="badge bg-{{ 'primary' if txn.voucher_type == 'Journal' else 'success' if txn.voucher_type == 'Cash' else 'info' }}">{{ txn.voucher_type }}</span></td>
+              <td>{{ txn.narration }}</td>
+              <td class="text-end fw-bold {{ 'text-danger' if txn.debit and txn.debit > 0 else 'text-success' }}">
+                ₹{{ "{:,.2f}".format(txn.debit) if txn.debit and txn.debit > 0 else '' }}
+              </td>
+              <td class="text-end fw-bold {{ 'text-success' if txn.credit and txn.credit > 0 else 'text-danger' }}">
+                ₹{{ "{:,.2f}".format(txn.credit) if txn.credit and txn.credit > 0 else '' }}
+              </td>
+              <td class="text-end fw-bold {{ 'text-success' if txn.balance >= 0 else 'text-danger' }}">
+                ₹{{ "{:,.2f}".format(txn.balance) }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-secondary fw-bold">
+            <tr>
+              <td colspan="4">Totals:</td>
+              <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='debit')) }}</td>
+              <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='credit')) }}</td>
+              <td class="text-end {{ 'text-success' if closing_balance >= 0 else 'text-danger' }}">
+                ₹{{ "{:,.2f}".format(closing_balance) }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      </div> <!-- Close standardLedgerView -->
+    </div>
+  </div>
+
+  <!-- JavaScript for Toggle Function -->
+  <script>
+    function toggleMilkStatement() {
+      const toggle = document.getElementById('milkStatementToggle');
+      const milkView = document.getElementById('milkStatementView');
+      const standardView = document.getElementById('standardLedgerView');
+      
+      if (toggle.checked) {
+        milkView.style.display = 'block';
+        standardView.style.display = 'none';
+      } else {
+        milkView.style.display = 'none';
+        standardView.style.display = 'block';
+      }
+    }
+  </script>
+
+  <!-- Footer with Flash Card -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body text-center">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="flash-card">
+            <div class="flash-content">
+              <h6 class="mb-0">📋 Certified True</h6>
+              <p class="mb-0 small">This is a certified copy of the ledger</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="flash-card">
+            <div class="flash-content">
+              <h6 class="mb-0">👤 Authorized Signatory</h6>
+              <p class="mb-0 small">_________________________</p>
+              <p class="mb-0 small">Date: ___________________</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    .card {
+      page-break-inside: avoid;
+    }
+    .table {
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    .stamp-area {
+      margin: 20px 0;
+    }
+    .stamp {
+      border: 2px dashed #333;
+      width: 80px;
+      height: 80px;
+      position: relative;
+      display: inline-block;
+    }
+    .stamp-border {
+      border: 2px dashed #333;
+      width: 80px;
+      height: 80px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+    }
+    .stamp-text {
+      font-weight: bold;
+      font-size: 12px;
+      color: #333;
+    }
+    .flash-card {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 0 10px;
+      background: #f8f9fa;
+      min-height: 80px;
+    }
+    .flash-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+  }
+  
+  .ledger-link {
+    color: #0d6efd;
+    text-decoration: none;
+  }
+  
+  .ledger-link:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<script>
+  // Auto-calculate totals
+  document.addEventListener('DOMContentLoaded', function() {
+    // Add any interactive JavaScript if needed
+  });
+</script>
+{% endblock %}
