@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from flask_login import login_required, current_user
 from extensions import db
 from models import JournalHeader, JournalLine, Account
-from datetime import datetime
+from datetime import datetime, date
 
 journal_bp = Blueprint("journal", __name__)
 
