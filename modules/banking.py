@@ -228,7 +228,7 @@ def manual_entry(bank_id):
             if debit > 0:
                 # Bank is receiving money (debit)
                 lines.append(JournalLine(
-                    header_id=jh.id,
+                    journal_header_id=jh.id,
                     account_id=bank.account_id or bank_id,  # Use linked account or bank_id
                     debit=debit,
                     credit=0,
@@ -236,7 +236,7 @@ def manual_entry(bank_id):
                 ))
                 # Other account is giving money (credit)
                 lines.append(JournalLine(
-                    header_id=jh.id,
+                    journal_header_id=jh.id,
                     account_id=int(account_id),
                     debit=0,
                     credit=debit,
@@ -245,7 +245,7 @@ def manual_entry(bank_id):
             else:
                 # Bank is paying money (credit)
                 lines.append(JournalLine(
-                    header_id=jh.id,
+                    journal_header_id=jh.id,
                     account_id=bank.account_id or bank_id,  # Use linked account or bank_id
                     debit=0,
                     credit=credit,
@@ -253,7 +253,7 @@ def manual_entry(bank_id):
                 ))
                 # Other account is receiving money (debit)
                 lines.append(JournalLine(
-                    header_id=jh.id,
+                    journal_header_id=jh.id,
                     account_id=int(account_id),
                     debit=credit,
                     credit=0,
@@ -383,7 +383,7 @@ def quick_entry():
                     # Bank account line (opposite of transaction type)
                     if transaction_type == "Deposit":
                         lines.append(JournalLine(
-                            header_id=jh.id,
+                            journal_header_id=jh.id,
                             account_id=int(bank_account_id),
                             debit=credit,
                             credit=0,
@@ -391,7 +391,7 @@ def quick_entry():
                         ))
                         # Account line
                         lines.append(JournalLine(
-                            header_id=jh.id,
+                            journal_header_id=jh.id,
                             account_id=int(account_id),
                             debit=0,
                             credit=credit,
@@ -399,7 +399,7 @@ def quick_entry():
                         ))
                     else:  # Withdrawal/Payment
                         lines.append(JournalLine(
-                            header_id=jh.id,
+                            journal_header_id=jh.id,
                             account_id=int(bank_account_id),
                             debit=debit,
                             credit=0,
@@ -407,7 +407,7 @@ def quick_entry():
                         ))
                         # Account line
                         lines.append(JournalLine(
-                            header_id=jh.id,
+                            journal_header_id=jh.id,
                             account_id=int(account_id),
                             debit=0,
                             credit=debit,
