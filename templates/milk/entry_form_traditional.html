@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Traditional Milk Entry{% endblock %}
 {% block content %}
+<style>
+#partySearchResults .list-group-item {
+  color: #333 !important;
+  border: 1px solid #dee2e6;
+}
+#partySearchResults .list-group-item:hover {
+  background-color: #f8f9fa !important;
+}
+#partySearchResults .list-group-item:focus {
+  background-color: #e9ecef !important;
+  outline: 2px solid #007bff !important;
+}
+</style>
 
 <!-- Include Party Modal -->
 {% include 'milk/add_party_modal.html' %}
@@ -73,7 +86,7 @@
         <div class="col-md-3">
           <label class="form-label fw-bold">Party *</label>
           <div class="input-group">
-            <input type="text" id="partyName" class="form-control" placeholder="Type to search party..." 
+            <input type="text" id="partyName" class="form-control" placeholder="Type party name or click + to add new party..." 
                    value="{% if edit_mode and txn and txn.party %}{{ txn.party.name }}{% elif default_party %}{{ default_party.name }}{% endif %}" 
                    required autocomplete="off" onkeyup="searchPartyWithBalance()" onfocus="searchPartyWithBalance(true)">
             <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn %}{{ txn.party_id }}{% elif default_party %}{{ default_party.id }}{% endif %}" required>
@@ -87,7 +100,7 @@
             {% endfor %}
           </select>
           <!-- Autocomplete dropdown -->
-          <div id="partySearchResults" class="list-group position-absolute" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none; width: calc(100% - 48px);"></div>
+          <div id="partySearchResults" class="list-group position-absolute" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none; width: calc(100% - 48px); background: white; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>
           <small class="text-muted">Type party name or click + to add new party</small>
         </div>
         <div class="col-md-1">
@@ -148,7 +161,7 @@
               <div class="input-group">
                 <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control form-control-lg"
                        step="0.01" placeholder="0.00" value="{% if edit_mode and txn %}{{ txn.rate }}{% endif %}" required 
-                       onchange="calculateMilk(); calculateMarketRates()" oninput="calculateMilk(); calculateMarketRates()">
+                       onchange="calculateMarketRates(); calculateMilk()" oninput="calculateMarketRates(); calculateMilk()" onkeyup="calculateMarketRates(); calculateMilk()">
                 <span class="input-group-text">
                   <div class="card card-body bg-success bg-opacity-10 border-success p-2 mb-0">
                     <div class="text-center">
@@ -486,15 +499,20 @@ function calculateMilk() {
   let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
   let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
   
-  // Use daily rate entered by user (per 100kg)
-  const dailyRate = parseFloat(document.getElementById('rate_per_liter').value) || 0;
-  
+  // Use component rates for milk calculation (original method)
   let finalAmount, ratePerLiter;
   
-  // Calculate final amount using daily rate
-  // dailyRate is per 100kg, so convert to per liter: dailyRate / 100
-  ratePerLiter = dailyRate / 100;
-  finalAmount = qty * ratePerLiter;
+  // Always use component-based calculation for traditional method
+  const bfAmount = bfKgs * fatRate;
+  const snfAmount = snfKgs * snfRate;
+  finalAmount = bfAmount + snfAmount;
+  ratePerLiter = qty > 0 ? finalAmount / qty : 0;
+  
+  // Debug logging
+  console.log('Debug - Component calculation:');
+  console.log('Debug - bfKgs:', bfKgs, '× fatRate:', fatRate, '=', bfAmount);
+  console.log('Debug - snfKgs:', snfKgs, '× snfRate:', snfRate, '=', snfAmount);
+  console.log('Debug - finalAmount:', bfAmount, '+', snfAmount, '=', finalAmount);
   
   // Debug logging
   console.log('Debug - qty:', qty, 'fat:', fat, 'snf:', snf);
@@ -549,6 +567,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Party search with balance information
 let searchTimeout;
+let selectedPartyIndex = -1;
+
 function searchPartyWithBalance(forceShow = false) {
   clearTimeout(searchTimeout);
   const searchTerm = document.getElementById('partyName').value.trim();
@@ -556,6 +576,7 @@ function searchPartyWithBalance(forceShow = false) {
   
   if (!forceShow && searchTerm.length < 1) {
     resultsDiv.style.display = 'none';
+    selectedPartyIndex = -1;
     return;
   }
   
@@ -565,9 +586,13 @@ function searchPartyWithBalance(forceShow = false) {
       .then(data => {
         if (data.success && data.parties.length > 0) {
           let html = '';
-          data.parties.forEach(party => {
+          data.parties.forEach((party, index) => {
             html += `
-              <a href="#" class="list-group-item list-group-item-action" onclick="selectPartyFromSearch(${party.id}, '${party.name.replace(/'/g, "\\'")}'); return false;">
+              <a href="#" class="list-group-item list-group-item-action" 
+                 data-index="${index}" 
+                 data-party-id="${party.id}" 
+                 data-party-name="${party.name.replace(/'/g, "\\'")}"
+                 onclick="selectPartyFromSearch(${party.id}, '${party.name.replace(/'/g, "\\'")}'); return false;">
                 <div class="d-flex justify-content-between align-items-center">
                   <div>
                     <strong>${party.name}</strong>
@@ -583,13 +608,16 @@ function searchPartyWithBalance(forceShow = false) {
           });
           resultsDiv.innerHTML = html;
           resultsDiv.style.display = 'block';
+          selectedPartyIndex = -1;
         } else {
           resultsDiv.style.display = 'none';
+          selectedPartyIndex = -1;
         }
       })
       .catch(error => {
         console.error('Party search error:', error);
         resultsDiv.style.display = 'none';
+        selectedPartyIndex = -1;
       });
   }, 300);
 }
@@ -610,23 +638,52 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Select party from autocomplete
-function selectParty() {
-  const partyName = document.getElementById('partyName').value.trim();
-  const partyIdField = document.getElementById('partyId');
-  
-  // Don't process if empty
-  if (!partyName) {
-    partyIdField.value = '';
-    return;
-  }
-}
-
 // Add event listener for when user selects from datalist
 document.addEventListener('DOMContentLoaded', function() {
   const partyInput = document.getElementById('partyName');
   const cashToggle = document.getElementById('cashAccountToggle');
   const partyIdField = document.getElementById('partyId');
+  
+  // Keyboard navigation for party search
+  if (partyInput) {
+    partyInput.addEventListener('keydown', function(e) {
+      const resultsDiv = document.getElementById('partySearchResults');
+      const items = resultsDiv.querySelectorAll('.list-group-item');
+      
+      if (resultsDiv.style.display === 'block' && items.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedPartyIndex = Math.min(selectedPartyIndex + 1, items.length - 1);
+          updatePartySelection(items);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedPartyIndex = Math.max(selectedPartyIndex - 1, -1);
+          updatePartySelection(items);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (selectedPartyIndex >= 0 && items[selectedPartyIndex]) {
+            const partyId = items[selectedPartyIndex].dataset.partyId;
+            const partyName = items[selectedPartyIndex].dataset.partyName;
+            selectPartyFromSearch(partyId, partyName);
+          }
+        } else if (e.key === 'Escape') {
+          resultsDiv.style.display = 'none';
+          selectedPartyIndex = -1;
+        }
+      }
+    });
+  }
+  
+  function updatePartySelection(items) {
+    // Remove previous selection
+    items.forEach(item => item.classList.remove('active', 'bg-primary', 'text-white'));
+    
+    // Add selection to current item
+    if (selectedPartyIndex >= 0 && items[selectedPartyIndex]) {
+      items[selectedPartyIndex].classList.add('active', 'bg-primary', 'text-white');
+      items[selectedPartyIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
   
   // Party search and auto-creation logic
   if (partyInput) {
@@ -660,6 +717,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
+  // Check if party exists in datalist
+  function partyExists(name) {
+    const lookup = document.getElementById('partyLookup');
+    if (!lookup) {
+      return false;
+    }
+    return Array.from(lookup.options).some(option => option.value.toLowerCase() === name.toLowerCase());
+  }
+
   // Cash account toggle handler
   if (cashToggle) {
     cashToggle.addEventListener('change', function() {
@@ -677,15 +743,6 @@ document.addEventListener('DOMContentLoaded', function() {
         partyInput.classList.remove('bg-light');
       }
     });
-  }
-  
-  // Check if party exists in datalist
-  function partyExists(name) {
-    const lookup = document.getElementById('partyLookup');
-    if (!lookup) {
-      return false;
-    }
-    return Array.from(lookup.options).some(option => option.value.toLowerCase() === name.toLowerCase());
   }
 
   if (partyInput && partyInput.value.trim()) {
@@ -790,13 +847,6 @@ function resetForm() {
 // Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
   toggleGST();
-  
-  // Initialize Select2
-  $('.searchable-select').select2({
-    theme: 'bootstrap-5',
-    width: '100%',
-    allowClear: true
-  });
   
   // Initialize calculations on page load with a slight delay
   setTimeout(function() {

@@ -252,8 +252,7 @@ $(document).ready(function() {
                     width: '100%',
                     placeholder: "-- Select Account --",
                     allowClear: false,
-                    minimumResultsForSearch: 0,
-                    keyboardNavigation: true
+                    minimumResultsForSearch: 0
                 });
             }
         });
@@ -261,6 +260,16 @@ $(document).ready(function() {
     
     // Initialize on page load
     window.initSelect2();
+    
+    // Ensure keyboard navigation works properly
+    $(document).on('select2:open', function() {
+        setTimeout(function() {
+            const searchField = document.querySelector('.select2-search__field');
+            if (searchField) {
+                searchField.focus();
+            }
+        }, 100);
+    });
 });
 </script>
 {% block scripts %}{% endblock %}
