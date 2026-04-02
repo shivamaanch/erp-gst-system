@@ -730,14 +730,14 @@ def add():
         
         # Auto-post journal entry (double-entry accounting)
         if account_id:
-            # Find or create Cash Account
+            # Find or create Cash Account named "Cash in Hand"
             cash_account = Account.query.filter_by(company_id=cid, is_active=True).filter(
-                Account.name.ilike('%cash%')
+                Account.name == "Cash in Hand"
             ).first()
             if not cash_account:
                 cash_account = Account(
-                    company_id=cid, name="Cash Account", account_type="Cash",
-                    group_name="Cash-in-Hand", opening_dr=0, opening_cr=0, is_active=True
+                    company_id=cid, name="Cash in Hand",
+                    opening_dr=0, opening_cr=0, is_active=True
                 )
                 db.session.add(cash_account)
                 db.session.flush()

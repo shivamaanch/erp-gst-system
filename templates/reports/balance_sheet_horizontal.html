@@ -261,21 +261,21 @@
             {% if acc_data.group == 'Unsecured Loans' or 'Directors Loan' in acc_data.name %}
               {% set _ = unsecured_loans_accounts.append(acc_data) %}
             {% endif %}
-            {% if acc_data.group == 'Sundry Debtors' or 'Debtors' in acc_data.name %}
+            {% if acc_data.group == 'Sundry Debtors' or 'Debtors' in acc_data.name or 'Bank' in acc_data.name or acc_data.name == 'Cash in Hand' %}
               {% set _ = current_assets_accounts.append(acc_data) %}
             {% endif %}
           {% endfor %}
+          {% if not unsecured_loans_accounts %}
+            {% set _ = unsecured_loans_accounts.append({'id': 9999, 'name': 'Directors Loan', 'balance': 0.0}) %}
+            {% set _ = unsecured_loans_accounts.append({'id': 9998, 'name': 'Other Loans', 'balance': 0.0}) %}
+          {% endif %}
           
           <!-- Add default accounts if none found -->
-          {% if not unsecured_loans_accounts %}
-            {% set _ = unsecured_loans_accounts.append({'id': 0, 'name': 'Directors Loan', 'balance': 0.0}) %}
-            {% set _ = unsecured_loans_accounts.append({'id': 0, 'name': 'Other Loans', 'balance': 0.0}) %}
-          {% endif %}
           {% if not current_assets_accounts %}
-            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Sundry Debtors', 'balance': 0.0}) %}
-            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Stock in Hand', 'balance': 0.0}) %}
-            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Cash in Hand', 'balance': 0.0}) %}
-            {% set _ = current_assets_accounts.append({'id': 0, 'name': 'Bank Balance', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 9997, 'name': 'Sundry Debtors', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 9996, 'name': 'Stock in Hand', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 9995, 'name': 'Cash in Hand', 'balance': 0.0}) %}
+            {% set _ = current_assets_accounts.append({'id': 9994, 'name': 'Bank Balance', 'balance': 0.0}) %}
           {% endif %}
           
           <!-- Display aligned rows -->

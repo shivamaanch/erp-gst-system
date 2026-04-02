@@ -49,12 +49,12 @@
             <td><a href="#" class="ledger-link" data-ledger="Opening Stock">Opening Stock</a></td>
             <td class="text-end">0.00</td>
             <td width="3%"></td>
-            <td><a href="#" class="ledger-link" data-ledger="Sales">Sales</a></td>
+            <td><a href="{{ url_for('reports.account_ledger', account_id=0) }}?entity=account&report_type=sales" class="ledger-link" data-ledger="Sales">Sales</a></td>
             <td class="text-end">{{ "{:,.2f}".format(sales) }}</td>
           </tr>
           <tr>
             <td></td>
-            <td><a href="#" class="ledger-link" data-ledger="Purchases">Purchases</a></td>
+            <td><a href="{{ url_for('reports.account_ledger', account_id=0) }}?entity=account&report_type=purchases" class="ledger-link" data-ledger="Purchases">Purchases</a></td>
             <td class="text-end">{{ "{:,.2f}".format(purchases) }}</td>
             <td></td>
             <td>Service Income</td>

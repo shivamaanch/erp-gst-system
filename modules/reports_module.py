@@ -211,10 +211,16 @@ def account_ledger(account_id):
     party = None
 
     from models import Party
+    report_type = request.args.get("report_type", "")
+    
     if entity == "party":
         party = Party.query.filter_by(id=account_id, company_id=cid).first()
     elif entity == "account":
-        account = Account.query.filter_by(id=account_id, company_id=cid).first()
+        if account_id == 0 and report_type:
+            # Special case: sales/purchases from P&L
+            account = None
+        else:
+            account = Account.query.filter_by(id=account_id, company_id=cid).first()
     else:
         account = Account.query.filter_by(id=account_id, company_id=cid).first()
         if not account:
@@ -229,6 +235,11 @@ def account_ledger(account_id):
         entity_name = party.name
         entity_group = f"Party - {party.party_type}"
         entity_type = "Party"
+    elif account_id == 0 and report_type:
+        # Special case from P&L links
+        entity_name = report_type.title()
+        entity_group = "P&L Summary"
+        entity_type = "Report"
     else:
         entity_name = "Unknown Entity"
         entity_group = "Default Group"
@@ -263,6 +274,24 @@ def account_ledger(account_id):
             Bill.fin_year == fy,
             Bill.is_cancelled == False
         ).order_by(Bill.bill_date, Bill.id).all()
+    
+    elif entity_type == "Report" and report_type:
+        # Special case: Sales or Purchases from P&L
+        from models import Bill
+        if report_type == "sales":
+            transactions = Bill.query.filter(
+                Bill.company_id == cid,
+                Bill.fin_year == fy,
+                Bill.bill_type == "Sales",
+                Bill.is_cancelled == False
+            ).order_by(Bill.bill_date, Bill.id).all()
+        elif report_type == "purchases":
+            transactions = Bill.query.filter(
+                Bill.company_id == cid,
+                Bill.fin_year == fy,
+                Bill.bill_type == "Purchase",
+                Bill.is_cancelled == False
+            ).order_by(Bill.bill_date, Bill.id).all()
     
     # Calculate opening balance
     opening_balance = 0.0

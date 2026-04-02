@@ -156,6 +156,8 @@ def emergency_database_fix():
                 "ALTER TABLE cash_book ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
                 # Fix existing balance_type column to allow longer values
                 "ALTER TABLE parties ALTER COLUMN balance_type TYPE VARCHAR(10)",
+                # Add is_cancelled column to journal_headers
+                "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT FALSE",
             ]
 
             for sql in all_ddl:

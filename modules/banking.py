@@ -67,8 +67,22 @@ def add_account():
             account_type=request.form.get("account_type","Current"),
             opening_balance=float(request.form.get("opening_balance") or 0)
         )
-        db.session.add(b); db.session.commit()
-        flash(f"✅ Bank account '{acc_name}' created!", "success")
+        db.session.add(b)
+        db.session.flush()  # Get the bank account ID
+        
+        # Create corresponding ledger account for the bank
+        from models import Account
+        bank_account = Account(
+            company_id=cid,
+            name=f"{acc_name} - {request.form['bank_name'].strip()}",
+            opening_dr=float(request.form.get("opening_balance") or 0),
+            opening_cr=0,
+            is_active=True
+        )
+        db.session.add(bank_account)
+        db.session.commit()
+        
+        flash(f"✅ Bank account '{acc_name}' created with ledger account!", "success")
         return redirect(url_for("banking.accounts"))
     return render_template("banking/account_form.html")
 
