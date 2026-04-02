@@ -158,6 +158,8 @@ def emergency_database_fix():
                 "ALTER TABLE parties ALTER COLUMN balance_type TYPE VARCHAR(10)",
                 # Add is_cancelled column to journal_headers
                 "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT FALSE",
+                # Add account_id column to bank_accounts
+                "ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS account_id INTEGER",
             ]
 
             for sql in all_ddl:

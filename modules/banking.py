@@ -75,11 +75,17 @@ def add_account():
         bank_account = Account(
             company_id=cid,
             name=f"{acc_name} - {request.form['bank_name'].strip()}",
+            group_name="Bank Accounts",
             opening_dr=float(request.form.get("opening_balance") or 0),
             opening_cr=0,
             is_active=True
         )
         db.session.add(bank_account)
+        db.session.flush()  # Get the ledger account ID
+        
+        # Link bank account to ledger account
+        b.account_id = bank_account.id
+        
         db.session.commit()
         
         flash(f"✅ Bank account '{acc_name}' created with ledger account!", "success")

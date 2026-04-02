@@ -638,6 +638,8 @@ class BankAccount(db.Model):
     opening_balance = db.Column(db.Numeric(14,2), default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Link to corresponding ledger account
+    account_id = db.Column(db.Integer, db.ForeignKey("accounts.id"))
     transactions = db.relationship("BankTransaction", backref="bank_account", lazy="dynamic")
     __table_args__ = (db.UniqueConstraint("company_id","account_no", name="uq_bank_acno"),)
 
