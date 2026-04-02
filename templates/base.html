@@ -242,12 +242,22 @@
 <script>
 $(document).ready(function() {
     if (!$.fn || !$.fn.select2) return;
-    // Initialize all searchable selects automatically
-    $('.searchable-select').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        allowClear: true
-    });
+    
+    // Function to initialize Select2 on searchable selects
+    window.initSelect2 = function() {
+        $('.searchable-select').each(function() {
+            if (!$(this).data('select2')) {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: "-- Select Account --"
+                });
+            }
+        });
+    }
+    
+    // Initialize on page load
+    window.initSelect2();
 });
 </script>
 {% block scripts %}{% endblock %}

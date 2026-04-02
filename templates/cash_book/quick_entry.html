@@ -375,6 +375,10 @@ function addRow() {
   const newRow = createRow();
   tbody.appendChild(newRow);
   attachEventListeners();
+  // Re-initialize Select2 for new dropdowns
+  if (typeof initSelect2 === 'function') {
+    setTimeout(initSelect2, 100);
+  }
 }
 
 function removeRow(btn) {
