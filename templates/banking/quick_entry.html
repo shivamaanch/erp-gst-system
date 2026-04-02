@@ -460,17 +460,6 @@ function saveQuickBankAccount() {
   });
 }
 
-$(document).ready(function() {
-    // Initialize all searchable selects
-    $('.searchable-select').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: function() {
-            $(this).data('placeholder', $(this).attr('placeholder'));
-            return $(this).attr('placeholder');
-        },
-        allowClear: true
-    });
-});
+// Select2 is initialized globally in base.html
 </script>
 {% endblock %}
