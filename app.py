@@ -160,6 +160,8 @@ def emergency_database_fix():
                 "ALTER TABLE journal_headers ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN NOT NULL DEFAULT FALSE",
                 # Add account_id column to bank_accounts
                 "ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS account_id INTEGER",
+                # Add expires_at column to user_companies
+                "ALTER TABLE user_companies ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP",
             ]
 
             for sql in all_ddl:
