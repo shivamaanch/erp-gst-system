@@ -24,7 +24,7 @@
           <label class="form-label">Bank Account *</label>
           <select name="bank_account_id" class="form-select searchable-select" required>
             <option value="">-- Select Bank Account --</option>
-            {% for bank in all_banks %}
+            {% for bank in banks %}
             <option value="{{ bank.id }}" {% if default_bank and bank.id == default_bank.id %}selected{% endif %}>{{ bank.account_name }} - {{ bank.bank_name }} {% if bank.account_no %}({{ bank.account_no }}){% endif %}</option>
             {% endfor %}
           </select>
@@ -123,7 +123,7 @@
       <div class="d-flex gap-2">
         <button type="button" class="btn btn-outline-primary" onclick="addRow()">+ Add Row</button>
         <button type="button" class="btn btn-success" onclick="saveSingleRow()">Save Single Row</button>
-        <button type="submit" class="btn btn-primary" id="saveBtn">Save Bank Entry</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save All Entries</button>
         <button type="reset" class="btn btn-outline-warning">Reset</button>
         <a href="{{ url_for('banking.accounts') }}" class="btn btn-outline-secondary">Cancel</a>
       </div>
@@ -132,73 +132,6 @@
 </div>
 
 <script>
-function saveSingleRow() {
-  const firstRow = document.querySelector('#bankBody tr');
-  if (!firstRow) {
-    alert('Please add at least one row');
-    return;
-  }
-  
-  const accountSelect = firstRow.querySelector('select[name="account_id[]"]');
-  const debitInput = firstRow.querySelector('input[name="debit[]"]');
-  const creditInput = firstRow.querySelector('input[name="credit[]"]');
-  const narrationInput = firstRow.querySelector('input[name="narration[]"]');
-  
-  if (!accountSelect.value || (!debitInput.value && !creditInput.value)) {
-    alert('Please fill account and at least one amount in the first row');
-    return;
-  }
-  
-  // Create hidden form for single row submission
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.style.display = 'none';
-  
-  // Add all existing form fields
-  const mainForm = document.getElementById('quickBankForm');
-  for (let input of mainForm.querySelectorAll('input, select')) {
-    if (input.type !== 'submit' && input.type !== 'reset') {
-      const clone = input.cloneNode(true);
-      form.appendChild(clone);
-    }
-  }
-  
-  // Add single row indicator
-  const singleInput = document.createElement('input');
-  singleInput.type = 'hidden';
-  singleInput.name = 'single_save';
-  singleInput.value = 'true';
-  form.appendChild(singleInput);
-  
-  // Add first row data with non-array names
-  const accountInput = document.createElement('input');
-  accountInput.type = 'hidden';
-  accountInput.name = 'account_id';
-  accountInput.value = accountSelect.value;
-  form.appendChild(accountInput);
-  
-  const debitInput2 = document.createElement('input');
-  debitInput2.type = 'hidden';
-  debitInput2.name = 'debit';
-  debitInput2.value = debitInput.value;
-  form.appendChild(debitInput2);
-  
-  const creditInput2 = document.createElement('input');
-  creditInput2.type = 'hidden';
-  creditInput2.name = 'credit';
-  creditInput2.value = creditInput.value;
-  form.appendChild(creditInput2);
-  
-  const narrationInput2 = document.createElement('input');
-  narrationInput2.type = 'hidden';
-  narrationInput2.name = 'narration';
-  narrationInput2.value = narrationInput.value;
-  form.appendChild(narrationInput2);
-  
-  document.body.appendChild(form);
-  form.submit();
-}
-
 function createRow() {
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
@@ -365,15 +298,12 @@ function calculateTotals() {
   document.getElementById('totalDebit').textContent = totalDebit.toFixed(2);
   document.getElementById('totalCredit').textContent = totalCredit.toFixed(2);
   
-  // Show/hide balance alert
+  // Show warning but DO NOT block saving (each row is independent)
   const alert = document.getElementById('balanceAlert');
-  const saveBtn = document.getElementById('saveBtn');
   if (Math.abs(totalDebit - totalCredit) > 0.01) {
     alert.classList.remove('d-none');
-    saveBtn.disabled = true;
   } else {
     alert.classList.add('d-none');
-    saveBtn.disabled = false;
   }
 }
 
@@ -428,17 +358,6 @@ function handleEnterKey(e) {
     }
   }
 }
-
-// Form validation
-document.getElementById('quickBankForm').addEventListener('submit', function(e) {
-  const totalDebit = parseFloat(document.getElementById('totalDebit').textContent) || 0;
-  const totalCredit = parseFloat(document.getElementById('totalCredit').textContent) || 0;
-  
-  if (Math.abs(totalDebit - totalCredit) > 0.01) {
-    e.preventDefault();
-    alert('Bank entry must be balanced (Debit = Credit)');
-  }
-});
 
 // Initialize with 20 rows
 document.addEventListener('DOMContentLoaded', function() {
@@ -506,10 +425,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Include Quick Add Ledger Modal -->
 {% include 'shared/quick_add_ledger.html' %}
-
-<!-- Select2 for searchable dropdowns -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 function showQuickAddBankAccount() {

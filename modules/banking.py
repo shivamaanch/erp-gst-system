@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify, send_file
-from flask_login import login_required
+from flask_login import login_required, current_user
 from extensions import db
 from models import BankAccount, BankTransaction, BankImportLog, Party, Account, JournalHeader, JournalLine
 from datetime import date, datetime
@@ -276,10 +276,7 @@ def quick_entry():
     cid = session.get("company_id")
     fy = session.get("fin_year")
     
-    # Get bank accounts from BankAccount table
-    bank_accounts = BankAccount.query.filter_by(company_id=cid, is_active=True).all()
-    
-    # Also get accounts from Chart of Accounts that are bank accounts
+    # Ensure: every bank ledger account has a corresponding BankAccount row
     bank_ledger_accounts = Account.query.filter(
         Account.company_id == cid,
         Account.is_active == True,
@@ -292,49 +289,55 @@ def quick_entry():
             Account.name.ilike('%axis%')
         )
     ).order_by(Account.name).all()
-    
-    # Combine both - mark source for display
-    all_banks = []
-    for b in bank_accounts:
-        all_banks.append({
-            'id': b.id,
-            'account_name': b.account_name,
-            'bank_name': b.bank_name,
-            'account_no': b.account_no,
-            'source': 'bank_account'
-        })
-    for a in bank_ledger_accounts:
-        # Avoid duplicates
-        if not any(b['account_name'] == a.name for b in all_banks):
-            all_banks.append({
-                'id': a.id,
-                'account_name': a.name,
-                'bank_name': a.group_name or 'Ledger Account',
-                'account_no': '',
-                'source': 'account'
-            })
-    
+
+    for acc in bank_ledger_accounts:
+        existing = BankAccount.query.filter_by(company_id=cid, account_id=acc.id).first()
+        if not existing:
+            db.session.add(BankAccount(
+                company_id=cid,
+                account_name=acc.name,
+                bank_name=(acc.group_name or "Bank"),
+                account_no=None,
+                ifsc=None,
+                branch=None,
+                account_type="Current",
+                opening_balance=0,
+                is_active=True,
+                account_id=acc.id,
+            ))
+    db.session.commit()
+
+    banks = BankAccount.query.filter_by(company_id=cid, is_active=True).order_by(BankAccount.account_name).all()
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     # Calculate previous bank balances
     bank_balances = {}
     today = date.today()
-    
-    for bank in all_banks:
-        # Get journal lines for this bank account up to today
+    from utils.filters import fy_dates
+    start, end = fy_dates(fy)
+    if today < end:
+        end = today
+
+    for bank in banks:
+        ledger_account_id = bank.account_id
+        if not ledger_account_id:
+            continue
+
         journal_lines = JournalLine.query.join(JournalHeader).filter(
             JournalHeader.company_id == cid,
-            JournalLine.account_id == bank['id'],
-            JournalHeader.voucher_date <= today
+            JournalHeader.fin_year == fy,
+            JournalHeader.voucher_date >= start,
+            JournalHeader.voucher_date <= end,
+            JournalHeader.is_cancelled == False,
+            JournalLine.account_id == ledger_account_id,
         ).all()
-        
-        # Calculate balance: Debit - Credit
-        balance = 0.0
+
+        balance = float(bank.opening_balance or 0)
         for line in journal_lines:
             balance += float(line.debit or 0)
             balance -= float(line.credit or 0)
-        
-        bank_balances[bank['id']] = balance
+
+        bank_balances[bank.id] = balance
     
     if request.method == "POST":
         bank_account_id = request.form.get("bank_account_id")
@@ -346,93 +349,150 @@ def quick_entry():
         # Check if this is a single row save or batch save
         single_save = request.form.get("single_save") == "true"
         
+        bank_obj = BankAccount.query.filter_by(id=bank_account_id, company_id=cid, is_active=True).first()
+        if not bank_obj or not bank_obj.account_id:
+            flash("❌ Please select a valid bank account", "danger")
+            return redirect(url_for("banking.quick_entry"))
+
+        def _auto_narration(is_receipt: bool) -> str:
+            mode = payment_mode or "Bank"
+            ref = reference_no.strip()
+            party = party_name.strip()
+            if is_receipt:
+                base = f"Amount received in bank via {mode}" + (f" ({ref})" if ref else "")
+            else:
+                base = f"Payment made from bank via {mode}" + (f" ({ref})" if ref else "")
+            if party:
+                return f"{base} - {party}"
+            return base
+
+        def _post_one(entry_date, other_account_id, dr_amount, cr_amount, narration_text):
+            # 1) Banking transaction (for Banking -> Transactions screen)
+            bt = BankTransaction(
+                company_id=cid,
+                fin_year=fy,
+                bank_account_id=bank_obj.id,
+                txn_date=entry_date,
+                description=narration_text,
+                ref_no=reference_no,
+                debit=dr_amount,
+                credit=cr_amount,
+                txn_mode=(payment_mode or "Bank"),
+                ledger_type="BANK",
+            )
+            db.session.add(bt)
+
+            # 2) Journal entry (for Ledger / BS / P&L)
+            jh = JournalHeader(
+                company_id=cid,
+                fin_year=fy,
+                voucher_no=None,
+                voucher_type="Bank",
+                voucher_date=entry_date,
+                narration=narration_text,
+                created_by=current_user.id,
+            )
+            db.session.add(jh)
+            db.session.flush()
+
+            if dr_amount > 0:
+                # Receipt: Bank Dr, Other Cr
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=bank_obj.account_id,
+                    debit=dr_amount,
+                    credit=0,
+                    narration=narration_text,
+                ))
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=int(other_account_id),
+                    debit=0,
+                    credit=dr_amount,
+                    narration=narration_text,
+                ))
+            else:
+                # Payment: Other Dr, Bank Cr
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=int(other_account_id),
+                    debit=cr_amount,
+                    credit=0,
+                    narration=narration_text,
+                ))
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=bank_obj.account_id,
+                    debit=0,
+                    credit=cr_amount,
+                    narration=narration_text,
+                ))
+
         if single_save:
-            # Single row save
             row_date = request.form.get("row_date", date.today().isoformat())
-            account_id = request.form.get("account_id")
-            debit = float(request.form.get("debit") or 0)
-            credit = float(request.form.get("credit") or 0)
-            narration = request.form.get("narration", "").strip()
-            
-            if (debit > 0 or credit > 0) and account_id:
-                # Create journal entry
-                txn_date = datetime.strptime(row_date, "%Y-%m-%d").date()
-                
-                # Get bank account info
-                bank_account = None
-                for b in all_banks:
-                    if str(b['id']) == bank_account_id:
-                        bank_account = b
-                        break
-                
-                if bank_account:
-                    # Create journal header
-                    jh = JournalHeader(
-                        company_id=cid,
-                        fin_year=fy,
-                        voucher_date=txn_date,
-                        voucher_type="Bank",
-                        narration=f"Bank Transaction - {party_name} - {narration}" if narration else f"Bank Transaction - {party_name}"
-                    )
-                    db.session.add(jh)
-                    db.session.flush()
-                    
-                    # Create journal lines
-                    lines = []
-                    
-                    # Bank account line (opposite of transaction type)
-                    if transaction_type == "Deposit":
-                        lines.append(JournalLine(
-                            journal_header_id=jh.id,
-                            account_id=int(bank_account_id),
-                            debit=credit,
-                            credit=0,
-                            narration=f"{party_name} - {narration}" if narration else party_name
-                        ))
-                        # Account line
-                        lines.append(JournalLine(
-                            journal_header_id=jh.id,
-                            account_id=int(account_id),
-                            debit=0,
-                            credit=credit,
-                            narration=f"{party_name} - {narration}" if narration else party_name
-                        ))
-                    else:  # Withdrawal/Payment
-                        lines.append(JournalLine(
-                            journal_header_id=jh.id,
-                            account_id=int(bank_account_id),
-                            debit=debit,
-                            credit=0,
-                            narration=f"{party_name} - {narration}" if narration else party_name
-                        ))
-                        # Account line
-                        lines.append(JournalLine(
-                            journal_header_id=jh.id,
-                            account_id=int(account_id),
-                            debit=0,
-                            credit=debit,
-                            narration=f"{party_name} - {narration}" if narration else party_name
-                        ))
-                    
-                    db.session.add_all(lines)
-                    db.session.commit()
-                    
-                    flash("✅ Bank entry saved successfully!", "success")
+            other_account_id = request.form.get("account_id")
+            dr_amount = float(request.form.get("debit") or 0)
+            cr_amount = float(request.form.get("credit") or 0)
+            narration_text = (request.form.get("narration") or "").strip()
+
+            if not other_account_id or (dr_amount <= 0 and cr_amount <= 0):
+                flash("❌ Please fill account and amount", "danger")
+                return redirect(url_for("banking.quick_entry"))
+
+            entry_date = datetime.strptime(row_date, "%Y-%m-%d").date()
+            session["last_txn_date"] = entry_date.isoformat()
+            if not narration_text:
+                narration_text = _auto_narration(is_receipt=(dr_amount > 0))
+
+            _post_one(entry_date, other_account_id, dr_amount, cr_amount, narration_text)
+            db.session.commit()
+            flash("✅ Bank entry saved successfully!", "success")
+            return redirect(url_for("banking.quick_entry"))
+
+        # Batch save: save all filled rows (no overall balancing required)
+        row_dates = request.form.getlist("row_date[]")
+        other_accounts = request.form.getlist("account_id[]")
+        debits = request.form.getlist("debit[]")
+        credits = request.form.getlist("credit[]")
+        narrations = request.form.getlist("narration[]")
+
+        created = 0
+        for i in range(len(other_accounts)):
+            if not other_accounts[i]:
+                continue
+            dr_amount = float(debits[i] or 0)
+            cr_amount = float(credits[i] or 0)
+            if dr_amount <= 0 and cr_amount <= 0:
+                continue
+
+            entry_date = date.today()
+            if i < len(row_dates) and row_dates[i]:
+                entry_date = datetime.strptime(row_dates[i], "%Y-%m-%d").date()
+            session["last_txn_date"] = entry_date.isoformat()
+
+            narration_text = (narrations[i] or "").strip()
+            if not narration_text:
+                narration_text = _auto_narration(is_receipt=(dr_amount > 0))
+
+            _post_one(entry_date, other_accounts[i], dr_amount, cr_amount, narration_text)
+            created += 1
+
+        if created:
+            db.session.commit()
+            flash(f"✅ Saved {created} bank entr{'y' if created==1 else 'ies'}", "success")
         else:
-            # Batch save logic here...
-            pass
-        
-        return redirect(url_for("banking.accounts"))
+            flash("⚠️ No filled rows found to save", "warning")
+
+        return redirect(url_for("banking.quick_entry"))
     
     # Get default bank account
-    default_bank = all_banks[0] if all_banks else None
+    default_bank = banks[0] if banks else None
     
     # Default date to last used or today
     default_date = session.get("last_txn_date") or date.today().isoformat()
     
     return render_template("banking/quick_entry.html", 
-                         banks=all_banks,
-                         all_banks=all_banks,
+                         banks=banks,
                          accounts=accounts,
                          default_bank=default_bank,
                          today=default_date,

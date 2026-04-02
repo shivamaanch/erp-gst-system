@@ -17,33 +17,44 @@ def get_account_balances():
     from utils.filters import fy_dates
     start, end = fy_dates(fy)
     
-    # Get all account balances
-    account_balances = db.session.query(
-        Account.id,
-        Account.name,
-        Account.group_name,
-        func.sum(JournalLine.debit).label("dr"),
-        func.sum(JournalLine.credit).label("cr"),
-    ).join(JournalLine, JournalLine.account_id == Account.id
-    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    journal_sums = db.session.query(
+        JournalLine.account_id.label("account_id"),
+        func.coalesce(func.sum(JournalLine.debit), 0).label("dr"),
+        func.coalesce(func.sum(JournalLine.credit), 0).label("cr"),
+    ).join(
+        JournalHeader, JournalHeader.id == JournalLine.journal_header_id
     ).filter(
-        Account.company_id == cid,
         JournalHeader.company_id == cid,
+        JournalHeader.fin_year == fy,
+        JournalHeader.voucher_date >= start,
         JournalHeader.voucher_date <= end,
         JournalHeader.is_cancelled == False,
-        Account.is_active == True
-    ).group_by(Account.id, Account.name, Account.group_name).all()
-    
-    # Calculate balances and filter non-zero balances
+    ).group_by(JournalLine.account_id).subquery()
+
+    accounts_with_sums = db.session.query(
+        Account,
+        journal_sums.c.dr,
+        journal_sums.c.cr,
+    ).outerjoin(
+        journal_sums, journal_sums.c.account_id == Account.id
+    ).filter(
+        Account.company_id == cid,
+        Account.is_active == True,
+    ).all()
+
     balances = {}
-    for acc in account_balances:
-        balance = float(acc.dr or 0) - float(acc.cr or 0)
-        if abs(balance) > 0.01:  # Only include accounts with balance
+    for acc, dr, cr in accounts_with_sums:
+        opening = float(acc.opening_dr or 0) - float(acc.opening_cr or 0)
+        txn_balance = float(dr or 0) - float(cr or 0)
+        balance = opening + txn_balance
+        if abs(balance) > 0.01:
             balances[acc.id] = {
+                'id': acc.id,
                 'name': acc.name,
                 'group': acc.group_name,
-                'balance': balance
+                'balance': balance,
             }
+
     return balances
 
 @reports_bp.route("/reports/hub")
@@ -64,35 +75,9 @@ def hub():
     from utils.filters import fy_dates
     start, end = fy_dates(fy)
     
-    # Get all account balances for financial position
-    account_balances = db.session.query(
-        Account.id,
-        Account.name,
-        Account.group_name,
-        func.sum(JournalLine.debit).label("dr"),
-        func.sum(JournalLine.credit).label("cr"),
-    ).join(JournalLine, JournalLine.account_id == Account.id
-    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
-    ).filter(
-        Account.company_id == cid,
-        JournalHeader.company_id == cid,
-        JournalHeader.voucher_date <= end,
-        JournalHeader.is_cancelled == False,
-        Account.is_active == True
-    ).group_by(Account.id, Account.name, Account.group_name).all()
-    
-    # Calculate financial position
-    financial_position = 0.0
-    for acc in account_balances:
-        balance = float(acc.dr or 0) - float(acc.cr or 0)
-        
-        # Add opening balance if available
-        if hasattr(acc, 'opening_dr') and acc.opening_dr:
-            balance += float(acc.opening_dr)
-        if hasattr(acc, 'opening_cr') and acc.opening_cr:
-            balance -= float(acc.opening_cr)
-        
-        financial_position += balance
+    # Calculate financial position (Total Assets) from FY-filtered balances
+    balances = get_account_balances()
+    financial_position = sum(v['balance'] for v in balances.values() if float(v.get('balance') or 0) > 0)
     
     # Calculate net profit
     net_profit = total_sales - total_purchases

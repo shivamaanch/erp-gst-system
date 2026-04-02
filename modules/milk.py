@@ -543,6 +543,47 @@ def add_entry():
     last_party_id = session.get("last_milk_party_id")
     last_party = Party.query.filter_by(id=last_party_id, company_id=cid).first() if last_party_id else None
     
+    # Get last milk entry for display
+    last_entry = None
+    try:
+        from sqlalchemy import text
+        sql = """
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
+               p.name as party_name
+        FROM milk_transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        WHERE t.company_id = :company_id 
+        ORDER BY t.txn_date DESC, t.id DESC
+        LIMIT 1
+        """
+        result = db.session.execute(text(sql), {"company_id": cid})
+        row = result.fetchone()
+        if row:
+            class LastMilkEntry:
+                def __init__(self, row):
+                    self.id = row.id
+                    # Handle date conversion properly
+                    from datetime import datetime
+                    if isinstance(row.txn_date, str):
+                        self.txn_date = datetime.strptime(row.txn_date, '%Y-%m-%d').date()
+                    else:
+                        self.txn_date = row.txn_date
+                    self.shift = row.shift
+                    self.txn_type = row.txn_type
+                    self.qty_liters = row.qty_liters
+                    self.fat = row.fat
+                    self.snf = row.snf
+                    self.clr = row.clr
+                    self.rate = row.rate
+                    self.amount = row.amount
+                    self.party_name = row.party_name or "Cash Account"
+                    self.narration = row.narration
+            last_entry = LastMilkEntry(row)
+    except Exception as e:
+        print(f"DEBUG: Could not fetch last entry: {e}")
+        last_entry = None
+    
     if request.method == "POST":
         fat=float(request.form["fat"]) 
         if fat > 10:
@@ -726,7 +767,7 @@ def add_entry():
         flash(msg,"success")
         return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
         
-    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party)
+    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party, last_entry=last_entry)
 
 @milk_bp.route("/entry/<int:txn_id>/edit", methods=["GET","POST"])
 def edit_entry(txn_id):

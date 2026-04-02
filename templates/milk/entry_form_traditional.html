@@ -16,6 +16,32 @@
   </div>
 </div>
 
+<!-- Last Entry Display -->
+{% if last_entry %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h6 class="alert-heading mb-2">✅ Last Saved Entry</h6>
+      <div class="row g-2">
+        <div class="col-auto"><strong>Date:</strong> {{ last_entry.txn_date.strftime('%d-%b-%Y') }}</div>
+        <div class="col-auto"><strong>Shift:</strong> {{ last_entry.shift }}</div>
+        <div class="col-auto"><strong>Type:</strong> {{ last_entry.txn_type }}</div>
+        <div class="col-auto"><strong>Party:</strong> {{ last_entry.party_name }}</div>
+        <div class="col-auto"><strong>Qty:</strong> {{ last_entry.qty_liters }}L</div>
+        <div class="col-auto"><strong>FAT:</strong> {{ last_entry.fat }}%</div>
+        <div class="col-auto"><strong>SNF:</strong> {{ last_entry.snf }}%</div>
+        <div class="col-auto"><strong>Rate:</strong> ₹{{ last_entry.rate }}/100kg</div>
+        <div class="col-auto"><strong>Amount:</strong> ₹{{ last_entry.amount }}</div>
+      </div>
+      {% if last_entry.narration %}
+      <div class="mt-1"><small class="text-muted">Note: {{ last_entry.narration }}</small></div>
+      {% endif %}
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+</div>
+{% endif %}
+
 <div class="card border-0 shadow-sm">
   <div class="card-body">
     <form method="POST" id="milkForm">
@@ -74,15 +100,16 @@
           </div>
           <small class="text-muted">Cash transaction</small>
         </div>
-        <div class="col-md-4">
-          <label class="form-label fw-bold">Item *</label>
-          <select name="item_name" class="form-select" required>
-            <option value="Milk" selected>Milk</option>
-            <!-- You can add more items from Items module -->
-          </select>
-          <small class="text-muted">Default: Milk. Add more items from Items module</small>
-        </div>
       </div>
+
+      <!-- Hidden input fields for calculations (compatibility) -->
+      <input type="hidden" id="snf_auto" value="8.500">
+      <input type="hidden" id="fat_rate" value="0.00">
+      <input type="hidden" id="snf_rate" value="0.00">
+      <input type="hidden" id="bf_kgs" value="0.000">
+      <input type="hidden" id="snf_kgs" value="0.000">
+      <input type="hidden" id="rate_per_liter_calc" value="0.00">
+      <input type="hidden" id="final_amount" value="0.00">
 
       <!-- Traditional Milk Calculation Section -->
       <div class="card mt-3 border-primary">
@@ -90,95 +117,142 @@
           🧮 Milk Calculation (Traditional Method)
         </div>
         <div class="card-body">
-          <div class="row g-3">
-            <!-- Step 1: Basic Measurements -->
+          <!-- Step 1: Input Fields -->
+          <div class="row g-3 mb-4">
             <div class="col-12">
-              <h6 class="text-muted fw-bold">Step 1: Enter Milk Details</h6>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Item Qty (Liters) *</label>
-              <input type="number" name="qty_liters" id="qty" class="form-control"
-                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.qty_liters }}{% endif %}" required onchange="calculateMarketRates(); calculateMilk()" oninput="calculateMarketRates(); calculateMilk()">
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">B.F % (Butter Fat) *</label>
-              <input type="number" name="fat" id="fat" class="form-control"
-                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.fat }}{% endif %}" required onchange="handleFatInput(); calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="handleFatInput(); calculateSNF(); calculateMarketRates(); calculateMilk()">
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">CLR (Corrected Lactometer Reading) *</label>
-              <input type="number" name="clr" id="clr" class="form-control"
-                     step="0.1" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.clr }}{% endif %}" required onchange="handleCLRInput(); calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="handleCLRInput(); calculateSNF(); calculateMarketRates(); calculateMilk()">
-              <small class="text-muted">Enter CLR value (e.g., 14, 28, 29, etc.)</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Daily Rate (₹/100 kg) *</label>
-              <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control"
-                     step="0.01" placeholder="0.00" value="{% if edit_mode and txn %}{{ txn.rate }}{% endif %}" required onchange="calculateMilk(); calculateMarketRates()" oninput="calculateMilk(); calculateMarketRates()">
-              <small class="text-muted">Daily rate per 100 kg milk (changes every day)</small>
-            </div>
-
-            <!-- Step 2: Auto-calculated SNF -->
-            <div class="col-12 mt-3">
-              <h6 class="text-muted fw-bold">Step 2: SNF Calculation</h6>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">SNF % (Auto)</label>
-              <input type="number" id="snf_auto" class="form-control bg-light" 
-                     readonly placeholder="8.50" value="{% if edit_mode and txn %}{{ txn.snf }}{% endif %}">
-              <small class="text-muted">Auto-calculated from CLR</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">B.F. Rate (Info)</label>
-              <input type="number" id="fat_rate" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">For reference only</small>
-            </div>
-                        <div class="col-md-2">
-              <label class="form-label fw-bold">SNF Rate (Info)</label>
-              <input type="number" id="snf_rate" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">For reference only</small>
-            </div>
-
-            <!-- Step 3: Component Calculations -->
-            <div class="col-12 mt-3">
-              <h6 class="text-muted fw-bold">Step 3: Component Weights (Auto-calculated)</h6>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">BF Kgs (Auto)</label>
-              <input type="number" id="bf_kgs" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">Qty × FAT% ÷ 100</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">SNF Kgs (Auto)</label>
-              <input type="number" id="snf_kgs" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">Qty × SNF% ÷ 100</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Rate per 100kg (Calc)</label>
-              <input type="number" id="rate_per_liter_calc" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">Based on components</small>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Final Amount (₹) (Auto)</label>
-              <input type="number" id="final_amount" class="form-control bg-light"
-                     readonly placeholder="0.00" value="0.00">
-              <small class="text-muted">(BF Kgs × BF Rate) + (SNF Kgs × SNF Rate)</small>
-            </div>
-
-            <!-- Step 4: Final Amount -->
-            <div class="col-12 mt-3">
-              <h6 class="text-muted fw-bold">Step 4: Final Amount (Auto-calculated)</h6>
+              <h6 class="text-muted fw-bold mb-3">📝 Step 1: Enter Milk Details</h6>
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-bold text-success">Final Amount (₹)</label>
-              <input type="number" name="amount" id="amount" class="form-control bg-success bg-opacity-10 text-success fw-bold" 
-                     readonly placeholder="0.00">
-              <small class="text-muted">(BF Kgs × BF Rate) + (SNF Kgs × SNF Rate)</small>
+              <label class="form-label fw-bold">Quantity (Liters) *</label>
+              <input type="number" name="qty_liters" id="qty" class="form-control form-control-lg"
+                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.qty_liters }}{% endif %}" required 
+                     onchange="calculateMarketRates(); calculateMilk()" oninput="calculateMarketRates(); calculateMilk()">
+              <small class="text-muted">Milk quantity in liters</small>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Butter Fat (%) *</label>
+              <input type="number" name="fat" id="fat" class="form-control form-control-lg"
+                     step="0.01" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.fat }}{% endif %}" required 
+                     onchange="handleFatInput(); calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="handleFatInput(); calculateSNF(); calculateMarketRates(); calculateMilk()">
+              <small class="text-muted">Fat percentage (e.g., 4.0 for 40%)</small>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">CLR Reading *</label>
+              <input type="number" name="clr" id="clr" class="form-control form-control-lg"
+                     step="0.1" placeholder="0.0" value="{% if edit_mode and txn %}{{ txn.clr }}{% endif %}" required 
+                     onchange="handleCLRInput(); calculateSNF(); calculateMarketRates(); calculateMilk()" oninput="handleCLRInput(); calculateSNF(); calculateMarketRates(); calculateMilk()">
+              <small class="text-muted">Corrected Lactometer Reading (e.g., 28, 29)</small>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold">Daily Rate (₹/100 kg) *</label>
+              <div class="input-group">
+                <input type="number" name="rate_per_liter" id="rate_per_liter" class="form-control form-control-lg"
+                       step="0.01" placeholder="0.00" value="{% if edit_mode and txn %}{{ txn.rate }}{% endif %}" required 
+                       onchange="calculateMilk(); calculateMarketRates()" oninput="calculateMilk(); calculateMarketRates()">
+                <span class="input-group-text">
+                  <div class="card card-body bg-success bg-opacity-10 border-success p-2 mb-0">
+                    <div class="text-center">
+                      <small class="text-muted d-block">Final Amount</small>
+                      <strong class="text-success">₹<span id="final_amount_flash">0.00</span></strong>
+                    </div>
+                  </div>
+                </span>
+              </div>
+              <small class="text-muted">Current market rate per 100 kg</small>
+            </div>
+          </div>
+
+          <!-- Step 2: Live Calculations Display -->
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <h6 class="text-muted fw-bold mb-3">🔄 Step 2: Live Calculations</h6>
+            </div>
+            
+            <!-- SNF Calculation -->
+            <div class="col-md-4">
+              <div class="card border-info h-100">
+                <div class="card-body text-center py-3">
+                  <h6 class="card-title text-info mb-2">SNF % (Auto-calculated)</h6>
+                  <div class="display-6 fw-bold text-info" id="snf_display">0.000</div>
+                  <small class="text-muted">From CLR: (CLR/4) + (0.20 × FAT) + 0.14</small>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Component Rates -->
+            <div class="col-md-4">
+              <div class="card border-secondary h-100">
+                <div class="card-body text-center py-3">
+                  <h6 class="card-title text-secondary mb-2">Component Rates</h6>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <small class="text-muted d-block">Fat Rate</small>
+                      <div class="fw-bold">₹<span id="fat_rate_display">0.00</span>/kg</div>
+                    </div>
+                    <div class="col-6">
+                      <small class="text-muted d-block">SNF Rate</small>
+                      <div class="fw-bold">₹<span id="snf_rate_display">0.00</span>/kg</div>
+                    </div>
+                  </div>
+                  <small class="text-muted d-block mt-2">Based on 60:40 split</small>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Component Weights -->
+            <div class="col-md-4">
+              <div class="card border-warning h-100">
+                <div class="card-body text-center py-3">
+                  <h6 class="card-title text-warning mb-2">Component Weights</h6>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <small class="text-muted d-block">BF Kgs</small>
+                      <div class="fw-bold"><span id="bf_kgs_display">0.000</span> kg</div>
+                    </div>
+                    <div class="col-6">
+                      <small class="text-muted d-block">SNF Kgs</small>
+                      <div class="fw-bold"><span id="snf_kgs_display">0.000</span> kg</div>
+                    </div>
+                  </div>
+                  <small class="text-muted d-block mt-2">Qty × Component% ÷ 100</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Final Results -->
+          <div class="row g-3">
+            <div class="col-12">
+              <h6 class="text-muted fw-bold mb-3">💰 Step 3: Final Amount</h6>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="card border-success h-100">
+                <div class="card-body text-center py-3">
+                  <h6 class="card-title text-success mb-2">Final Amount (₹)</h6>
+                  <div class="display-4 fw-bold text-success">₹<span id="final_amount_display">0.00</span></div>
+                  <small class="text-muted">(BF Kgs × BF Rate) + (SNF Kgs × SNF Rate)</small>
+                  <input type="hidden" name="amount" id="amount" value="0.00">
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="card border-primary h-100">
+                <div class="card-body text-center py-3">
+                  <h6 class="card-title text-primary mb-2">Rate Summary</h6>
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <small class="text-muted d-block">Daily Rate</small>
+                      <div class="fw-bold">₹<span id="daily_rate_display">0.00</span>/100kg</div>
+                    </div>
+                    <div class="col-12">
+                      <small class="text-muted d-block">Calculated Rate</small>
+                      <div class="fw-bold">₹<span id="calc_rate_display">0.00</span>/100kg</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -325,7 +399,13 @@ function calculateSNF() {
     snf = 0; // No SNF if CLR is 0
   }
   
+  // Update both old and new display elements
   document.getElementById('snf_auto').value = snf.toFixed(3);
+  const snfDisplay = document.getElementById('snf_display');
+  if (snfDisplay) {
+    snfDisplay.textContent = snf.toFixed(3);
+  }
+  
   calculateMarketRates(); // Auto-calc rates based on CLR
   calculateMilk();
 }
@@ -363,12 +443,21 @@ function calculateMarketRates() {
     console.log(`Component rates - BF: ₹${bfRate.toFixed(2)}/kg, SNF: ₹${snfRate.toFixed(2)}/kg`);
   }
   
-  // Update display
+  // Update display elements
   const fatRateElement = document.getElementById('fat_rate');
   const snfRateElement = document.getElementById('snf_rate');
+  const fatRateDisplay = document.getElementById('fat_rate_display');
+  const snfRateDisplay = document.getElementById('snf_rate_display');
+  const dailyRateDisplay = document.getElementById('daily_rate_display');
   
+  // Update old input fields (for compatibility)
   if (fatRateElement) fatRateElement.value = bfRate.toFixed(2);
   if (snfRateElement) snfRateElement.value = snfRate.toFixed(2);
+  
+  // Update new display elements
+  if (fatRateDisplay) fatRateDisplay.textContent = bfRate.toFixed(2);
+  if (snfRateDisplay) snfRateDisplay.textContent = snfRate.toFixed(2);
+  if (dailyRateDisplay) dailyRateDisplay.textContent = dailyRate.toFixed(2);
   
   console.log(`Updated component rates display`);
 }
@@ -420,6 +509,19 @@ function calculateMilk() {
   document.getElementById('rate_per_liter_calc').value = (ratePerLiter * 100).toFixed(2); // Show as per 100kg
   document.getElementById('final_amount').value = finalAmount.toFixed(2);
   document.getElementById('amount').value = finalAmount.toFixed(2);
+  
+  // Update new display elements
+  const bfKgsDisplay = document.getElementById('bf_kgs_display');
+  const snfKgsDisplay = document.getElementById('snf_kgs_display');
+  const finalAmountDisplay = document.getElementById('final_amount_display');
+  const calcRateDisplay = document.getElementById('calc_rate_display');
+  const flashAmountDisplay = document.getElementById('final_amount_flash');
+  
+  if (bfKgsDisplay) bfKgsDisplay.textContent = bfKgs.toFixed(3);
+  if (snfKgsDisplay) snfKgsDisplay.textContent = snfKgs.toFixed(3);
+  if (finalAmountDisplay) finalAmountDisplay.textContent = finalAmount.toFixed(2);
+  if (calcRateDisplay) calcRateDisplay.textContent = (ratePerLiter * 100).toFixed(2);
+  if (flashAmountDisplay) flashAmountDisplay.textContent = finalAmount.toFixed(2);
   
   calculateGST();
 }
@@ -689,7 +791,6 @@ function resetForm() {
 // Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
   toggleGST();
-  calculateSNF(); // Set default SNF
   
   // Initialize Select2
   $('.searchable-select').select2({
@@ -698,11 +799,15 @@ document.addEventListener('DOMContentLoaded', function() {
     allowClear: true
   });
   
-  // Trigger calculations to populate all fields
+  // Initialize calculations on page load with a slight delay
   setTimeout(function() {
-    console.log('Initializing calculations for add/edit mode...');
+    console.log('Initializing calculations...');
+    
+    // Trigger calculations to populate all fields
+    calculateSNF();
     calculateMarketRates();
     calculateMilk();
+    
     console.log('Calculations initialized');
   }, 100);
 });
