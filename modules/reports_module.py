@@ -108,44 +108,91 @@ def hub():
 @login_required
 def quick_ledger():
     cid = session.get("company_id")
+    fy = session.get("fin_year")
+    from utils.filters import fy_dates
+    start, end = fy_dates(fy)
     
     # Get all accounts for quick search
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
-    # Get all parties for quick search (milk entry parties)
-    from models import Party
+    # Pre-compute account balances from journal lines
+    account_bal_query = db.session.query(
+        JournalLine.account_id,
+        func.sum(JournalLine.debit).label("dr"),
+        func.sum(JournalLine.credit).label("cr"),
+    ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    ).filter(
+        JournalHeader.company_id == cid,
+        JournalHeader.voucher_date >= start,
+        JournalHeader.voucher_date <= end,
+        JournalHeader.is_cancelled == False
+    ).group_by(JournalLine.account_id).all()
+    
+    account_txn_bal = {r.account_id: float(r.dr or 0) - float(r.cr or 0) for r in account_bal_query}
+    
+    # Get all parties for quick search
+    from models import Party, Bill, CashBook
     parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
     
-    # Combine accounts and parties for comprehensive ledger search
-    all_ledgers = []
+    # Pre-compute party balances from bills + cash book
+    party_bill_totals = {}
+    bill_rows = db.session.query(
+        Bill.party_id,
+        Bill.bill_type,
+        func.sum(Bill.total_amount).label("total")
+    ).filter(
+        Bill.company_id == cid, Bill.fin_year == fy, Bill.is_cancelled == False
+    ).group_by(Bill.party_id, Bill.bill_type).all()
     
-    # Add accounts
+    for r in bill_rows:
+        if r.party_id not in party_bill_totals:
+            party_bill_totals[r.party_id] = 0.0
+        amt = float(r.total or 0)
+        if r.bill_type == 'Purchase':
+            party_bill_totals[r.party_id] += amt  # We owe = debit for party
+        elif r.bill_type in ('Sales', 'Sale'):
+            party_bill_totals[r.party_id] -= amt  # They owe = credit for party
+    
+    # Combine accounts and parties - skip accounts that duplicate party names
+    all_ledgers = []
+    party_names_lower = {p.name.lower() for p in parties}
+    
+    # Add accounts (skip those that are just party duplicates)
     for account in accounts:
+        if account.account_type == 'Party' and account.name.lower() in party_names_lower:
+            continue  # Skip - party already represents this entity
+        
+        opening = float(account.opening_dr or 0) - float(account.opening_cr or 0)
+        txn_bal = account_txn_bal.get(account.id, 0.0)
+        
         all_ledgers.append({
             'id': account.id,
             'name': account.name,
             'type': 'Account',
             'entity': 'account',
-            'group_name': account.group_name,
-            'account_type': account.account_type,
-            'balance': float(account.opening_dr or 0) - float(account.opening_cr or 0)
+            'group_name': account.group_name or '',
+            'account_type': account.account_type or '',
+            'balance': round(opening + txn_bal, 2)
         })
     
-    # Add parties
+    # Add parties with actual calculated balance
     for party in parties:
+        opening = float(party.opening_balance or 0) * (1 if party.balance_type == 'Dr' else -1)
+        bill_bal = party_bill_totals.get(party.id, 0.0)
+        
         all_ledgers.append({
             'id': party.id,
             'name': party.name,
             'type': 'Party',
             'entity': 'party',
-            'party_type': party.party_type,
-            'gstin': party.gstin,
-            'phone': party.phone,
-            'balance': float(party.opening_balance or 0) * (1 if party.balance_type == 'Dr' else -1)
+            'party_type': party.party_type or '',
+            'gstin': party.gstin or '',
+            'phone': party.phone or '',
+            'balance': round(opening + bill_bal, 2)
         })
     
     # Sort by name
-    all_ledgers.sort(key=lambda x: x['name'])
+    all_ledgers.sort(key=lambda x: x['name'].lower())
     
     return render_template("reports/quick_ledger.html", accounts=all_ledgers)
 
@@ -250,19 +297,15 @@ def account_ledger(account_id):
             })
     
     elif party:
-        # Process Party transactions (Bills)
+        # Process Party transactions from ALL sources
+        all_party_txns = []
+        
+        # A. Bills (milk entries, invoices, etc.)
         for bill in transactions:
             amount = float(bill.total_amount or 0)
             narration = bill.narration or f'{bill.bill_type} - {bill.bill_no}'
             
-            # Try to get milk transaction details (may not exist for all bills)
-            qty_liters = None
-            fat = None
-            snf = None
-            rate = None
-            shift = None
-            bf_clr = None
-            
+            qty_liters = None; fat = None; snf = None; rate = None; shift = None; bf_clr = None
             try:
                 milk_txn = MilkTransaction.query.filter_by(company_id=cid, bill_id=bill.id).order_by(MilkTransaction.id.desc()).first()
                 if milk_txn:
@@ -272,53 +315,86 @@ def account_ledger(account_id):
                     rate = float(milk_txn.rate) if milk_txn.rate is not None else None
                     shift = milk_txn.shift
                     bf_clr = f"BF:{fat} / CLR:{milk_txn.clr}" if fat is not None and getattr(milk_txn, 'clr', None) is not None else None
-            except Exception as e:
-                # If milk transaction lookup fails, continue without milk details
-                print(f"Warning: Could not fetch milk transaction for bill {bill.id}: {e}")
+            except Exception:
+                pass
             
-            basic_amount = amount
-            fat_value = 0.0
-            snf_value = 0.0
-            
-            # Determine debit/credit based on bill type and party type
-            # Purchase bills = we owe them (credit/payable)
-            # Sale bills = they owe us (debit/receivable)
             if bill.bill_type == 'Purchase':
-                # We purchased from them - credit (we owe)
-                debit = 0
-                credit = amount
-                running_balance -= amount
+                debit = amount; credit = 0
             elif bill.bill_type in ['Sale', 'Sales']:
-                # We sold to them - debit (they owe)
-                debit = amount
-                credit = 0
-                running_balance += amount
+                debit = 0; credit = amount
             else:
-                # Default behavior
-                debit = amount
-                credit = 0
-                running_balance += amount
+                debit = amount; credit = 0
             
-            transaction_data.append({
-                'date': bill.bill_date,
-                'voucher_no': bill.bill_no,
-                'type': bill.bill_type or 'Bill',
-                'voucher_type': bill.bill_type or 'Bill',
-                'narration': narration,
-                'debit': debit,
-                'credit': credit,
-                'balance': running_balance,
-                'qty_liters': qty_liters,
-                'fat_percentage': fat,
-                'snf_percentage': snf,
-                'rate': rate,
-                'basic_amount': basic_amount,
-                'fat_value': fat_value,
-                'snf_value': snf_value,
-                'total_amount': amount,
-                'shift': shift,
-                'bf_clr': bf_clr
+            all_party_txns.append({
+                'date': bill.bill_date, 'voucher_no': bill.bill_no,
+                'type': bill.bill_type or 'Bill', 'voucher_type': bill.bill_type or 'Bill',
+                'narration': narration, 'debit': debit, 'credit': credit,
+                'qty_liters': qty_liters, 'fat_percentage': fat, 'snf_percentage': snf,
+                'rate': rate, 'basic_amount': amount, 'fat_value': 0.0, 'snf_value': 0.0,
+                'total_amount': amount, 'shift': shift, 'bf_clr': bf_clr
             })
+        
+        # B. Cash Book entries for this party (by party_name match)
+        from models import CashBook
+        cash_entries = CashBook.query.filter(
+            CashBook.company_id == cid,
+            CashBook.fin_year == fy,
+            db.func.lower(CashBook.party_name) == party.name.lower()
+        ).order_by(CashBook.transaction_date, CashBook.id).all()
+        
+        for cb in cash_entries:
+            amt = float(cb.amount or 0)
+            if cb.transaction_type == 'Receipt':
+                debit = 0; credit = amt
+            else:
+                debit = amt; credit = 0
+            all_party_txns.append({
+                'date': cb.transaction_date, 'voucher_no': cb.voucher_no,
+                'type': f'Cash {cb.transaction_type}', 'voucher_type': 'Cash',
+                'narration': cb.narration or '', 'debit': debit, 'credit': credit,
+                'qty_liters': None, 'fat_percentage': None, 'snf_percentage': None,
+                'rate': None, 'basic_amount': amt, 'fat_value': 0.0, 'snf_value': 0.0,
+                'total_amount': amt, 'shift': None, 'bf_clr': None
+            })
+        
+        # C. Journal entries for matching account (by name)
+        matching_account = Account.query.filter(
+            Account.company_id == cid,
+            db.func.lower(Account.name) == party.name.lower()
+        ).first()
+        
+        if matching_account:
+            jl_entries = db.session.query(JournalLine, JournalHeader).join(
+                JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+            ).filter(
+                JournalLine.account_id == matching_account.id,
+                JournalHeader.company_id == cid,
+                JournalHeader.voucher_date >= start,
+                JournalHeader.voucher_date <= end,
+                JournalHeader.is_cancelled == False
+            ).order_by(JournalHeader.voucher_date, JournalHeader.id).all()
+            
+            for line, header in jl_entries:
+                debit = float(line.debit or 0)
+                credit = float(line.credit or 0)
+                all_party_txns.append({
+                    'date': header.voucher_date, 'voucher_no': header.voucher_no,
+                    'type': header.voucher_type or 'Journal', 'voucher_type': header.voucher_type or 'Journal',
+                    'narration': line.narration or header.narration or '',
+                    'debit': debit, 'credit': credit,
+                    'qty_liters': None, 'fat_percentage': None, 'snf_percentage': None,
+                    'rate': None, 'basic_amount': 0, 'fat_value': 0.0, 'snf_value': 0.0,
+                    'total_amount': 0, 'shift': None, 'bf_clr': None
+                })
+        
+        # Sort all party transactions by date
+        all_party_txns.sort(key=lambda x: x['date'])
+        
+        # Calculate running balance
+        for txn in all_party_txns:
+            running_balance += float(txn['debit'] or 0) - float(txn['credit'] or 0)
+            txn['balance'] = running_balance
+            transaction_data.append(txn)
     
     # Calculate totals
     total_debits = sum(t['debit'] for t in transaction_data)
@@ -346,31 +422,35 @@ def account_ledger(account_id):
 @login_required
 def account_ledger_pdf(account_id):
     from utils.filters import fy_dates
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import A4, landscape
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
-    from reportlab.lib.units import inch
+    from reportlab.lib.units import inch, cm
     from io import BytesIO
     from flask import Response
     
     cid = session.get("company_id")
     fy = session.get("fin_year")
+    company = Company.query.get(cid)
+    entity = request.args.get("entity", "account")
     
-    # Get account details (handle default accounts)
-    account = Account.query.get(account_id) if account_id > 0 else None
-    account_name = account.name if account else "Default Account"
+    # Get account/party details
+    account_name = "Unknown"
+    if entity == "party":
+        p = Party.query.get(account_id)
+        account_name = p.name if p else "Unknown Party"
+    else:
+        acc = Account.query.get(account_id) if account_id > 0 else None
+        account_name = acc.name if acc else "Default Account"
     
-    # Get financial year dates
     start, end = fy_dates(fy)
     
-    # Get transactions (only if real account exists)
+    # Get transactions
     transactions = []
-    if account:
-        transactions = db.session.query(
-            JournalLine,
-            JournalHeader
-        ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    if entity == "account" and account_id > 0:
+        transactions = db.session.query(JournalLine, JournalHeader).join(
+            JournalHeader, JournalHeader.id == JournalLine.journal_header_id
         ).filter(
             JournalLine.account_id == account_id,
             JournalHeader.company_id == cid,
@@ -379,70 +459,79 @@ def account_ledger_pdf(account_id):
             JournalHeader.is_cancelled == False
         ).order_by(JournalHeader.voucher_date, JournalLine.id).all()
     
-    # Create PDF
-    doc = SimpleDocTemplate("buffer", pagesize=A4)
+    # Build PDF into BytesIO
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4),
+                            topMargin=1*cm, bottomMargin=1*cm,
+                            leftMargin=1*cm, rightMargin=1*cm)
     styles = getSampleStyleSheet()
-    
-    # Add custom ParagraphStyle
-    styles.add(ParagraphStyle('CustomTitle', fontSize=16, textColor=colors.black, alignment=1))
+    styles.add(ParagraphStyle('CompanyName', fontSize=16, textColor=colors.HexColor('#1F4E79'),
+                              alignment=1, spaceAfter=4, fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle('SubHeader', fontSize=10, textColor=colors.black, alignment=1, spaceAfter=8))
     
     story = []
     
-    # Company header
-    story.append(Paragraph("Account Ledger", styles['CustomTitle']))
-    story.append(Spacer(1, 12))
-    
-    # Account info
-    story.append(Paragraph(f"Account: {account_name}", styles['Normal']))
-    story.append(Paragraph(f"Financial Year: {fy}", styles['Normal']))
+    # Professional company header
+    company_name = company.name if company else 'Company'
+    story.append(Paragraph(company_name, styles['CompanyName']))
+    if company and company.address:
+        story.append(Paragraph(company.address, styles['SubHeader']))
+    story.append(Paragraph(f"Account Ledger: {account_name} | FY: {fy}", styles['SubHeader']))
     story.append(Spacer(1, 12))
     
     # Table data
-    data = [['Date', 'Voucher No', 'Type', 'Narration', 'Debit', 'Credit', 'Balance']]
+    data = [['Date', 'Voucher No', 'Type', 'Narration', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']]
+    col_widths = [2*cm, 3*cm, 2.5*cm, 9*cm, 3*cm, 3*cm, 3*cm]
     
     running_balance = 0.0
     for line, header in transactions:
         debit = float(line.debit or 0)
         credit = float(line.credit or 0)
-        
-        if debit > 0:
-            running_balance += debit
-        else:
-            running_balance -= credit
-        
+        running_balance += debit - credit
         data.append([
             header.voucher_date.strftime('%d-%m-%Y'),
             header.voucher_no,
             header.voucher_type or 'Journal',
-            line.narration or header.narration or '',
-            f"₹{debit:.2f}" if debit > 0 else '',
-            f"₹{credit:.2f}" if credit > 0 else '',
-            f"₹{running_balance:.2f}"
+            (line.narration or header.narration or '')[:60],
+            f"{debit:,.2f}" if debit > 0 else '',
+            f"{credit:,.2f}" if credit > 0 else '',
+            f"{running_balance:,.2f}"
         ])
     
-    table = Table(data)
+    # Totals row
+    tot_dr = sum(float(l.debit or 0) for l, h in transactions)
+    tot_cr = sum(float(l.credit or 0) for l, h in transactions)
+    data.append(['', '', '', 'TOTAL', f"{tot_dr:,.2f}", f"{tot_cr:,.2f}", f"{running_balance:,.2f}"])
+    
+    table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (2, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F2F2F2')]),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#D6E4F0')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     
     story.append(table)
-    doc.build(story)
+    story.append(Spacer(1, 20))
+    story.append(Paragraph(f"Generated on {date.today().strftime('%d-%b-%Y')} | {company_name}", styles['SubHeader']))
     
-    buffer = BytesIO()
-    doc.save(buffer)
+    doc.build(story)
     buffer.seek(0)
     
-    response = Response(
+    return Response(
         buffer.getvalue(),
         mimetype='application/pdf',
         headers={'Content-Disposition': f'attachment; filename={account_name}_Ledger.pdf'}
     )
-    return response
 
 @reports_bp.route("/reports/account-ledger/<int:account_id>/excel")
 @login_required
@@ -451,24 +540,27 @@ def account_ledger_excel(account_id):
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
     from flask import Response
+    from utils.filters import fy_dates
     
     cid = session.get("company_id")
     fy = session.get("fin_year")
+    company = Company.query.get(cid)
+    entity = request.args.get("entity", "account")
     
-    # Get account details (handle default accounts)
-    account = Account.query.get(account_id) if account_id > 0 else None
-    account_name = account.name if account else "Default Account"
+    # Get name
+    if entity == "party":
+        p = Party.query.get(account_id)
+        account_name = p.name if p else "Unknown Party"
+    else:
+        acc = Account.query.get(account_id) if account_id > 0 else None
+        account_name = acc.name if acc else "Default Account"
     
-    # Get financial year dates
     start, end = fy_dates(fy)
     
-    # Get transactions (only if real account exists)
     transactions = []
-    if account:
-        transactions = db.session.query(
-            JournalLine,
-            JournalHeader
-        ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+    if entity == "account" and account_id > 0:
+        transactions = db.session.query(JournalLine, JournalHeader).join(
+            JournalHeader, JournalHeader.id == JournalLine.journal_header_id
         ).filter(
             JournalLine.account_id == account_id,
             JournalHeader.company_id == cid,
@@ -477,74 +569,146 @@ def account_ledger_excel(account_id):
             JournalHeader.is_cancelled == False
         ).order_by(JournalHeader.voucher_date, JournalLine.id).all()
     
-    # Create Excel
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = f"{account_name} Ledger"
+    ws.title = "Ledger"
     
-    # Headers
-    headers = ['Date', 'Voucher No', 'Type', 'Narration', 'Debit', 'Credit', 'Balance']
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill("solid", fgColor="1F4E79")
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    total_fill = PatternFill("solid", fgColor="D6E4F0")
+    
+    # Company header row
+    company_name = company.name if company else 'Company'
+    ws.merge_cells('A1:G1')
+    c = ws.cell(row=1, column=1, value=company_name)
+    c.font = Font(bold=True, size=14, color="1F4E79")
+    c.alignment = Alignment(horizontal="center")
+    
+    ws.merge_cells('A2:G2')
+    c = ws.cell(row=2, column=1, value=f"Account Ledger: {account_name} | FY: {fy}")
+    c.font = Font(size=10)
+    c.alignment = Alignment(horizontal="center")
+    
+    # Column headers at row 4
+    headers = ['Date', 'Voucher No', 'Type', 'Narration', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']
+    for col, hdr in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col, value=hdr)
+        cell.font = header_font
+        cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
     
-    # Data
+    # Data rows
     running_balance = 0.0
-    for i, (line, header) in enumerate(transactions, 2):
+    row = 5
+    for line, header in transactions:
         debit = float(line.debit or 0)
         credit = float(line.credit or 0)
+        running_balance += debit - credit
         
-        if debit > 0:
-            running_balance += debit
-        else:
-            running_balance -= credit
-        
-        ws.cell(row=i, column=1, value=header.voucher_date.strftime('%d-%m-%Y'))
-        ws.cell(row=i, column=2, value=header.voucher_no)
-        ws.cell(row=i, column=3, value=header.voucher_type or 'Journal')
-        ws.cell(row=i, column=4, value=line.narration or header.narration or '')
-        ws.cell(row=i, column=5, value=debit if debit > 0 else '')
-        ws.cell(row=i, column=6, value=credit if credit > 0 else '')
-        ws.cell(row=i, column=7, value=running_balance)
+        vals = [
+            header.voucher_date.strftime('%d-%m-%Y'),
+            header.voucher_no,
+            header.voucher_type or 'Journal',
+            line.narration or header.narration or '',
+            debit if debit > 0 else '',
+            credit if credit > 0 else '',
+            running_balance
+        ]
+        for col, val in enumerate(vals, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.border = thin_border
+            if col >= 5 and isinstance(val, (int, float)) and val != '':
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal="right")
+        row += 1
     
-    # Format currency columns
-    for row in range(2, len(transactions) + 2):
-        for col in [5, 6, 7]:  # Debit, Credit, Balance columns
-            cell = ws.cell(row=row, column=col)
-            if cell.value:
-                cell.number_format = '₹#,##0.00'
+    # Totals row
+    tot_dr = sum(float(l.debit or 0) for l, h in transactions)
+    tot_cr = sum(float(l.credit or 0) for l, h in transactions)
+    for col, val in enumerate(['', '', '', 'TOTAL', tot_dr, tot_cr, running_balance], 1):
+        cell = ws.cell(row=row, column=col, value=val)
+        cell.font = Font(bold=True)
+        cell.fill = total_fill
+        cell.border = thin_border
+        if col >= 5 and isinstance(val, (int, float)):
+            cell.number_format = '#,##0.00'
+            cell.alignment = Alignment(horizontal="right")
+    
+    # Column widths
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 14
+    ws.column_dimensions['C'].width = 10
+    ws.column_dimensions['D'].width = 40
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 14
     
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     
-    response = Response(
+    return Response(
         buffer.getvalue(),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': f'attachment; filename={account_name}_Ledger.xlsx'}
     )
-    return response
 
 @reports_bp.route("/reports/profit_loss")
 @login_required
 def profit_loss():
     cid  = session.get("company_id")
     fy   = session.get("fin_year")
+    from utils.filters import fy_dates
+    start, end = fy_dates(fy)
     
     # Get company
     company = Company.query.get(cid)
     
-    # Calculate sales and purchases
-    sales_total = float(db.session.query(func.sum(Bill.total_amount)).filter_by(
+    # 1. Sales and Purchases from Bills (milk entries + invoices)
+    sales_from_bills = float(db.session.query(func.sum(Bill.total_amount)).filter_by(
         company_id=cid, fin_year=fy, bill_type="Sales", is_cancelled=False).scalar() or 0)
-    purchase_total = float(db.session.query(func.sum(Bill.total_amount)).filter_by(
+    purchase_from_bills = float(db.session.query(func.sum(Bill.total_amount)).filter_by(
         company_id=cid, fin_year=fy, bill_type="Purchase", is_cancelled=False).scalar() or 0)
+    
+    # 2. Income/Expense from Journal entries (cash book auto-posts, manual journals)
+    INCOME_GROUPS = ["Sales", "Direct Income", "Indirect Income", "Other Income"]
+    EXPENSE_GROUPS = ["Purchase", "Direct Expense", "Indirect Expense", "Depreciation",
+                      "Cost of Goods Sold", "Salary", "Rent", "Utilities"]
+    
+    def journal_group_totals(groups):
+        rows = db.session.query(
+            Account.group_name,
+            func.sum(JournalLine.debit).label("dr"),
+            func.sum(JournalLine.credit).label("cr"),
+        ).join(JournalLine, JournalLine.account_id == Account.id
+        ).join(JournalHeader, JournalHeader.id == JournalLine.journal_header_id
+        ).filter(
+            Account.company_id == cid,
+            Account.group_name.in_(groups),
+            JournalHeader.company_id == cid,
+            JournalHeader.voucher_date.between(start, end),
+            JournalHeader.is_cancelled == False,
+        ).group_by(Account.group_name).all()
+        return {r.group_name: float(r.cr or 0) - float(r.dr or 0) for r in rows}
+    
+    income_from_journals = journal_group_totals(INCOME_GROUPS)
+    expense_from_journals = journal_group_totals(EXPENSE_GROUPS)
+    
+    journal_income_total = sum(income_from_journals.values())
+    journal_expense_total = sum(expense_from_journals.values())
+    
+    # Combine: Bills + Journal entries
+    sales_total = sales_from_bills + max(journal_income_total, 0)
+    purchase_total = purchase_from_bills + abs(min(journal_expense_total, 0))
     
     # Calculate profits
     gross_profit = sales_total - purchase_total
-    net_profit = gross_profit  # Simplified - no indirect expenses yet
+    net_profit = gross_profit
     total_expenses = purchase_total
     total_income = sales_total
     
@@ -558,6 +722,8 @@ def profit_loss():
                            net_profit=net_profit,
                            total_expenses=total_expenses,
                            total_income=total_income,
+                           income_details=income_from_journals,
+                           expense_details=expense_from_journals,
                            fiscal_year_end=f"31 Mar {int(fy[:4])+1}",
                            current_date=date.today())
 

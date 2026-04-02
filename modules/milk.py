@@ -706,28 +706,8 @@ def add_entry():
                 print(f"WARNING: Could not set bill_id (column may not exist): {e}")
             print(f"DEBUG: Invoice creation completed")
             
-            # Create or get party account for ledger (only for non-cash transactions)
-            if not is_cash_account and party_id:
-                from models import Account
-                # Use party name directly for consistency with clients module
-                account_name = party.name
-                party_account = Account.query.filter_by(company_id=cid, name=account_name).first()
-                if not party_account:
-                    # Create automatic party account
-                    party_account = Account(
-                        company_id=cid,
-                        name=account_name,
-                        account_type="Party",
-                        group_name="Sundry Creditors" if txn_type == "Purchase" else "Sundry Debtors",
-                        opening_dr=0.0,
-                        opening_cr=0.0,
-                        is_active=True
-                    )
-                    db.session.add(party_account)
-                    db.session.flush()
-                    print(f"DEBUG: Created party account: {party_account.name}")
-            elif is_cash_account:
-                print(f"DEBUG: Cash account mode - skipping party account creation")
+            # Party ledger works via Bills + CashBook + JournalLines
+            # No separate Account record needed - prevents duplicate entries
             
             db.session.commit()
             session["last_txn_date"] = txn_date.isoformat()
@@ -735,7 +715,6 @@ def add_entry():
                 session["last_milk_party_id"] = party_id
             msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
             if bill_no: msg+=f" | Invoice {bill_no} created"
-            if party_account and not party_account.id: msg+=f" | Party account created"
             flash(msg,"success")
             return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
 
@@ -1354,24 +1333,6 @@ def add_party():
         )
         
         db.session.add(party)
-        db.session.flush()  # Get the party ID
-        
-        # Also create corresponding account for ledger consistency
-        from models import Account
-        existing_account = Account.query.filter_by(company_id=cid, name=name).first()
-        if not existing_account:
-            party_account = Account(
-                company_id=cid,
-                name=name,  # Same name as party - no suffix
-                account_type="Party",
-                group_name="Sundry Creditors",  # Default for milk suppliers
-                opening_dr=0.0,
-                opening_cr=0.0,
-                is_active=True
-            )
-            db.session.add(party_account)
-            print(f"DEBUG: Created corresponding account for party: {name}")
-        
         db.session.commit()
         
         return jsonify({

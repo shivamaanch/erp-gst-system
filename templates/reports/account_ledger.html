@@ -206,16 +206,25 @@
               <td></td>
             </tr>
             {% for txn in transactions %}
-            <tr>
+            {% set ttype = (txn.type or txn.get('voucher_type', ''))|lower %}
+            {% set is_purchase = 'purchase' in ttype %}
+            {% set is_sale = 'sale' in ttype or 'sales' in ttype %}
+            {% set is_receipt = 'receipt' in ttype %}
+            {% set is_payment = 'payment' in ttype %}
+            <tr class="{{ 'table-success-light' if (is_sale or is_receipt) else 'table-warning-light' if (is_purchase or is_payment) else '' }}">
               <td class="text-center">{{ loop.index }}</td>
               <td class="text-center">{{ txn.date.strftime('%d-%m-%Y') }}</td>
-              <td class="text-center"><span class="badge bg-{{ 'primary' if txn.voucher_type == 'Journal' else 'success' if txn.voucher_type == 'Cash' else 'info' }}">{{ txn.voucher_type }}</span></td>
-              <td>{{ txn.narration }}</td>
-              <td class="text-end fw-bold {{ 'text-danger' if txn.debit and txn.debit > 0 else 'text-success' }}">
-                ₹{{ "{:,.2f}".format(txn.debit) if txn.debit and txn.debit > 0 else '' }}
+              <td class="text-center">
+                <span class="badge bg-{{ 'success' if (is_sale or is_receipt) else 'warning text-dark' if (is_purchase or is_payment) else 'primary' if 'journal' in ttype else 'secondary' if 'cash' in ttype else 'info' }}">
+                  {{ txn.type or txn.get('voucher_type', 'Entry') }}
+                </span>
               </td>
-              <td class="text-end fw-bold {{ 'text-success' if txn.credit and txn.credit > 0 else 'text-danger' }}">
-                ₹{{ "{:,.2f}".format(txn.credit) if txn.credit and txn.credit > 0 else '' }}
+              <td>{{ txn.narration }}</td>
+              <td class="text-end fw-bold text-danger">
+                {{ "₹{:,.2f}".format(txn.debit) if txn.debit and txn.debit > 0 else '' }}
+              </td>
+              <td class="text-end fw-bold text-success">
+                {{ "₹{:,.2f}".format(txn.credit) if txn.credit and txn.credit > 0 else '' }}
               </td>
               <td class="text-end fw-bold {{ 'text-success' if txn.balance >= 0 else 'text-danger' }}">
                 ₹{{ "{:,.2f}".format(txn.balance) }}
@@ -346,6 +355,14 @@
   
   .ledger-link:hover {
     text-decoration: underline;
+  }
+  
+  .table-success-light {
+    background-color: #d4edda !important;
+  }
+  
+  .table-warning-light {
+    background-color: #fff3cd !important;
   }
 </style>
 

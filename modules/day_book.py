@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, make_response
 from flask_login import login_required
 from extensions import db
-from models import DayBook, Account, Company, Bill, MilkTransaction, Party
+from models import DayBook, Account, Company, Bill, MilkTransaction, Party, JournalHeader, JournalLine, CashBook
 from datetime import date, datetime
 from sqlalchemy import text, or_, and_
 import csv
@@ -33,40 +33,56 @@ def index():
     to_date = request.args.get("to_date")
     account_filter = request.args.get("account_id", "")
     
-    # Collect all transactions
+    # Collect all transactions from ALL sources
     transactions = []
+    seen_vouchers = set()  # Track voucher numbers to avoid duplicates
     
-    # 1. Day Book entries (manual journal entries)
-    daybook_query = DayBook.query.filter_by(company_id=cid, fin_year=fy)
-    if search:
-        daybook_query = daybook_query.filter(DayBook.narration.contains(search))
+    # 1. Journal Entries (includes auto-posted from cash book)
+    jh_query = JournalHeader.query.filter_by(company_id=cid, fin_year=fy, is_cancelled=False)
     if from_date:
-        daybook_query = daybook_query.filter(DayBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+        jh_query = jh_query.filter(JournalHeader.voucher_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
     if to_date:
-        daybook_query = daybook_query.filter(DayBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
-    if account_filter:
-        daybook_query = daybook_query.filter(DayBook.account_id == int(account_filter))
+        jh_query = jh_query.filter(JournalHeader.voucher_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    if search:
+        jh_query = jh_query.filter(or_(
+            JournalHeader.narration.ilike(f"%{search}%"),
+            JournalHeader.voucher_no.ilike(f"%{search}%")
+        ))
     
-    for entry in daybook_query.all():
-        transactions.append({
-            'type': 'Journal',
-            'date': entry.transaction_date,
-            'voucher_no': entry.voucher_no,
-            'account': entry.account.name if entry.account else 'Unknown',
-            'debit': entry.debit_amount or 0,
-            'credit': entry.credit_amount or 0,
-            'narration': entry.narration,
-            'id': entry.id,
-            'edit_url': url_for('day_book.edit', entry_id=entry.id),
-            'delete_url': url_for('day_book.delete', entry_id=entry.id)
-        })
+    for jh in jh_query.all():
+        lines = JournalLine.query.filter_by(journal_header_id=jh.id).all()
+        for line in lines:
+            account = Account.query.get(line.account_id) if line.account_id else None
+            acc_name = account.name if account else 'Unknown'
+            debit = float(line.debit or 0)
+            credit = float(line.credit or 0)
+            
+            if account_filter and str(line.account_id) != str(account_filter):
+                continue
+            if search and search.lower() not in (jh.narration or '').lower() and search.lower() not in acc_name.lower():
+                continue
+            
+            vtype = jh.voucher_type or 'Journal'
+            transactions.append({
+                'type': vtype,
+                'date': jh.voucher_date,
+                'voucher_no': jh.voucher_no,
+                'account': acc_name,
+                'debit': debit,
+                'credit': credit,
+                'narration': line.narration or jh.narration or '',
+                'id': jh.id,
+                'edit_url': url_for('journal.view', jh_id=jh.id),
+                'delete_url': '#'
+            })
+        seen_vouchers.add(jh.voucher_no)
     
-    # 2. Bills (Sales/Purchase invoices)
-    bills_query = Bill.query.filter_by(company_id=cid, fin_year=fy)
+    # 2. Bills (Sales/Purchase invoices including milk)
+    bills_query = Bill.query.filter_by(company_id=cid, fin_year=fy, is_cancelled=False)
     if search:
         bills_query = bills_query.filter(or_(
-            Bill.narration.contains(search),
-            Bill.bill_no.contains(search)
+            Bill.narration.ilike(f"%{search}%"),
+            Bill.bill_no.ilike(f"%{search}%")
         ))
     if from_date:
         bills_query = bills_query.filter(Bill.bill_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
@@ -74,43 +90,70 @@ def index():
         bills_query = bills_query.filter(Bill.bill_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
     
     for bill in bills_query.all():
+        if bill.bill_no in seen_vouchers:
+            continue
         party = Party.query.get(bill.party_id) if bill.party_id else None
+        acc_name = party.name if party else 'Unknown Party'
+        if account_filter:
+            # Check if party has matching account
+            matching_acc = Account.query.filter_by(company_id=cid, id=int(account_filter)).first()
+            if matching_acc and matching_acc.name.lower() != acc_name.lower():
+                continue
+        
+        amt = float(bill.total_amount or 0)
         transactions.append({
             'type': bill.bill_type or 'Invoice',
-            'date': bill.bill_date or datetime.now().date(),
+            'date': bill.bill_date or date.today(),
             'voucher_no': bill.bill_no or f'BILL-{bill.id}',
-            'account': party.name if party else 'Unknown Party',
-            'debit': bill.total_amount or 0 if bill.bill_type == 'Purchase' else 0,
-            'credit': bill.total_amount or 0 if bill.bill_type == 'Sales' else 0,
-            'narration': bill.narration or f'{bill.bill_type or "Invoice"} #{bill.bill_no}',
+            'account': acc_name,
+            'debit': amt if bill.bill_type == 'Purchase' else 0,
+            'credit': amt if bill.bill_type in ('Sales', 'Sale') else 0,
+            'narration': bill.narration or f'{bill.bill_type} #{bill.bill_no}',
             'id': bill.id,
-            'edit_url': url_for('enhanced_invoice.print_invoice', bill_id=bill.id),
+            'edit_url': url_for('enhanced_invoice.print_invoice', bill_id=bill.id) if bill.bill_type in ('Sales', 'Sale') else '#',
             'delete_url': '#'
         })
+        seen_vouchers.add(bill.bill_no)
     
-    # 3. Milk Transactions (only those without bills to avoid duplicates)
-    milk_query = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).filter(MilkTransaction.bill_id.is_(None))
-    if search:
-        milk_query = milk_query.filter(or_(
-            MilkTransaction.narration.contains(search)
-        ))
+    # 3. Cash Book entries NOT already in journals (legacy entries without journal posting)
+    cb_query = CashBook.query.filter_by(company_id=cid, fin_year=fy)
     if from_date:
-        milk_query = milk_query.filter(MilkTransaction.txn_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+        cb_query = cb_query.filter(CashBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
     if to_date:
-        milk_query = milk_query.filter(MilkTransaction.txn_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+        cb_query = cb_query.filter(CashBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    if search:
+        cb_query = cb_query.filter(or_(
+            CashBook.narration.ilike(f"%{search}%"),
+            CashBook.party_name.ilike(f"%{search}%")
+        ))
     
-    for milk in milk_query.all():
-        party = Party.query.get(milk.party_id) if milk.party_id else None
+    for cb in cb_query.all():
+        if cb.voucher_no in seen_vouchers:
+            continue
+        # Check if this CB entry has a corresponding journal entry
+        has_journal = JournalHeader.query.filter(
+            JournalHeader.company_id == cid,
+            JournalHeader.narration.ilike(f"%{cb.voucher_no}%")
+        ).first()
+        if has_journal:
+            continue  # Already shown via journal entries
+        
+        acc_name = cb.party_name or 'Cash'
+        if account_filter:
+            if cb.account_id and str(cb.account_id) != str(account_filter):
+                continue
+        
+        amt = float(cb.amount or 0)
         transactions.append({
-            'type': f'Milk {milk.txn_type}',
-            'date': milk.txn_date,
-            'voucher_no': f'MILK-{milk.id}',
-            'account': party.name if party else 'Unknown Party',
-            'debit': milk.amount or 0 if milk.txn_type == 'Purchase' else 0,
-            'credit': milk.amount or 0 if milk.txn_type == 'Sale' else 0,
-            'narration': milk.narration or f'{milk.txn_type} - {milk.qty_liters}L @ {milk.rate}',
-            'id': milk.id,
-            'edit_url': url_for('milk.edit_entry', txn_id=milk.id),
+            'type': 'Cash ' + (cb.transaction_type or ''),
+            'date': cb.transaction_date,
+            'voucher_no': cb.voucher_no,
+            'account': acc_name,
+            'debit': amt if cb.transaction_type == 'Payment' else 0,
+            'credit': amt if cb.transaction_type == 'Receipt' else 0,
+            'narration': cb.narration or '',
+            'id': cb.id,
+            'edit_url': url_for('cash_book.edit', entry_id=cb.id),
             'delete_url': '#'
         })
     
@@ -118,8 +161,8 @@ def index():
     transactions.sort(key=lambda x: x['date'], reverse=True)
     
     # Calculate totals
-    total_debit = sum(t['debit'] for t in transactions)
-    total_credit = sum(t['credit'] for t in transactions)
+    total_debit = sum(float(t['debit'] or 0) for t in transactions)
+    total_credit = sum(float(t['credit'] or 0) for t in transactions)
     balance = total_debit - total_credit
     
     # Get accounts for filter dropdown
@@ -228,49 +271,119 @@ def view(entry_id):
     
     return render_template("day_book/view.html", entry=entry)
 
+def _collect_all_transactions(cid, fy, search="", from_date=None, to_date=None, account_filter=""):
+    """Collect ALL transactions from journals, bills, cash book for day book display/export."""
+    transactions = []
+    seen_vouchers = set()
+
+    # 1. Journal Entries
+    jh_query = JournalHeader.query.filter_by(company_id=cid, fin_year=fy, is_cancelled=False)
+    if from_date:
+        jh_query = jh_query.filter(JournalHeader.voucher_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+    if to_date:
+        jh_query = jh_query.filter(JournalHeader.voucher_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    if search:
+        jh_query = jh_query.filter(or_(JournalHeader.narration.ilike(f"%{search}%"), JournalHeader.voucher_no.ilike(f"%{search}%")))
+
+    for jh in jh_query.all():
+        for line in JournalLine.query.filter_by(journal_header_id=jh.id).all():
+            account = Account.query.get(line.account_id) if line.account_id else None
+            acc_name = account.name if account else 'Unknown'
+            if account_filter and str(line.account_id) != str(account_filter):
+                continue
+            transactions.append({
+                'type': jh.voucher_type or 'Journal', 'date': jh.voucher_date,
+                'voucher_no': jh.voucher_no, 'account': acc_name,
+                'debit': float(line.debit or 0), 'credit': float(line.credit or 0),
+                'narration': line.narration or jh.narration or ''
+            })
+        seen_vouchers.add(jh.voucher_no)
+
+    # 2. Bills
+    bills_query = Bill.query.filter_by(company_id=cid, fin_year=fy, is_cancelled=False)
+    if search:
+        bills_query = bills_query.filter(or_(Bill.narration.ilike(f"%{search}%"), Bill.bill_no.ilike(f"%{search}%")))
+    if from_date:
+        bills_query = bills_query.filter(Bill.bill_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+    if to_date:
+        bills_query = bills_query.filter(Bill.bill_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+
+    for bill in bills_query.all():
+        if bill.bill_no in seen_vouchers:
+            continue
+        party = Party.query.get(bill.party_id) if bill.party_id else None
+        amt = float(bill.total_amount or 0)
+        transactions.append({
+            'type': bill.bill_type or 'Invoice', 'date': bill.bill_date or date.today(),
+            'voucher_no': bill.bill_no or f'BILL-{bill.id}',
+            'account': party.name if party else 'Unknown Party',
+            'debit': amt if bill.bill_type == 'Purchase' else 0,
+            'credit': amt if bill.bill_type in ('Sales', 'Sale') else 0,
+            'narration': bill.narration or f'{bill.bill_type} #{bill.bill_no}'
+        })
+        seen_vouchers.add(bill.bill_no)
+
+    # 3. Legacy cash book entries not in journals
+    cb_query = CashBook.query.filter_by(company_id=cid, fin_year=fy)
+    if from_date:
+        cb_query = cb_query.filter(CashBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+    if to_date:
+        cb_query = cb_query.filter(CashBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+    if search:
+        cb_query = cb_query.filter(or_(CashBook.narration.ilike(f"%{search}%"), CashBook.party_name.ilike(f"%{search}%")))
+
+    for cb in cb_query.all():
+        if cb.voucher_no in seen_vouchers:
+            continue
+        has_journal = JournalHeader.query.filter(JournalHeader.company_id == cid, JournalHeader.narration.ilike(f"%{cb.voucher_no}%")).first()
+        if has_journal:
+            continue
+        amt = float(cb.amount or 0)
+        transactions.append({
+            'type': 'Cash ' + (cb.transaction_type or ''), 'date': cb.transaction_date,
+            'voucher_no': cb.voucher_no, 'account': cb.party_name or 'Cash',
+            'debit': amt if cb.transaction_type == 'Payment' else 0,
+            'credit': amt if cb.transaction_type == 'Receipt' else 0,
+            'narration': cb.narration or ''
+        })
+
+    transactions.sort(key=lambda x: x['date'], reverse=True)
+    return transactions
+
 @day_book_bp.route("/day-book/export/<format>")
 @login_required
 def export(format):
     cid = session.get("company_id")
     fy = session.get("fin_year")
     
-    # Get filtered data
     search = request.args.get("search", "")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
     account_filter = request.args.get("account_id", "")
     
-    query = DayBook.query.filter_by(company_id=cid, fin_year=fy)
-    
-    if search:
-        query = query.filter(DayBook.narration.contains(search))
-    if from_date:
-        query = query.filter(DayBook.transaction_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
-    if to_date:
-        query = query.filter(DayBook.transaction_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
-    if account_filter:
-        query = query.filter(DayBook.account_id == int(account_filter))
-    
-    transactions = query.order_by(DayBook.transaction_date.desc()).all()
+    transactions = _collect_all_transactions(cid, fy, search, from_date, to_date, account_filter)
     
     if format == "excel":
-        # Create CSV for Excel
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # Header
-        writer.writerow(['Voucher No', 'Date', 'Account', 'Debit', 'Credit', 'Narration'])
+        company = Company.query.get(cid)
+        writer.writerow([company.name if company else 'Company'])
+        writer.writerow([f'Day Book - FY: {fy}'])
+        writer.writerow([])
+        writer.writerow(['Type', 'Voucher No', 'Date', 'Account', 'Debit', 'Credit', 'Narration'])
         
-        # Data
         for t in transactions:
             writer.writerow([
-                t.voucher_no,
-                t.transaction_date.strftime('%d-%m-%Y'),
-                t.account.name if t.account else '',
-                t.debit_amount,
-                t.credit_amount,
-                t.narration
+                t['type'], t['voucher_no'],
+                t['date'].strftime('%d-%m-%Y') if t['date'] else '',
+                t['account'], t['debit'], t['credit'], t['narration']
             ])
+        
+        writer.writerow([])
+        writer.writerow(['', '', '', 'TOTAL',
+            sum(float(t['debit'] or 0) for t in transactions),
+            sum(float(t['credit'] or 0) for t in transactions), ''])
         
         output.seek(0)
         response = make_response(output.getvalue())
@@ -279,7 +392,6 @@ def export(format):
         return response
     
     elif format == "pdf":
-        # Return PDF template
         company = Company.query.get(cid)
         return render_template("day_book/pdf.html", 
                              transactions=transactions,

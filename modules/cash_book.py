@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, session, flash, redirect, url_for
+from flask import Blueprint, render_template, request, session, flash, redirect, url_for, Response
 from flask_login import login_required, current_user
 from extensions import db
 from models import CashBook, Company, FinancialYear, Account, JournalHeader, JournalLine, BankAccount
 from datetime import date, datetime
 from sqlalchemy import text
+from utils.filters import fy_dates
 
 cash_book_bp = Blueprint("cash_book", __name__)
 
@@ -726,9 +727,43 @@ def add():
             account_id=int(account_id) if account_id else None
         )
         db.session.add(entry)
+        
+        # Auto-post journal entry (double-entry accounting)
+        if account_id:
+            # Find or create Cash Account
+            cash_account = Account.query.filter_by(company_id=cid, is_active=True).filter(
+                Account.name.ilike('%cash%')
+            ).first()
+            if not cash_account:
+                cash_account = Account(
+                    company_id=cid, name="Cash Account", account_type="Cash",
+                    group_name="Cash-in-Hand", opening_dr=0, opening_cr=0, is_active=True
+                )
+                db.session.add(cash_account)
+                db.session.flush()
+            
+            journal_voucher_no = next_journal_voucher_no(cid, fy)
+            jh = JournalHeader(
+                company_id=cid, fin_year=fy,
+                voucher_no=journal_voucher_no,
+                voucher_type="Cash",
+                voucher_date=transaction_date,
+                narration=f"Cash Book: {narration}",
+                created_by=current_user.id,
+            )
+            db.session.add(jh)
+            db.session.flush()
+            
+            if transaction_type == "Receipt":
+                db.session.add(JournalLine(journal_header_id=jh.id, account_id=cash_account.id, debit=amount, credit=0))
+                db.session.add(JournalLine(journal_header_id=jh.id, account_id=int(account_id), debit=0, credit=amount))
+            else:
+                db.session.add(JournalLine(journal_header_id=jh.id, account_id=int(account_id), debit=amount, credit=0))
+                db.session.add(JournalLine(journal_header_id=jh.id, account_id=cash_account.id, debit=0, credit=amount))
+        
         db.session.commit()
         
-        flash(f"Cash book entry {voucher_no} added successfully!", "success")
+        flash(f"Cash book entry {voucher_no} posted to ledger!", "success")
         return redirect(url_for("cash_book.index"))
     
     # Generate next voucher number for display

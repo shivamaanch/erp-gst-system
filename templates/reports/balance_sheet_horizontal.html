@@ -482,16 +482,16 @@ function updatePrintDate(dateValue) {
   document.getElementById('printDate').textContent = formatted;
 }
 
-// Handle ledger link clicks
+// Handle ledger link clicks - open in new tab with entity=account
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.ledger-link').forEach(link => {
     link.addEventListener('click', function(e) {
       e.preventDefault();
-      const ledgerName = this.dataset.ledger;
-      const accountId = this.href.match(/account_id=(\d+)/)[1];
-      
-      // Open ledger in new tab
-      window.open(this.href, '_blank');
+      let url = this.href;
+      if (!url.includes('entity=')) {
+        url += (url.includes('?') ? '&' : '?') + 'entity=account';
+      }
+      window.open(url, '_blank');
     });
   });
 });
