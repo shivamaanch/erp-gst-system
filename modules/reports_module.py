@@ -339,12 +339,41 @@ def account_ledger(account_id):
             else:
                 debit = amount; credit = 0
             
+            # Calculate fat and SNF values for milk transactions using actual rates
+            fat_value = 0.0
+            snf_value = 0.0
+            if qty_liters and (fat or snf):
+                # Get active milk rate chart for this date
+                from models import MilkRateChart
+                rate_chart = MilkRateChart.query.filter(
+                    MilkRateChart.company_id == cid,
+                    MilkRateChart.effective_date <= bill.bill_date,
+                    MilkRateChart.is_active == True,
+                    MilkRateChart.txn_type.in_(['Both', bill.bill_type])
+                ).order_by(MilkRateChart.effective_date.desc()).first()
+                
+                if rate_chart:
+                    fat_rate = float(rate_chart.fat_rate)  # Rate per unit FAT
+                    snf_rate = float(rate_chart.snf_rate)  # Rate per unit SNF
+                    
+                    # Calculate component values
+                    if qty_liters and fat:
+                        # BF Kgs = qty * fat / 100
+                        bf_kgs = qty_liters * fat / 100
+                        # Fat Value = BF Kgs * Fat Rate (per kg)
+                        fat_value = bf_kgs * fat_rate
+                    if qty_liters and snf:
+                        # SNF Kgs = qty * snf / 100
+                        snf_kgs = qty_liters * snf / 100
+                        # SNF Value = SNF Kgs * SNF Rate (per kg)
+                        snf_value = snf_kgs * snf_rate
+            
             all_party_txns.append({
                 'date': bill.bill_date, 'voucher_no': bill.bill_no,
                 'type': bill.bill_type or 'Bill', 'voucher_type': bill.bill_type or 'Bill',
                 'narration': narration, 'debit': debit, 'credit': credit,
                 'qty_liters': qty_liters, 'fat_percentage': fat, 'snf_percentage': snf,
-                'rate': rate, 'basic_amount': amount, 'fat_value': 0.0, 'snf_value': 0.0,
+                'rate': rate, 'basic_amount': amount, 'fat_value': fat_value, 'snf_value': snf_value,
                 'total_amount': amount, 'shift': shift, 'bf_clr': bf_clr
             })
         

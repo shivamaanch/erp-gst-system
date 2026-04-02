@@ -99,7 +99,7 @@
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="milkStatementToggle" onchange="toggleMilkStatement()">
               <label class="form-check-label" for="milkStatementToggle">
-                <i class="bi bi-cup-hot"></i> Show Milk Statement View
+                <i class="bi bi-cup-hot"></i> Show All Transactions (Milk + Bank + Cash)
               </label>
             </div>
           </div>
@@ -110,46 +110,57 @@
       <div id="milkStatementView" style="display: none;">
         <div class="card shadow-sm mb-3">
           <div class="card-header bg-success text-white">
-            <h6 class="mb-0"><i class="bi bi-cup-hot"></i> Milk Statement - Rate Calculation Details</h6>
+            <h6 class="mb-0"><i class="bi bi-cup-hot"></i> Complete Statement - All Transactions (Milk + Bank + Cash)</h6>
           </div>
           <div class="card-body">
             <div class="table-responsive">
               <table class="table table-bordered table-sm">
                 <thead class="table-light">
                   <tr>
-                    <th width="5%" class="text-center">Sr No</th>
-                    <th width="8%" class="text-center">Date</th>
-                    <th width="6%" class="text-center">Shift</th>
-                    <th width="8%" class="text-center">Qty (L)</th>
-                    <th width="6%" class="text-center">Fat %</th>
-                    <th width="6%" class="text-center">SNF %</th>
-                    <th width="8%" class="text-center">Rate/L</th>
-                    <th width="10%" class="text-end">Basic Amount</th>
-                    <th width="8%" class="text-end">Fat Value</th>
-                    <th width="8%" class="text-end">SNF Value</th>
-                    <th width="10%" class="text-end">Total Amount</th>
-                    <th width="8%" class="text-center">BF/CLR</th>
-                    <th width="10%" class="text-end">Debit</th>
-                    <th width="10%" class="text-end">Credit</th>
-                    <th width="7%" class="text-end">Balance</th>
+                    <th width="4%" class="text-center">Sr No</th>
+                    <th width="7%" class="text-center">Date</th>
+                    <th width="8%" class="text-center">Type</th>
+                    <th width="15%" class="text-center">Description/Narration</th>
+                    <th width="5%" class="text-center">Shift</th>
+                    <th width="6%" class="text-center">Qty (L)</th>
+                    <th width="5%" class="text-center">Fat %</th>
+                    <th width="5%" class="text-center">SNF %</th>
+                    <th width="6%" class="text-center">Rate/L</th>
+                    <th width="8%" class="text-end">Basic Amount</th>
+                    <th width="6%" class="text-end">Fat Value</th>
+                    <th width="6%" class="text-end">SNF Value</th>
+                    <th width="8%" class="text-end">Total Amount</th>
+                    <th width="8%" class="text-end">Debit</th>
+                    <th width="8%" class="text-end">Credit</th>
+                    <th width="6%" class="text-end">Balance</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for txn in transactions %}
-                  {% if txn.qty_liters %}
                   <tr>
                     <td class="text-center">{{ loop.index }}</td>
                     <td class="text-center">{{ txn.date.strftime('%d-%m-%Y') }}</td>
+                    <td class="text-center">
+                      <span class="badge bg-{{ 'success' if 'Receipt' in (txn.type or '') else 'danger' if 'Payment' in (txn.type or '') else 'primary' }}">
+                        {{ txn.type or txn.voucher_type or 'General' }}
+                      </span>
+                    </td>
+                    <td class="text-start">
+                      {% if txn.qty_liters %}
+                        <small>Milk Purchase</small>
+                      {% else %}
+                        {{ txn.narration or '-' }}
+                      {% endif %}
+                    </td>
                     <td class="text-center">{{ txn.shift or '-' }}</td>
-                    <td class="text-center">{{ "{:,.2f}".format(txn.qty_liters) }}</td>
+                    <td class="text-center">{{ "{:,.2f}".format(txn.qty_liters) if txn.qty_liters else '-' }}</td>
                     <td class="text-center">{{ "{:,.1f}".format(txn.fat_percentage) if txn.fat_percentage else '-' }}</td>
                     <td class="text-center">{{ "{:,.1f}".format(txn.snf_percentage) if txn.snf_percentage else '-' }}</td>
                     <td class="text-center">{{ "{:,.2f}".format(txn.rate) if txn.rate else '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(txn.basic_amount) if txn.basic_amount else '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(txn.fat_value) if txn.fat_value else '-' }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(txn.snf_value) if txn.snf_value else '-' }}</td>
-                    <td class="text-end fw-bold">{{ "{:,.2f}".format(txn.total_amount) if txn.total_amount else '-' }}</td>
-                    <td class="text-center">{{ txn.bf_clr or '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(txn.total_amount) if txn.total_amount else '-' }}</td>
                     <td class="text-end fw-bold {{ 'text-danger' if txn.debit and txn.debit > 0 else '' }}">
                       ₹{{ "{:,.2f}".format(txn.debit) if txn.debit and txn.debit > 0 else '' }}
                     </td>
@@ -160,17 +171,15 @@
                       ₹{{ "{:,.2f}".format(txn.balance) }}
                     </td>
                   </tr>
-                  {% endif %}
                   {% endfor %}
                 </tbody>
                 <tfoot class="table-secondary fw-bold">
                   <tr>
-                    <td colspan="7" class="text-end">Grand Totals:</td>
+                    <td colspan="9" class="text-end">Grand Totals:</td>
                     <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('basic_amount')|sum(attribute='basic_amount')|default(0)) }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('fat_value')|sum(attribute='fat_value')|default(0)) }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('snf_value')|sum(attribute='snf_value')|default(0)) }}</td>
                     <td class="text-end">{{ "{:,.2f}".format(transactions|selectattr('total_amount')|sum(attribute='total_amount')|default(0)) }}</td>
-                    <td></td>
                     <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='debit')) }}</td>
                     <td class="text-end">₹{{ "{:,.2f}".format(transactions|sum(attribute='credit')) }}</td>
                     <td class="text-end {{ 'text-success' if closing_balance >= 0 else 'text-danger' }}">₹{{ "{:,.2f}".format(closing_balance) }}</td>

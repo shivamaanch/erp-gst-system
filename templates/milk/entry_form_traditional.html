@@ -486,16 +486,15 @@ function calculateMilk() {
   let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
   let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
   
-  // Simple daily rate calculation (Rate per Liter is primary)
-  const ratePerLiterInput = parseFloat(document.getElementById('rate_per_liter').value) || 0;
+  // Use daily rate entered by user (per 100kg)
+  const dailyRate = parseFloat(document.getElementById('rate_per_liter').value) || 0;
   
   let finalAmount, ratePerLiter;
   
-  // Always use component-based calculation for traditional method
-  const bfAmount = bfKgs * fatRate;
-  const snfAmount = snfKgs * snfRate;
-  finalAmount = bfAmount + snfAmount;
-  ratePerLiter = qty > 0 ? finalAmount / qty : 0;
+  // Calculate final amount using daily rate
+  // dailyRate is per 100kg, so convert to per liter: dailyRate / 100
+  ratePerLiter = dailyRate / 100;
+  finalAmount = qty * ratePerLiter;
   
   // Debug logging
   console.log('Debug - qty:', qty, 'fat:', fat, 'snf:', snf);

@@ -250,7 +250,10 @@ $(document).ready(function() {
                 $(this).select2({
                     theme: 'bootstrap-5',
                     width: '100%',
-                    placeholder: "-- Select Account --"
+                    placeholder: "-- Select Account --",
+                    allowClear: false,
+                    minimumResultsForSearch: 0,
+                    keyboardNavigation: true
                 });
             }
         });
