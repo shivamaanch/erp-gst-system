@@ -7,7 +7,7 @@
 <form method="POST">
   <div class="mb-3">
     <label class="form-label fw-bold small">Party</label>
-    <select name="party_id" class="form-select form-select-sm" required>
+    <select name="party_id" class="form-select form-select-sm searchable-select" required>
       <option value="">-- Select Party --</option>
       {% for p in parties %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
     </select>

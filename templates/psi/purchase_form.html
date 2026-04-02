@@ -6,7 +6,7 @@
     <div class="row g-3">
       <div class="col-md-4">
         <label>Party</label>
-        <select name="party_id" class="form-select" required>
+        <select name="party_id" class="form-select searchable-select" required>
           {% for p in parties %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}
         </select>
       </div>

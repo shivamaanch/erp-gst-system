@@ -16,7 +16,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label fw-bold">Party Type *</label>
-          <select name="party_type" class="form-select" required>
+          <select name="party_type" class="form-select searchable-select" required>
             {% for pt in party_types %}
             <option value="{{ pt }}" {{ 'selected' if (party and party.party_type==pt) or (not party and pt=='Debtor') }}>{{ pt }}</option>
             {% endfor %}
@@ -66,4 +66,20 @@
     </form>
   </div>
 </div>
+</div>
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize all searchable selects
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: true
+    });
+});
+</script>
 {% endblock %}

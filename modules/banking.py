@@ -193,34 +193,82 @@ def transactions(bank_id):
         bank=bank, txns=txns, total_dr=total_dr, total_cr=total_cr,
         suspense_count=len(suspense), cash_count=len(cash_txns))
 
-@banking_bp.route("/banking/entry/<int:bank_id>", methods=["GET","POST"])
+@banking_bp.route("/banking/manual-entry/<int:bank_id>", methods=["GET","POST"])
 @login_required
 def manual_entry(bank_id):
-    cid = session.get("company_id"); fy = session.get("fin_year")
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
     bank = BankAccount.query.filter_by(id=bank_id, company_id=cid).first_or_404()
-    parties = Party.query.filter_by(company_id=cid, is_active=True).all()
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
+    
     if request.method == "POST":
         desc = request.form["description"].strip()
         ref_no = request.form.get("ref_no","").strip()
         debit = float(request.form.get("debit") or 0)
         credit = float(request.form.get("credit") or 0)
+        account_id = request.form.get("account_id")
         txn_date = datetime.strptime(request.form["txn_date"],"%Y-%m-%d").date()
-        h = make_hash(bank_id, txn_date, debit, credit, ref_no, desc)
-        if BankTransaction.query.filter_by(hash_key=h).first():
-            flash("❌ Duplicate entry detected!", "danger")
-            return redirect(url_for("banking.manual_entry", bank_id=bank_id))
-        mode   = detect_mode(desc)
-        ledger = detect_ledger(desc, mode)
-        t = BankTransaction(
-            company_id=cid, fin_year=fy, bank_account_id=bank_id,
-            txn_date=txn_date, description=desc, ref_no=ref_no,
-            debit=debit, credit=credit,
-            txn_mode=mode, ledger_type=ledger, hash_key=h
-        )
-        db.session.add(t); db.session.commit()
-        flash(f"✅ Entry saved → {ledger} Account ({mode})", "success")
-        return redirect(url_for("banking.transactions", bank_id=bank_id))
-    return render_template("banking/manual_entry.html", bank=bank, parties=parties, today=date.today().isoformat())
+        
+        if (debit > 0 or credit > 0) and account_id:
+            # Create journal entry for double-entry
+            jh = JournalHeader(
+                company_id=cid,
+                fin_year=fy,
+                voucher_date=txn_date,
+                voucher_type="Bank",
+                narration=f"Bank Transaction - {desc}" + (f" (Ref: {ref_no})" if ref_no else "")
+            )
+            db.session.add(jh)
+            db.session.flush()
+            
+            # Create journal lines
+            lines = []
+            
+            # Bank account line
+            if debit > 0:
+                # Bank is receiving money (debit)
+                lines.append(JournalLine(
+                    header_id=jh.id,
+                    account_id=bank.account_id or bank_id,  # Use linked account or bank_id
+                    debit=debit,
+                    credit=0,
+                    narration=desc
+                ))
+                # Other account is giving money (credit)
+                lines.append(JournalLine(
+                    header_id=jh.id,
+                    account_id=int(account_id),
+                    debit=0,
+                    credit=debit,
+                    narration=desc
+                ))
+            else:
+                # Bank is paying money (credit)
+                lines.append(JournalLine(
+                    header_id=jh.id,
+                    account_id=bank.account_id or bank_id,  # Use linked account or bank_id
+                    debit=0,
+                    credit=credit,
+                    narration=desc
+                ))
+                # Other account is receiving money (debit)
+                lines.append(JournalLine(
+                    header_id=jh.id,
+                    account_id=int(account_id),
+                    debit=credit,
+                    credit=0,
+                    narration=desc
+                ))
+            
+            db.session.add_all(lines)
+            db.session.commit()
+            
+            flash("✅ Bank entry saved successfully!", "success")
+            return redirect(url_for("banking.transactions", bank_id=bank_id))
+        else:
+            flash("❌ Please fill all required fields!", "danger")
+    
+    return render_template("banking/manual_entry.html", bank=bank, accounts=accounts, today=date.today().isoformat())
 
 @banking_bp.route("/banking/quick-entry", methods=["GET","POST"])
 @login_required
@@ -228,18 +276,55 @@ def quick_entry():
     cid = session.get("company_id")
     fy = session.get("fin_year")
     
-    banks = BankAccount.query.filter_by(company_id=cid, is_active=True).all()
+    # Get bank accounts from BankAccount table
+    bank_accounts = BankAccount.query.filter_by(company_id=cid, is_active=True).all()
+    
+    # Also get accounts from Chart of Accounts that are bank accounts
+    bank_ledger_accounts = Account.query.filter(
+        Account.company_id == cid,
+        Account.is_active == True,
+        db.or_(
+            Account.group_name.ilike('%bank%'),
+            Account.name.ilike('%bank%'),
+            Account.name.ilike('%hdfc%'),
+            Account.name.ilike('%sbi%'),
+            Account.name.ilike('%icici%'),
+            Account.name.ilike('%axis%')
+        )
+    ).order_by(Account.name).all()
+    
+    # Combine both - mark source for display
+    all_banks = []
+    for b in bank_accounts:
+        all_banks.append({
+            'id': b.id,
+            'account_name': b.account_name,
+            'bank_name': b.bank_name,
+            'account_no': b.account_no,
+            'source': 'bank_account'
+        })
+    for a in bank_ledger_accounts:
+        # Avoid duplicates
+        if not any(b['account_name'] == a.name for b in all_banks):
+            all_banks.append({
+                'id': a.id,
+                'account_name': a.name,
+                'bank_name': a.group_name or 'Ledger Account',
+                'account_no': '',
+                'source': 'account'
+            })
+    
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     # Calculate previous bank balances
     bank_balances = {}
     today = date.today()
     
-    for bank in banks:
+    for bank in all_banks:
         # Get journal lines for this bank account up to today
         journal_lines = JournalLine.query.join(JournalHeader).filter(
             JournalHeader.company_id == cid,
-            JournalLine.account_id == bank.account_id,
+            JournalLine.account_id == bank['id'],
             JournalHeader.voucher_date <= today
         ).all()
         
@@ -249,11 +334,7 @@ def quick_entry():
             balance += float(line.debit or 0)
             balance -= float(line.credit or 0)
         
-        # Add opening balance if available
-        if hasattr(bank, 'opening_balance') and bank.opening_balance:
-            balance += float(bank.opening_balance)
-        
-        bank_balances[bank.id] = balance
+        bank_balances[bank['id']] = balance
     
     if request.method == "POST":
         bank_account_id = request.form.get("bank_account_id")
@@ -266,8 +347,77 @@ def quick_entry():
         single_save = request.form.get("single_save") == "true"
         
         if single_save:
-            # Single row save logic here...
-            pass
+            # Single row save
+            row_date = request.form.get("row_date", date.today().isoformat())
+            account_id = request.form.get("account_id")
+            debit = float(request.form.get("debit") or 0)
+            credit = float(request.form.get("credit") or 0)
+            narration = request.form.get("narration", "").strip()
+            
+            if (debit > 0 or credit > 0) and account_id:
+                # Create journal entry
+                txn_date = datetime.strptime(row_date, "%Y-%m-%d").date()
+                
+                # Get bank account info
+                bank_account = None
+                for b in all_banks:
+                    if str(b['id']) == bank_account_id:
+                        bank_account = b
+                        break
+                
+                if bank_account:
+                    # Create journal header
+                    jh = JournalHeader(
+                        company_id=cid,
+                        fin_year=fy,
+                        voucher_date=txn_date,
+                        voucher_type="Bank",
+                        narration=f"Bank Transaction - {party_name} - {narration}" if narration else f"Bank Transaction - {party_name}"
+                    )
+                    db.session.add(jh)
+                    db.session.flush()
+                    
+                    # Create journal lines
+                    lines = []
+                    
+                    # Bank account line (opposite of transaction type)
+                    if transaction_type == "Deposit":
+                        lines.append(JournalLine(
+                            header_id=jh.id,
+                            account_id=int(bank_account_id),
+                            debit=credit,
+                            credit=0,
+                            narration=f"{party_name} - {narration}" if narration else party_name
+                        ))
+                        # Account line
+                        lines.append(JournalLine(
+                            header_id=jh.id,
+                            account_id=int(account_id),
+                            debit=0,
+                            credit=credit,
+                            narration=f"{party_name} - {narration}" if narration else party_name
+                        ))
+                    else:  # Withdrawal/Payment
+                        lines.append(JournalLine(
+                            header_id=jh.id,
+                            account_id=int(bank_account_id),
+                            debit=debit,
+                            credit=0,
+                            narration=f"{party_name} - {narration}" if narration else party_name
+                        ))
+                        # Account line
+                        lines.append(JournalLine(
+                            header_id=jh.id,
+                            account_id=int(account_id),
+                            debit=0,
+                            credit=debit,
+                            narration=f"{party_name} - {narration}" if narration else party_name
+                        ))
+                    
+                    db.session.add_all(lines)
+                    db.session.commit()
+                    
+                    flash("✅ Bank entry saved successfully!", "success")
         else:
             # Batch save logic here...
             pass
@@ -275,13 +425,14 @@ def quick_entry():
         return redirect(url_for("banking.accounts"))
     
     # Get default bank account
-    default_bank = banks[0] if banks else None
+    default_bank = all_banks[0] if all_banks else None
     
     # Default date to last used or today
     default_date = session.get("last_txn_date") or date.today().isoformat()
     
     return render_template("banking/quick_entry.html", 
-                         banks=banks,
+                         banks=all_banks,
+                         all_banks=all_banks,
                          accounts=accounts,
                          default_bank=default_bank,
                          today=default_date,

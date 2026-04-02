@@ -20,7 +20,7 @@
             <div class="col-md-3">
               <label class="form-label">Cash Account *</label>
               <div class="input-group">
-                <select name="cash_account_id" id="cashAccountId" class="form-select" required>
+                <select name="cash_account_id" id="cashAccountId" class="form-select searchable-select" required>
                   <option value="">-- Select Cash Account --</option>
                   {% for acc in accounts %}
                   <option value="{{ acc.id }}" {% if acc.name.lower().find('cash') != -1 %}selected{% endif %}>{{ acc.name }}</option>
@@ -254,7 +254,7 @@ function createRow() {
       <input type="date" name="row_date[]" class="form-control date-input" value="${lastDate}" onchange="updateNextRows(this)">
     </td>
     <td>
-      <select name="account_id[]" class="form-select account-select" onchange="updateNarrationOnAccountChange(this)">
+      <select name="account_id[]" class="form-select account-select searchable-select" onchange="updateNarrationOnAccountChange(this)">
         <option value="">-- Select Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -507,4 +507,19 @@ function loadPreviousBalance() {
 
 <!-- Include Quick Add Ledger Modal -->
 {% include 'shared/quick_add_ledger.html' %}
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize all searchable selects
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: true
+    });
+});
+</script>
 {% endblock %}

@@ -175,7 +175,7 @@ function createRow() {
       <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
     </td>
     <td>
-      <select name="debit_account_id[]" class="form-select account-select debit-select" required onchange="autoFillCredit(this)">
+      <select name="debit_account_id[]" class="form-select account-select debit-select searchable-select" required onchange="autoFillCredit(this)">
         <option value="">-- Select Debit Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -186,7 +186,7 @@ function createRow() {
       <input type="number" name="debit_amount[]" class="form-control debit-input" step="0.01" min="0" value="0" onchange="autoFillCredit(this)">
     </td>
     <td>
-      <select name="credit_account_id[]" class="form-select account-select credit-select" required>
+      <select name="credit_account_id[]" class="form-select account-select credit-select searchable-select" required>
         <option value="">-- Select Credit Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -390,4 +390,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Include Quick Add Ledger Modal -->
 {% include 'shared/quick_add_ledger.html' %}
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize all searchable selects
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: true
+    });
+});
+</script>
 {% endblock %}

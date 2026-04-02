@@ -26,7 +26,7 @@
         <div class="col-md-4">
           <label class="form-label fw-bold">{{ "Customer (Debtor)" if btype=="Sales" else "Supplier / Creditor" }} *</label>
           <div class="input-group">
-            <select name="party_id" id="partySelect" class="form-select" required>
+            <select name="party_id" id="partySelect" class="form-select searchable-select" required>
               <option value="">-- Select Party --</option>
               {% for p in parties %}
               <option value="{{ p.id }}">{{ p.name }} {% if p.gstin %}({{ p.gstin }}){% endif %}</option>

@@ -4,6 +4,9 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold">🏦 Quick Bank Entry</h4>
   <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-primary" onclick="showQuickAddBankAccount()">
+      <i class="bi bi-plus-circle"></i> Add Bank Account
+    </button>
     <button type="button" class="btn btn-outline-info" onclick="showQuickAddLedger()">
       <i class="bi bi-plus-circle"></i> Add Ledger
     </button>
@@ -19,10 +22,10 @@
       <div class="row g-3 mb-3">
         <div class="col-md-4">
           <label class="form-label">Bank Account *</label>
-          <select name="bank_account_id" class="form-select" required>
+          <select name="bank_account_id" class="form-select searchable-select" required>
             <option value="">-- Select Bank Account --</option>
-            {% for bank in banks %}
-            <option value="{{ bank.id }}" {% if default_bank and bank.id == default_bank.id %}selected{% endif %}>{{ bank.bank_name }} - {{ bank.account_no }}</option>
+            {% for bank in all_banks %}
+            <option value="{{ bank.id }}" {% if default_bank and bank.id == default_bank.id %}selected{% endif %}>{{ bank.account_name }} - {{ bank.bank_name }} {% if bank.account_no %}({{ bank.account_no }}){% endif %}</option>
             {% endfor %}
           </select>
         </div>
@@ -67,7 +70,7 @@
         <div class="me-3">
           <i class="bi bi-bank"></i>
           <strong>Default Bank Account:</strong>
-          {{ default_bank.bank_name }} - {{ default_bank.account_no }}
+          {{ default_bank.account_name }} - {{ default_bank.bank_name }} {% if default_bank.account_no %}({{ default_bank.account_no }}){% endif %}
         </div>
         <div class="ms-auto">
           <small class="text-muted">Bank contra entries will be posted to this account</small>
@@ -203,7 +206,7 @@ function createRow() {
       <input type="date" name="row_date[]" class="form-control date-input" value="{{ today }}" required>
     </td>
     <td>
-      <select name="account_id[]" class="form-select account-select" required>
+      <select name="account_id[]" class="form-select account-select searchable-select" required>
         <option value="">-- Select Account --</option>
         {% for acc in accounts %}
         <option value="{{ acc.id }}">{{ acc.name }}</option>
@@ -244,6 +247,109 @@ function removeRow(btn) {
   }
 }
 
+function saveSingleRow() {
+  // Find the first non-empty row
+  const tbody = document.getElementById('bankBody');
+  const rows = tbody.querySelectorAll('tr');
+  
+  let activeRow = null;
+  for (let row of rows) {
+    const debit = parseFloat(row.querySelector('.debit-input').value) || 0;
+    const credit = parseFloat(row.querySelector('.credit-input').value) || 0;
+    const account = row.querySelector('.account-select').value;
+    
+    if ((debit > 0 || credit > 0) && account) {
+      activeRow = row;
+      break;
+    }
+  }
+  
+  if (!activeRow) {
+    alert('Please fill at least one row with data');
+    return;
+  }
+  
+  // Create form to submit single row
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = window.location.href;
+  
+  // Add single_save flag
+  const singleSaveInput = document.createElement('input');
+  singleSaveInput.type = 'hidden';
+  singleSaveInput.name = 'single_save';
+  singleSaveInput.value = 'true';
+  form.appendChild(singleSaveInput);
+  
+  // Add bank account ID
+  const bankAccountId = document.querySelector('select[name="bank_account_id"]').value;
+  const bankInput = document.createElement('input');
+  bankInput.type = 'hidden';
+  bankInput.name = 'bank_account_id';
+  bankInput.value = bankAccountId;
+  form.appendChild(bankInput);
+  
+  // Add transaction type
+  const txnType = document.querySelector('select[name="transaction_type"]').value;
+  const txnInput = document.createElement('input');
+  txnInput.type = 'hidden';
+  txnInput.name = 'transaction_type';
+  txnInput.value = txnType;
+  form.appendChild(txnInput);
+  
+  // Add reference and party
+  const refInput = document.createElement('input');
+  refInput.type = 'hidden';
+  refInput.name = 'reference_no';
+  refInput.value = document.querySelector('input[name="reference_no"]').value;
+  form.appendChild(refInput);
+  
+  const partyInput = document.createElement('input');
+  partyInput.type = 'hidden';
+  partyInput.name = 'party_name';
+  partyInput.value = document.querySelector('input[name="party_name"]').value;
+  form.appendChild(partyInput);
+  
+  // Add row data
+  const dateInput = activeRow.querySelector('.date-input');
+  const dateInput2 = document.createElement('input');
+  dateInput2.type = 'hidden';
+  dateInput2.name = 'row_date';
+  dateInput2.value = dateInput.value;
+  form.appendChild(dateInput2);
+  
+  const accountSelect = activeRow.querySelector('.account-select');
+  const accountInput = document.createElement('input');
+  accountInput.type = 'hidden';
+  accountInput.name = 'account_id';
+  accountInput.value = accountSelect.value;
+  form.appendChild(accountInput);
+  
+  const debitInput = activeRow.querySelector('.debit-input');
+  const debitInput2 = document.createElement('input');
+  debitInput2.type = 'hidden';
+  debitInput2.name = 'debit';
+  debitInput2.value = debitInput.value;
+  form.appendChild(debitInput2);
+  
+  const creditInput = activeRow.querySelector('.credit-input');
+  const creditInput2 = document.createElement('input');
+  creditInput2.type = 'hidden';
+  creditInput2.name = 'credit';
+  creditInput2.value = creditInput.value;
+  form.appendChild(creditInput2);
+  
+  const narrationInput = activeRow.querySelector('.narration-input');
+  const narrationInput2 = document.createElement('input');
+  narrationInput2.type = 'hidden';
+  narrationInput2.name = 'narration';
+  narrationInput2.value = narrationInput.value;
+  form.appendChild(narrationInput2);
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
 function calculateTotals() {
   let totalDebit = 0;
   let totalCredit = 0;
@@ -279,6 +385,13 @@ function attachEventListeners() {
   // Add Enter key navigation
   document.querySelectorAll('.account-select, .debit-input, .credit-input, .narration-input').forEach(input => {
     input.addEventListener('keydown', handleEnterKey);
+  });
+  
+  // Initialize select2 for new rows
+  $('.searchable-select').select2({
+    theme: 'bootstrap-5',
+    width: '100%',
+    allowClear: true
   });
 }
 
@@ -338,6 +451,111 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Quick Add Bank Account Modal -->
+<div class="modal fade" id="quickAddBankModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">🏦 Add Bank Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddBankForm">
+          <div class="mb-3">
+            <label class="form-label">Account Name *</label>
+            <input type="text" name="account_name" class="form-control" placeholder="e.g., Current Account" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bank Name *</label>
+            <input type="text" name="bank_name" class="form-control" placeholder="e.g., HDFC Bank" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Account Number *</label>
+            <input type="text" name="account_no" class="form-control" placeholder="e.g., 1234567890" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">IFSC Code</label>
+            <input type="text" name="ifsc" class="form-control" placeholder="e.g., HDFC0001234">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Branch</label>
+            <input type="text" name="branch" class="form-control" placeholder="e.g., Main Branch">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Account Type</label>
+            <select name="account_type" class="form-select">
+              <option value="Current">Current</option>
+              <option value="Savings">Savings</option>
+              <option value="OD">OD</option>
+              <option value="CC">CC</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Opening Balance</label>
+            <input type="number" name="opening_balance" class="form-control" step="0.01" value="0">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveQuickBankAccount()">Save Bank Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Include Quick Add Ledger Modal -->
 {% include 'shared/quick_add_ledger.html' %}
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+function showQuickAddBankAccount() {
+  const modal = new bootstrap.Modal(document.getElementById('quickAddBankModal'));
+  modal.show();
+}
+
+function saveQuickBankAccount() {
+  const form = document.getElementById('quickAddBankForm');
+  const formData = new FormData(form);
+  
+  fetch('/banking/accounts/add', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.text())
+  .then(html => {
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('quickAddBankModal')).hide();
+    
+    // Reset form
+    form.reset();
+    
+    // Show success message
+    alert('Bank account added successfully!');
+    
+    // Refresh the page to update dropdown
+    window.location.reload();
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error adding bank account');
+  });
+}
+
+$(document).ready(function() {
+    // Initialize all searchable selects
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: function() {
+            $(this).data('placeholder', $(this).attr('placeholder'));
+            return $(this).attr('placeholder');
+        },
+        allowClear: true
+    });
+});
+</script>
 {% endblock %}

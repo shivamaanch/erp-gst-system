@@ -193,7 +193,7 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-bold">Select Rate Chart</label>
-              <select name="chart_id" id="chart_id" class="form-select" onchange="loadRateChart()">
+              <select name="chart_id" id="chart_id" class="form-select searchable-select" onchange="loadRateChart()">
                 <option value="">-- Manual Entry --</option>
                 {% for c in charts %}
                 <option value="{{ c.id }}" data-fat="{{ c.fat_rate }}" data-snf="{{ c.snf_rate }}">
@@ -691,6 +691,13 @@ document.addEventListener('DOMContentLoaded', function() {
   toggleGST();
   calculateSNF(); // Set default SNF
   
+  // Initialize Select2
+  $('.searchable-select').select2({
+    theme: 'bootstrap-5',
+    width: '100%',
+    allowClear: true
+  });
+  
   // Trigger calculations to populate all fields
   setTimeout(function() {
     console.log('Initializing calculations for add/edit mode...');
@@ -700,4 +707,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 100);
 });
 </script>
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 {% endblock %}

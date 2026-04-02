@@ -30,7 +30,7 @@
     <thead class="table-dark"><tr><th>Account</th><th>Debit</th><th>Credit</th><th></th></tr></thead>
     <tbody id="lineBody">
       <tr>
-        <td><select name="account_id[]" class="form-select form-select-sm" required>
+        <td><select name="account_id[]" class="form-select form-select-sm searchable-select" required>
           <option value="">-- Select --</option>
           {% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}
         </select></td>
@@ -39,7 +39,7 @@
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
       </tr>
       <tr>
-        <td><select name="account_id[]" class="form-select form-select-sm" required>
+        <td><select name="account_id[]" class="form-select form-select-sm searchable-select" required>
           <option value="">-- Select --</option>
           {% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.name }}</option>{% endfor %}
         </select></td>

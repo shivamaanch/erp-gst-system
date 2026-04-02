@@ -29,7 +29,7 @@
         </div>
         <div class="col-md-5">
           <label class="form-label fw-bold">Rate Chart *</label>
-          <select name="chart_id" id="chart_id" class="form-select" required onchange="recalc()">
+          <select name="chart_id" id="chart_id" class="form-select searchable-select" required onchange="recalc()">
             <option value="">-- Select --</option>
             {% for c in charts %}
             <option value="{{ c.id }}" data-fat="{{ c.fat_rate }}" data-snf="{{ c.snf_rate }}">
@@ -40,7 +40,7 @@
         </div>
         <div class="col-md-6">
           <label class="form-label fw-bold">Party *</label>
-          <select name="party_id" class="form-select" required>
+          <select name="party_id" class="form-select searchable-select" required>
             <option value="">-- Select Party --</option>
             {% for p in parties %}
             <option value="{{ p.id }}">{{ p.name }}</option>
@@ -150,5 +150,20 @@ function toggleGST(){
   document.getElementById('gstSection').style.display=
     document.getElementById('createInv').checked?'flex':'none';
 }
+</script>
+
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize all searchable selects
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: true
+    });
+});
 </script>
 {% endblock %}
