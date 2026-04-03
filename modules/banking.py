@@ -310,6 +310,9 @@ def quick_entry():
     banks = BankAccount.query.filter_by(company_id=cid, is_active=True).order_by(BankAccount.account_name).all()
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
+    # Get parties for dropdown (treat as ledgers)
+    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    
     # Calculate previous bank balances
     bank_balances = {}
     today = date.today()
@@ -430,12 +433,37 @@ def quick_entry():
 
         if single_save:
             row_date = request.form.get("row_date", date.today().isoformat())
-            other_account_id = request.form.get("account_id")
+            account_id_str = request.form.get("account_id")
             dr_amount = float(request.form.get("debit") or 0)
             cr_amount = float(request.form.get("credit") or 0)
             narration_text = (request.form.get("narration") or "").strip()
+            
+            # Parse account_id - can be "acc_123" or "party_123"
+            actual_account_id = None
+            if account_id_str:
+                if account_id_str.startswith("acc_"):
+                    actual_account_id = int(account_id_str.split("_")[1])
+                elif account_id_str.startswith("party_"):
+                    party_id = int(account_id_str.split("_")[1])
+                    party = Party.query.get(party_id)
+                    if party:
+                        # Find or create a ledger account for this party
+                        party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
+                        if not party_account:
+                            party_account = Account(
+                                company_id=cid,
+                                name=party.name,
+                                group_id=21 if dr_amount > 0 else 20,  # 21=Sundry Debtors, 20=Sundry Creditors
+                                is_active=True
+                            )
+                            db.session.add(party_account)
+                            db.session.flush()
+                        actual_account_id = party_account.id
+                else:
+                    # Fallback for old format
+                    actual_account_id = int(account_id_str)
 
-            if not other_account_id or (dr_amount <= 0 and cr_amount <= 0):
+            if not actual_account_id or (dr_amount <= 0 and cr_amount <= 0):
                 flash("❌ Please fill account and amount", "danger")
                 return redirect(url_for("banking.quick_entry"))
 
@@ -444,26 +472,52 @@ def quick_entry():
             if not narration_text:
                 narration_text = _auto_narration(is_receipt=(dr_amount > 0))
 
-            _post_one(entry_date, other_account_id, dr_amount, cr_amount, narration_text)
+            _post_one(entry_date, actual_account_id, dr_amount, cr_amount, narration_text)
             db.session.commit()
             flash("✅ Bank entry saved successfully!", "success")
             return redirect(url_for("banking.quick_entry"))
 
         # Batch save: save all filled rows (no overall balancing required)
         row_dates = request.form.getlist("row_date[]")
-        other_accounts = request.form.getlist("account_id[]")
+        account_ids = request.form.getlist("account_id[]")
         debits = request.form.getlist("debit[]")
         credits = request.form.getlist("credit[]")
         narrations = request.form.getlist("narration[]")
 
         created = 0
-        for i in range(len(other_accounts)):
-            if not other_accounts[i]:
+        for i in range(len(account_ids)):
+            if not account_ids[i]:
                 continue
             dr_amount = float(debits[i] or 0)
             cr_amount = float(credits[i] or 0)
             if dr_amount <= 0 and cr_amount <= 0:
                 continue
+
+            # Parse account_id - can be "acc_123" or "party_123"
+            actual_account_id = None
+            account_id_str = account_ids[i]
+            
+            if account_id_str.startswith("acc_"):
+                actual_account_id = int(account_id_str.split("_")[1])
+            elif account_id_str.startswith("party_"):
+                party_id = int(account_id_str.split("_")[1])
+                party = Party.query.get(party_id)
+                if party:
+                    # Find or create a ledger account for this party
+                    party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
+                    if not party_account:
+                        party_account = Account(
+                            company_id=cid,
+                            name=party.name,
+                            group_id=21 if dr_amount > 0 else 20,
+                            is_active=True
+                        )
+                        db.session.add(party_account)
+                        db.session.flush()
+                    actual_account_id = party_account.id
+            else:
+                # Fallback for old format
+                actual_account_id = int(account_id_str)
 
             entry_date = date.today()
             if i < len(row_dates) and row_dates[i]:
@@ -474,7 +528,7 @@ def quick_entry():
             if not narration_text:
                 narration_text = _auto_narration(is_receipt=(dr_amount > 0))
 
-            _post_one(entry_date, other_accounts[i], dr_amount, cr_amount, narration_text)
+            _post_one(entry_date, actual_account_id, dr_amount, cr_amount, narration_text)
             created += 1
 
         if created:
@@ -494,6 +548,7 @@ def quick_entry():
     return render_template("banking/quick_entry.html", 
                          banks=banks,
                          accounts=accounts,
+                         parties=parties,
                          default_bank=default_bank,
                          today=default_date,
                          bank_balances=bank_balances)
