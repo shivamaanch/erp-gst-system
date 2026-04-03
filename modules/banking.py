@@ -453,7 +453,7 @@ def quick_entry():
                             party_account = Account(
                                 company_id=cid,
                                 name=party.name,
-                                group_id=21 if dr_amount > 0 else 20,  # 21=Sundry Debtors, 20=Sundry Creditors
+                                group_name="Sundry Debtors" if dr_amount > 0 else "Sundry Creditors",
                                 is_active=True
                             )
                             db.session.add(party_account)
@@ -509,7 +509,7 @@ def quick_entry():
                         party_account = Account(
                             company_id=cid,
                             name=party.name,
-                            group_id=21 if dr_amount > 0 else 20,
+                            group_name="Sundry Debtors" if dr_amount > 0 else "Sundry Creditors",
                             is_active=True
                         )
                         db.session.add(party_account)

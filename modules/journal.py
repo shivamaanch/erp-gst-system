@@ -139,7 +139,7 @@ def quick_entry():
                         party_account = Account(
                             company_id=cid,
                             name=party.name,
-                            group_id=20,  # Sundry Creditors by default
+                            group_name="Sundry Creditors",
                             is_active=True
                         )
                         db.session.add(party_account)

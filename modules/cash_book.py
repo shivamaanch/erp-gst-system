@@ -926,7 +926,7 @@ def quick_entry():
                             party_account = Account(
                                 company_id=cid,
                                 name=party.name,
-                                group_id=21 if transaction_type == "Receipt" else 20,
+                                group_name="Sundry Debtors" if transaction_type == "Receipt" else "Sundry Creditors",
                                 is_active=True
                             )
                             db.session.add(party_account)
@@ -1136,7 +1136,7 @@ def quick_entry():
                             party_account = Account(
                                 company_id=cid,
                                 name=party.name,
-                                group_id=21 if transaction_type == "Receipt" else 20,  # 21=Sundry Debtors, 20=Sundry Creditors
+                                group_name="Sundry Debtors" if transaction_type == "Receipt" else "Sundry Creditors",
                                 is_active=True
                             )
                             db.session.add(party_account)
