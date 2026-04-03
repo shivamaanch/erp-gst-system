@@ -177,9 +177,16 @@ function createRow() {
     <td>
       <select name="debit_account_id[]" class="form-select account-select debit-select searchable-select" required onchange="autoFillCredit(this)">
         <option value="">-- Select Debit Account --</option>
-        {% for acc in accounts %}
-        <option value="{{ acc.id }}">{{ acc.name }}</option>
-        {% endfor %}
+        <optgroup label="Ledger Accounts">
+          {% for acc in accounts %}
+          <option value="acc_{{ acc.id }}">{{ acc.name }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Parties (Customers/Suppliers)">
+          {% for party in parties %}
+          <option value="party_{{ party.id }}">{{ party.name }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </td>
     <td>
@@ -188,9 +195,16 @@ function createRow() {
     <td>
       <select name="credit_account_id[]" class="form-select account-select credit-select searchable-select" required>
         <option value="">-- Select Credit Account --</option>
-        {% for acc in accounts %}
-        <option value="{{ acc.id }}">{{ acc.name }}</option>
-        {% endfor %}
+        <optgroup label="Ledger Accounts">
+          {% for acc in accounts %}
+          <option value="acc_{{ acc.id }}">{{ acc.name }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Parties (Customers/Suppliers)">
+          {% for party in parties %}
+          <option value="party_{{ party.id }}">{{ party.name }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </td>
     <td>

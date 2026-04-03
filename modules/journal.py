@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from flask_login import login_required, current_user
 from extensions import db
-from models import JournalHeader, JournalLine, Account
+from models import JournalHeader, JournalLine, Account, Party
 from datetime import datetime, date
 
 journal_bp = Blueprint("journal", __name__)
@@ -86,6 +86,9 @@ def quick_entry():
     # Get accounts for dropdown
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
+    # Get parties for dropdown (treat as ledgers)
+    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    
     # Calculate previous account balances
     account_balances = {}
     today = date.today()
@@ -115,16 +118,138 @@ def quick_entry():
     if request.method == "POST":
         voucher_type = request.form.get("voucher_type", "Journal")
         narration = request.form.get("narration", "").strip()
+        voucher_date = datetime.strptime(request.form.get("voucher_date", date.today().isoformat()), "%Y-%m-%d").date()
         
         # Check if this is a single row save or batch save
         single_save = request.form.get("single_save") == "true"
         
+        # Helper function to parse account_id
+        def parse_account_id(account_id_str):
+            if not account_id_str:
+                return None
+            if account_id_str.startswith("acc_"):
+                return int(account_id_str.split("_")[1])
+            elif account_id_str.startswith("party_"):
+                party_id = int(account_id_str.split("_")[1])
+                party = Party.query.get(party_id)
+                if party:
+                    # Find or create a ledger account for this party
+                    party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
+                    if not party_account:
+                        party_account = Account(
+                            company_id=cid,
+                            name=party.name,
+                            group_id=20,  # Sundry Creditors by default
+                            is_active=True
+                        )
+                        db.session.add(party_account)
+                        db.session.flush()
+                    return party_account.id
+            else:
+                # Fallback for old format
+                return int(account_id_str)
+        
         if single_save:
-            # Single row save logic here...
-            pass
+            # Single row save
+            debit_account_id_str = request.form.get("debit_account_id")
+            credit_account_id_str = request.form.get("credit_account_id")
+            debit_amount = float(request.form.get("debit_amount") or 0)
+            credit_amount = float(request.form.get("credit_amount") or 0)
+            line_narration = request.form.get("line_narration", "").strip()
+            
+            debit_account_id = parse_account_id(debit_account_id_str)
+            credit_account_id = parse_account_id(credit_account_id_str)
+            
+            if debit_account_id and credit_account_id and (debit_amount > 0 or credit_amount > 0):
+                # Generate voucher number
+                voucher_no = next_journal_voucher_no(cid, fy)
+                
+                # Create Journal Header
+                jh = JournalHeader(
+                    company_id=cid,
+                    fin_year=fy,
+                    voucher_no=voucher_no,
+                    voucher_type=voucher_type,
+                    voucher_date=voucher_date,
+                    narration=narration or line_narration,
+                    created_by=current_user.id,
+                )
+                db.session.add(jh)
+                db.session.flush()
+                
+                # Create Journal Lines
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=debit_account_id,
+                    debit=debit_amount,
+                    credit=0,
+                    narration=line_narration,
+                ))
+                db.session.add(JournalLine(
+                    journal_header_id=jh.id,
+                    account_id=credit_account_id,
+                    debit=0,
+                    credit=credit_amount,
+                    narration=line_narration,
+                ))
+                
+                db.session.commit()
+                flash("✅ Journal entry saved successfully!", "success")
+            else:
+                flash("❌ Please fill all required fields", "danger")
         else:
-            # Batch save logic here...
-            pass
+            # Batch save logic
+            debit_account_ids = request.form.getlist("debit_account_id[]")
+            credit_account_ids = request.form.getlist("credit_account_id[]")
+            debit_amounts = request.form.getlist("debit_amount[]")
+            credit_amounts = request.form.getlist("credit_amount[]")
+            line_narrations = request.form.getlist("line_narration[]")
+            
+            # Generate voucher number
+            voucher_no = next_journal_voucher_no(cid, fy)
+            
+            # Create Journal Header
+            jh = JournalHeader(
+                company_id=cid,
+                fin_year=fy,
+                voucher_no=voucher_no,
+                voucher_type=voucher_type,
+                voucher_date=voucher_date,
+                narration=narration,
+                created_by=current_user.id,
+            )
+            db.session.add(jh)
+            db.session.flush()
+            
+            lines_created = 0
+            for i in range(len(debit_account_ids)):
+                debit_account_id = parse_account_id(debit_account_ids[i])
+                credit_account_id = parse_account_id(credit_account_ids[i])
+                debit_amount = float(debit_amounts[i] or 0)
+                credit_amount = float(credit_amounts[i] or 0)
+                
+                if debit_account_id and credit_account_id and (debit_amount > 0 or credit_amount > 0):
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=debit_account_id,
+                        debit=debit_amount,
+                        credit=0,
+                        narration=line_narrations[i],
+                    ))
+                    db.session.add(JournalLine(
+                        journal_header_id=jh.id,
+                        account_id=credit_account_id,
+                        debit=0,
+                        credit=credit_amount,
+                        narration=line_narrations[i],
+                    ))
+                    lines_created += 1
+            
+            if lines_created > 0:
+                db.session.commit()
+                flash(f"✅ Saved journal entry with {lines_created} lines", "success")
+            else:
+                flash("⚠️ No valid lines to save", "warning")
         
         return redirect(url_for("journal.index"))
     
@@ -133,5 +258,6 @@ def quick_entry():
     
     return render_template("journal/quick_entry.html", 
                          accounts=accounts,
+                         parties=parties,
                          today=default_date,
                          account_balances=account_balances)
