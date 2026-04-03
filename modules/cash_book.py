@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, Response
 from flask_login import login_required, current_user
 from extensions import db
-from models import CashBook, Company, FinancialYear, Account, JournalHeader, JournalLine, BankAccount
+from models import CashBook, Company, FinancialYear, Account, JournalHeader, JournalLine, BankAccount, Party
 from datetime import date, datetime
 from sqlalchemy import text
 from utils.filters import fy_dates
@@ -853,6 +853,9 @@ def quick_entry():
     # Get accounts for dropdown
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
+    # Get parties for dropdown (treat as ledgers)
+    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    
     # Get default cash account (first account with 'Cash' in name or ID 1)
     default_cash = Account.query.filter_by(company_id=cid, is_active=True).filter(
         Account.name.ilike('%cash%')
@@ -894,7 +897,7 @@ def quick_entry():
         
         if single_save:
             # Single row save - get first row data only
-            account_id = request.form.get("account_id")
+            account_id_str = request.form.get("account_id")
             cash_received = request.form.get("cash_received")
             cash_paid = request.form.get("cash_paid")
             narration = request.form.get("narration")
@@ -902,6 +905,38 @@ def quick_entry():
             
             # Update session with last used date
             session["last_txn_date"] = transaction_date.isoformat()
+            
+            # Parse account_id - can be "acc_123" or "party_123"
+            party_name = ""
+            actual_account_id = None
+            
+            if account_id_str:
+                if account_id_str.startswith("acc_"):
+                    actual_account_id = int(account_id_str.split("_")[1])
+                    account = Account.query.get(actual_account_id)
+                    party_name = account.name if account else ""
+                elif account_id_str.startswith("party_"):
+                    party_id = int(account_id_str.split("_")[1])
+                    party = Party.query.get(party_id)
+                    if party:
+                        party_name = party.name
+                        # Find or create a ledger account for this party
+                        party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
+                        if not party_account:
+                            party_account = Account(
+                                company_id=cid,
+                                name=party.name,
+                                group_id=21 if transaction_type == "Receipt" else 20,
+                                is_active=True
+                            )
+                            db.session.add(party_account)
+                            db.session.flush()
+                        actual_account_id = party_account.id
+                else:
+                    # Fallback for old format
+                    actual_account_id = int(account_id_str)
+                    account = Account.query.get(actual_account_id)
+                    party_name = account.name if account else ""
             
             # Get amount based on transaction type
             amount = 0
@@ -913,7 +948,7 @@ def quick_entry():
                 amount = float(cash_paid)
                 transaction_type = "Payment"
             
-            if account_id and transaction_type and amount > 0 and narration:
+            if actual_account_id and transaction_type and amount > 0 and narration:
                 # Generate voucher numbers
                 cash_voucher_no = next_voucher_no(cid, fy)
                 journal_voucher_no = next_journal_voucher_no(cid, fy)
@@ -927,10 +962,10 @@ def quick_entry():
                     transaction_type=transaction_type,
                     amount=amount,
                     narration=narration,
-                    party_name=Account.query.get(account_id).name,
+                    party_name=party_name,
                     payment_mode=payment_mode,
                     reference_no=reference_no,
-                    account_id=int(account_id)
+                    account_id=actual_account_id
                 )
                 db.session.add(cash_entry)
                 
@@ -958,7 +993,7 @@ def quick_entry():
                     ))
                     db.session.add(JournalLine(
                         journal_header_id=jh.id,
-                        account_id=int(account_id),
+                        account_id=actual_account_id,
                         debit=0,
                         credit=amount,
                     ))
@@ -966,7 +1001,7 @@ def quick_entry():
                     # Other Account (Debit), Cash Account (Credit)
                     db.session.add(JournalLine(
                         journal_header_id=jh.id,
-                        account_id=int(account_id),
+                        account_id=actual_account_id,
                         debit=amount,
                         credit=0,
                     ))
@@ -1078,8 +1113,40 @@ def quick_entry():
                 journal_voucher_no = next_journal_voucher_no(cid, fy)
                 bank_voucher_no = f"BNK-{fy}-{JournalHeader.query.filter_by(company_id=cid).count() + journal_entries_created + 1:04d}"
                 
-                account = Account.query.get(account_ids[i])
-                party_name = account.name if account else ""
+                # Parse account_id - can be "acc_123" or "party_123"
+                account_id_str = account_ids[i]
+                party_name = ""
+                actual_account_id = None
+                is_party = False
+                
+                if account_id_str.startswith("acc_"):
+                    actual_account_id = int(account_id_str.split("_")[1])
+                    account = Account.query.get(actual_account_id)
+                    party_name = account.name if account else ""
+                elif account_id_str.startswith("party_"):
+                    party_id = int(account_id_str.split("_")[1])
+                    party = Party.query.get(party_id)
+                    if party:
+                        party_name = party.name
+                        is_party = True
+                        # Find or create a ledger account for this party
+                        party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
+                        if not party_account:
+                            # Create a sundry debtor/creditor account for the party
+                            party_account = Account(
+                                company_id=cid,
+                                name=party.name,
+                                group_id=21 if transaction_type == "Receipt" else 20,  # 21=Sundry Debtors, 20=Sundry Creditors
+                                is_active=True
+                            )
+                            db.session.add(party_account)
+                            db.session.flush()
+                        actual_account_id = party_account.id
+                else:
+                    # Fallback for old format (just numeric ID)
+                    actual_account_id = int(account_id_str)
+                    account = Account.query.get(actual_account_id)
+                    party_name = account.name if account else ""
                 
                 # 1. Create Cash Book Entry
                 cash_entry = CashBook(
@@ -1093,7 +1160,7 @@ def quick_entry():
                     party_name=party_name,
                     payment_mode=payment_mode,
                     reference_no=reference_no,
-                    account_id=int(account_ids[i])
+                    account_id=actual_account_id
                 )
                 db.session.add(cash_entry)
                 entries_created += 1
@@ -1122,7 +1189,7 @@ def quick_entry():
                     ))
                     db.session.add(JournalLine(
                         journal_header_id=jh.id,
-                        account_id=int(account_ids[i]),
+                        account_id=actual_account_id,
                         debit=0,
                         credit=amount,
                     ))
@@ -1130,7 +1197,7 @@ def quick_entry():
                     # Other Account (Debit), Cash Account (Credit)
                     db.session.add(JournalLine(
                         journal_header_id=jh.id,
-                        account_id=int(account_ids[i]),
+                        account_id=actual_account_id,
                         debit=amount,
                         credit=0,
                     ))
@@ -1167,7 +1234,7 @@ def quick_entry():
                         ))
                         db.session.add(JournalLine(
                             journal_header_id=bank_jh.id,
-                            account_id=int(account_ids[i]),
+                            account_id=actual_account_id,
                             debit=0,
                             credit=amount,
                         ))
@@ -1175,7 +1242,7 @@ def quick_entry():
                         # Other Account (Debit), Bank Account (Credit)
                         db.session.add(JournalLine(
                             journal_header_id=bank_jh.id,
-                            account_id=int(account_ids[i]),
+                            account_id=actual_account_id,
                             debit=amount,
                             credit=0,
                         ))
@@ -1201,6 +1268,7 @@ def quick_entry():
     
     return render_template("cash_book/quick_entry.html", 
                          accounts=accounts,
+                         parties=parties,
                          default_cash=default_cash,
                          today=default_date,
                          previous_balance=previous_balance)
