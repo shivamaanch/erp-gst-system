@@ -140,17 +140,10 @@ function createRow() {
     </td>
     <td>
       <select name="account_id[]" class="form-select account-select searchable-select" required>
-        <option value="">-- Select Account/Party --</option>
-        <optgroup label="Ledger Accounts">
-          {% for acc in accounts %}
-          <option value="acc_{{ acc.id }}">{{ acc.name }}</option>
-          {% endfor %}
-        </optgroup>
-        <optgroup label="Parties (Customers/Suppliers)">
-          {% for party in parties %}
-          <option value="party_{{ party.id }}">{{ party.name }}</option>
-          {% endfor %}
-        </optgroup>
+        <option value="">-- Select Account --</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}">{{ acc.name }}</option>
+        {% endfor %}
       </select>
     </td>
     <td>

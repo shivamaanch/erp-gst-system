@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify
 from flask_login import login_required
 from extensions import db
-from models import MilkRateChart, MilkTransaction, Party, Bill, BillItem
+from models import MilkRateChart, MilkTransaction, Party, Bill, BillItem, Account
 from datetime import date, datetime
 from sqlalchemy import text
 

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from flask_login import login_required, current_user
 from extensions import db
-from models import JournalHeader, JournalLine, Account, Party
+from models import JournalHeader, JournalLine, Account
 from datetime import datetime, date
 
 journal_bp = Blueprint("journal", __name__)
@@ -86,9 +86,6 @@ def quick_entry():
     # Get accounts for dropdown
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
-    # Get parties for dropdown (treat as ledgers)
-    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
-    
     # Calculate previous account balances
     account_balances = {}
     today = date.today()
@@ -123,31 +120,11 @@ def quick_entry():
         # Check if this is a single row save or batch save
         single_save = request.form.get("single_save") == "true"
         
-        # Helper function to parse account_id
+        # Helper function to parse account_id (now just direct ID)
         def parse_account_id(account_id_str):
             if not account_id_str:
                 return None
-            if account_id_str.startswith("acc_"):
-                return int(account_id_str.split("_")[1])
-            elif account_id_str.startswith("party_"):
-                party_id = int(account_id_str.split("_")[1])
-                party = Party.query.get(party_id)
-                if party:
-                    # Find or create a ledger account for this party
-                    party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
-                    if not party_account:
-                        party_account = Account(
-                            company_id=cid,
-                            name=party.name,
-                            group_name="Sundry Creditors",
-                            is_active=True
-                        )
-                        db.session.add(party_account)
-                        db.session.flush()
-                    return party_account.id
-            else:
-                # Fallback for old format
-                return int(account_id_str)
+            return int(account_id_str)
         
         if single_save:
             # Single row save
@@ -258,6 +235,5 @@ def quick_entry():
     
     return render_template("journal/quick_entry.html", 
                          accounts=accounts,
-                         parties=parties,
                          today=default_date,
                          account_balances=account_balances)

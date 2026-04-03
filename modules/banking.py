@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify, send_file
 from flask_login import login_required, current_user
 from extensions import db
-from models import BankAccount, BankTransaction, BankImportLog, Party, Account, JournalHeader, JournalLine
+from models import BankAccount, BankTransaction, BankImportLog, Account, JournalHeader, JournalLine
 from datetime import date, datetime
 import hashlib, io, re, uuid
 
@@ -310,9 +310,6 @@ def quick_entry():
     banks = BankAccount.query.filter_by(company_id=cid, is_active=True).order_by(BankAccount.account_name).all()
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
-    # Get parties for dropdown (treat as ledgers)
-    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
-    
     # Calculate previous bank balances
     bank_balances = {}
     today = date.today()
@@ -438,30 +435,8 @@ def quick_entry():
             cr_amount = float(request.form.get("credit") or 0)
             narration_text = (request.form.get("narration") or "").strip()
             
-            # Parse account_id - can be "acc_123" or "party_123"
-            actual_account_id = None
-            if account_id_str:
-                if account_id_str.startswith("acc_"):
-                    actual_account_id = int(account_id_str.split("_")[1])
-                elif account_id_str.startswith("party_"):
-                    party_id = int(account_id_str.split("_")[1])
-                    party = Party.query.get(party_id)
-                    if party:
-                        # Find or create a ledger account for this party
-                        party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
-                        if not party_account:
-                            party_account = Account(
-                                company_id=cid,
-                                name=party.name,
-                                group_name="Sundry Debtors" if dr_amount > 0 else "Sundry Creditors",
-                                is_active=True
-                            )
-                            db.session.add(party_account)
-                            db.session.flush()
-                        actual_account_id = party_account.id
-                else:
-                    # Fallback for old format
-                    actual_account_id = int(account_id_str)
+            # Parse account_id - now just direct ID
+            actual_account_id = int(account_id_str)
 
             if not actual_account_id or (dr_amount <= 0 and cr_amount <= 0):
                 flash("❌ Please fill account and amount", "danger")
@@ -493,31 +468,8 @@ def quick_entry():
             if dr_amount <= 0 and cr_amount <= 0:
                 continue
 
-            # Parse account_id - can be "acc_123" or "party_123"
-            actual_account_id = None
-            account_id_str = account_ids[i]
-            
-            if account_id_str.startswith("acc_"):
-                actual_account_id = int(account_id_str.split("_")[1])
-            elif account_id_str.startswith("party_"):
-                party_id = int(account_id_str.split("_")[1])
-                party = Party.query.get(party_id)
-                if party:
-                    # Find or create a ledger account for this party
-                    party_account = Account.query.filter_by(company_id=cid, name=party.name).first()
-                    if not party_account:
-                        party_account = Account(
-                            company_id=cid,
-                            name=party.name,
-                            group_name="Sundry Debtors" if dr_amount > 0 else "Sundry Creditors",
-                            is_active=True
-                        )
-                        db.session.add(party_account)
-                        db.session.flush()
-                    actual_account_id = party_account.id
-            else:
-                # Fallback for old format
-                actual_account_id = int(account_id_str)
+            # Parse account_id - now just direct ID
+            actual_account_id = int(account_ids[i])
 
             entry_date = date.today()
             if i < len(row_dates) and row_dates[i]:
@@ -548,7 +500,6 @@ def quick_entry():
     return render_template("banking/quick_entry.html", 
                          banks=banks,
                          accounts=accounts,
-                         parties=parties,
                          default_bank=default_bank,
                          today=default_date,
                          bank_balances=bank_balances)
