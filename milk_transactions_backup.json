@@ -1,0 +1,40 @@
+[
+  {
+    "id": 2,
+    "company_id": 2,
+    "fin_year": "2025-26",
+    "voucher_no": null,
+    "party_id": 13,
+    "txn_date": "2026-04-03",
+    "shift": "Morning",
+    "txn_type": "Purchase",
+    "qty_liters": 8.0,
+    "fat": 2.0,
+    "snf": 7.54,
+    "clr": 28.0,
+    "rate": 4500.0,
+    "amount": 194.16,
+    "chart_id": null,
+    "narration": "",
+    "bill_id": 2
+  },
+  {
+    "id": 3,
+    "company_id": 2,
+    "fin_year": "2025-26",
+    "voucher_no": null,
+    "party_id": 17,
+    "txn_date": "2026-04-03",
+    "shift": "Morning",
+    "txn_type": "Purchase",
+    "qty_liters": 8.0,
+    "fat": 4.0,
+    "snf": 7.93,
+    "clr": 28.0,
+    "rate": 4500.0,
+    "amount": 267.39,
+    "chart_id": null,
+    "narration": "",
+    "bill_id": 3
+  }
+]

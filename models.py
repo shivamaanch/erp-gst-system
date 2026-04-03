@@ -489,7 +489,7 @@ class MilkTransaction(db.Model):
     company_id  = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
     fin_year    = db.Column(db.String(10), nullable=False)
     voucher_no  = db.Column(db.String(50), index=True)  # Unique voucher number for tracking
-    party_id    = db.Column(db.Integer, db.ForeignKey("parties.id"), nullable=False)
+    account_id   = db.Column(db.Integer, db.ForeignKey("accounts.id"), nullable=False)  
     txn_date    = db.Column(db.Date, nullable=False)
     shift       = db.Column(db.String(10), default="Morning")     # Morning/Evening
     txn_type    = db.Column(db.String(20), nullable=False)        # Purchase/Sale
@@ -503,7 +503,7 @@ class MilkTransaction(db.Model):
     narration   = db.Column(db.Text)
     bill_id     = db.Column(db.Integer, db.ForeignKey("bills.id"))
     company     = db.relationship("Company", backref="milk_transactions")
-    party       = db.relationship("Party",   backref="milk_transactions")
+    account     = db.relationship("Account", backref="milk_transactions")  
     chart       = db.relationship("MilkRateChart", backref="transactions")
     bill        = db.relationship("Bill", backref="milk_transactions", foreign_keys=[bill_id])
 

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify
 from flask_login import login_required
 from extensions import db
-from models import MilkRateChart, MilkTransaction, Party, Bill, BillItem, Account
+from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem
 from datetime import date, datetime
 from sqlalchemy import text
 
@@ -520,39 +520,36 @@ def add_entry():
         session["user_role"] = "admin"
     
     cid = session.get("company_id"); fy = session.get("fin_year")
-    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
-    # Add default party if none exist
-    if not parties:
-        default_party = Party(
+    # Add default account if none exist
+    if not accounts:
+        default_account = Account(
             company_id=cid,
             name="Shivam Grover",
-            phone="",
-            email="",
-            address="",
-            balance_type="Dr",
-            opening_balance=0.0,
+            group_name="Sundry Debtors",
+            opening_dr=0.0,
             is_active=True
         )
-        db.session.add(default_party)
+        db.session.add(default_account)
         db.session.commit()
-        parties = [default_party]
+        accounts = [default_account]
     
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
     default_date = session.get("last_txn_date") or date.today().isoformat()
-    last_party_id = session.get("last_milk_party_id")
-    last_party = Party.query.filter_by(id=last_party_id, company_id=cid).first() if last_party_id else None
+    last_account_id = session.get("last_milk_account_id")
+    last_account = Account.query.filter_by(id=last_account_id, company_id=cid).first() if last_account_id else None
     
     # Get last milk entry for display
     last_entry = None
     try:
         from sqlalchemy import text
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               p.name as party_name
+               a.name as account_name
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id 
         ORDER BY t.txn_date DESC, t.id DESC
         LIMIT 1
@@ -577,7 +574,7 @@ def add_entry():
                     self.clr = row.clr
                     self.rate = row.rate
                     self.amount = row.amount
-                    self.party_name = row.party_name or "Cash Account"
+                    self.account_name = row.account_name or "Cash Account"
                     self.narration = row.narration
             last_entry = LastMilkEntry(row)
     except Exception as e:
@@ -677,18 +674,18 @@ def add_entry():
                 db.session.flush()
                 print(f"DEBUG: Created cash account: {cash_account.name}")
         else:
-            # Use party account
-            party_id_str = request.form.get("party_id", "").strip()
-            if not party_id_str or party_id_str == 'cash':
-                flash("Please select a party", "error")
+            # Use account
+            account_id_str = request.form.get("party_id", "").strip()
+            if not account_id_str or account_id_str == 'cash':
+                flash("Please select an account", "error")
                 return redirect(url_for('milk.add_entry'))
-            party_id=int(party_id_str)
-            party = Party.query.get(party_id)
-            if not party:
-                flash("Invalid party selected", "error")
-                return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party)
+            account_id=int(account_id_str)
+            account = Account.query.get(account_id)
+            if not account:
+                flash("Invalid account selected", "error")
+                return render_template("milk/entry_form_traditional.html", accounts=accounts, charts=charts, today=default_date, edit_mode=False, default_account=last_account)
         
-        txn=MilkTransaction(company_id=cid,fin_year=fy,party_id=party_id,txn_date=txn_date,
+        txn=MilkTransaction(company_id=cid,fin_year=fy,account_id=account_id,txn_date=txn_date,
             shift=request.form.get("shift","Morning"),txn_type=txn_type,
             qty_liters=qty,fat=fat,snf=snf,clr=clr,  # Store converted CLR
             rate=rate,amount=amount,  # Store rate per 100kg (already correct)
@@ -752,8 +749,8 @@ def add_entry():
             
             db.session.commit()
             session["last_txn_date"] = txn_date.isoformat()
-            if party_id:
-                session["last_milk_party_id"] = party_id
+            if account_id:
+                session["last_milk_account_id"] = account_id
             msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
             if bill_no: msg+=f" | Invoice {bill_no} created"
             flash(msg,"success")
@@ -761,13 +758,13 @@ def add_entry():
 
         db.session.commit()
         session["last_txn_date"] = txn_date.isoformat()
-        if party_id:
-            session["last_milk_party_id"] = party_id
+        if account_id:
+            session["last_milk_account_id"] = account_id
         msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
         flash(msg,"success")
         return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
         
-    return render_template("milk/entry_form_traditional.html", parties=parties, charts=charts, today=default_date, edit_mode=False, default_party=last_party, last_entry=last_entry)
+    return render_template("milk/entry_form_traditional.html", accounts=accounts, charts=charts, today=default_date, edit_mode=False, default_account=last_account, last_entry=last_entry)
 
 @milk_bp.route("/entry/<int:txn_id>/edit", methods=["GET","POST"])
 def edit_entry(txn_id):
@@ -798,30 +795,27 @@ def edit_entry(txn_id):
             print(f"DEBUG: Error adding CLR column: {e2}")
             db.session.rollback()
     
-    parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
+    accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
-    # Add default party if none exist
-    if not parties:
-        default_party = Party(
+    # Add default account if none exist
+    if not accounts:
+        default_account = Account(
             company_id=cid,
             name="Shivam Grover",
-            phone="",
-            email="",
-            address="",
-            balance_type="Dr",
-            opening_balance=0.0,
+            group_name="Sundry Debtors",
+            opening_dr=0.0,
             is_active=True
         )
-        db.session.add(default_party)
+        db.session.add(default_account)
         db.session.commit()
-        parties = [default_party]
+        accounts = [default_account]
     
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
     
     # Get existing transaction - use raw SQL to avoid ORM issues
     from sqlalchemy import text
     sql = """
-    SELECT id, company_id, fin_year, voucher_no, party_id, txn_date, shift, 
+    SELECT id, company_id, fin_year, voucher_no, account_id, txn_date, shift, 
            txn_type, qty_liters, fat, snf, clr, rate, amount, chart_id, narration, bill_id
     FROM milk_transactions 
     WHERE id = :txn_id AND company_id = :company_id AND fin_year = :fin_year
@@ -1048,7 +1042,7 @@ def edit_entry(txn_id):
     
     # Pre-fill form with existing data
     return render_template("milk/entry_form_traditional.html", 
-                     parties=parties, charts=charts, 
+                     accounts=accounts, charts=charts, 
                      txn=txn, edit_mode=True,
                      today=txn.txn_date.isoformat())
 

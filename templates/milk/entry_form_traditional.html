@@ -115,24 +115,17 @@
           </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label fw-bold">Party *</label>
-          <div class="input-group">
-            <input type="text" id="partyName" class="form-control" placeholder="Type party name or click + to add new party..." 
-                   value="{% if edit_mode and txn and txn.party %}{{ txn.party.name }}{% elif default_party %}{{ default_party.name }}{% endif %}" 
-                   required autocomplete="off" onkeyup="searchPartyWithBalance()" onfocus="searchPartyWithBalance(true)">
-            <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn %}{{ txn.party_id }}{% elif default_party %}{{ default_party.id }}{% endif %}" required>
-            <button class="btn btn-outline-primary" type="button" onclick="openAddPartyModal()" title="Add New Party">
-              <i class="fas fa-plus"></i>
-            </button>
-          </div>
-          <select id="partyLookup" class="d-none">
-            {% for p in parties %}
-            <option value="{{ p.name }}" data-id="{{ p.id }}"></option>
+          <label class="form-label fw-bold">Account *</label>
+          <select name="party_id" id="partyId" class="form-select searchable-select" required>
+            <option value="">-- Select Account --</option>
+            {% if default_account %}
+            <option value="{{ default_account.id }}" selected>{{ default_account.name }}</option>
+            {% endif %}
+            {% for acc in accounts %}
+            <option value="{{ acc.id }}" {% if edit_mode and txn and txn.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
             {% endfor %}
           </select>
-          <!-- Autocomplete dropdown -->
-          <div id="partySearchResults" class="list-group position-absolute" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none; width: calc(100% - 48px); background: white; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>
-          <small class="text-muted">Type party name or click + to add new party</small>
+          <small class="text-muted">Select ledger account for milk transaction</small>
         </div>
         <div class="col-md-1">
           <label class="form-label fw-bold">Cash A/c</label>
@@ -596,201 +589,26 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 500);
 });
 
-// Party search with balance information
-let searchTimeout;
-let selectedPartyIndex = -1;
-
-function searchPartyWithBalance(forceShow = false) {
-  clearTimeout(searchTimeout);
-  const searchTerm = document.getElementById('partyName').value.trim();
-  const resultsDiv = document.getElementById('partySearchResults');
-  
-  if (!forceShow && searchTerm.length < 1) {
-    resultsDiv.style.display = 'none';
-    selectedPartyIndex = -1;
-    return;
-  }
-  
-  searchTimeout = setTimeout(() => {
-    fetch(`/milk/parties/search?q=${encodeURIComponent(searchTerm)}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.success && data.parties.length > 0) {
-          let html = '';
-          data.parties.forEach((party, index) => {
-            html += `
-              <a href="#" class="list-group-item list-group-item-action compact-party-item" 
-                 data-index="${index}" 
-                 data-party-id="${party.id}" 
-                 data-party-name="${party.name.replace(/'/g, "\\'")}"
-                 onclick="selectPartyFromSearch(${party.id}, '${party.name.replace(/'/g, "\\'")}'); return false;">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>${party.name}</strong>
-                  </div>
-                  <div class="text-end">
-                    <span class="badge bg-${party.current_balance >= 0 ? 'success' : 'danger'}" style="font-size: 0.75em;">${party.balance_display}</span>
-                  </div>
-                </div>
-              </a>
-            `;
-          });
-          resultsDiv.innerHTML = html;
-          resultsDiv.style.display = 'block';
-          selectedPartyIndex = -1;
-        } else {
-          resultsDiv.style.display = 'none';
-          selectedPartyIndex = -1;
-        }
-      })
-      .catch(error => {
-        console.error('Party search error:', error);
-        resultsDiv.style.display = 'none';
-        selectedPartyIndex = -1;
-      });
-  }, 300);
-}
-
-function selectPartyFromSearch(partyId, partyName) {
-  document.getElementById('partyName').value = partyName;
-  document.getElementById('partyId').value = partyId;
-  document.getElementById('partySearchResults').style.display = 'none';
-  console.log('Selected party:', partyName, 'ID:', partyId);
-}
-
-// Open add party modal with pre-filled name
-function openAddPartyModal() {
-  const partyNameInput = document.getElementById('partyName');
-  const modalNameInput = document.querySelector('#addPartyModal input[name="name"]');
-  
-  // Pre-fill the name if user has typed something
-  if (partyNameInput && partyNameInput.value.trim()) {
-    modalNameInput.value = partyNameInput.value.trim();
-  }
-  
-  // Show the modal
-  const modal = new bootstrap.Modal(document.getElementById('addPartyModal'));
-  modal.show();
-}
-
-// Hide search results when clicking outside
-document.addEventListener('click', function(e) {
-  const partyInput = document.getElementById('partyName');
-  const resultsDiv = document.getElementById('partySearchResults');
-  if (partyInput && resultsDiv && !partyInput.contains(e.target) && !resultsDiv.contains(e.target)) {
-    resultsDiv.style.display = 'none';
-  }
-});
-
-// Add event listener for when user selects from datalist
+// Simple account selection handler
 document.addEventListener('DOMContentLoaded', function() {
-  const partyInput = document.getElementById('partyName');
+  const accountSelect = document.getElementById('partyId');
   const cashToggle = document.getElementById('cashAccountToggle');
-  const partyIdField = document.getElementById('partyId');
   
-  // Keyboard navigation for party search
-  if (partyInput) {
-    partyInput.addEventListener('keydown', function(e) {
-      const resultsDiv = document.getElementById('partySearchResults');
-      const items = resultsDiv.querySelectorAll('.list-group-item');
-      
-      if (resultsDiv.style.display === 'block' && items.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          selectedPartyIndex = Math.min(selectedPartyIndex + 1, items.length - 1);
-          updatePartySelection(items);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          selectedPartyIndex = Math.max(selectedPartyIndex - 1, -1);
-          updatePartySelection(items);
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (selectedPartyIndex >= 0 && items[selectedPartyIndex]) {
-            const partyId = items[selectedPartyIndex].dataset.partyId;
-            const partyName = items[selectedPartyIndex].dataset.partyName;
-            selectPartyFromSearch(partyId, partyName);
-          }
-        } else if (e.key === 'Escape') {
-          resultsDiv.style.display = 'none';
-          selectedPartyIndex = -1;
-        }
-      }
-    });
-  }
-  
-  function updatePartySelection(items) {
-    // Remove previous selection
-    items.forEach(item => item.classList.remove('active', 'bg-primary', 'text-white'));
-    
-    // Add selection to current item
-    if (selectedPartyIndex >= 0 && items[selectedPartyIndex]) {
-      items[selectedPartyIndex].classList.add('active', 'bg-primary', 'text-white');
-      items[selectedPartyIndex].scrollIntoView({ block: 'nearest' });
-    }
-  }
-  
-  // Party search and auto-creation logic
-  if (partyInput) {
-    partyInput.addEventListener('input', function() {
-      const partyName = this.value.trim();
-      
-      // Handle cash account toggle
-      if (cashToggle.checked) {
-        partyIdField.value = 'cash'; // Set cash account ID
-        this.value = 'Cash Account';
-        this.readOnly = true;
-        return;
-      } else {
-        this.readOnly = false;
-      }
-
-      if (!partyName) {
-        partyIdField.value = '';
-      }
-
-      // Check if party exists and show modal if new
-      if (partyName && !partyExists(partyName)) {
-        // Auto-show add party modal after a short delay
-        setTimeout(() => {
-          if (document.getElementById('partyName').value === partyName) {
-            document.getElementById('newPartyName').value = partyName;
-            new bootstrap.Modal(document.getElementById('addPartyModal')).show();
-          }
-        }, 1500);
-      }
-    });
-  }
-  
-  // Check if party exists in datalist
-  function partyExists(name) {
-    const lookup = document.getElementById('partyLookup');
-    if (!lookup) {
-      return false;
-    }
-    return Array.from(lookup.options).some(option => option.value.toLowerCase() === name.toLowerCase());
-  }
-
-  // Cash account toggle handler
-  if (cashToggle) {
+  // Handle cash account toggle
+  if (cashToggle && accountSelect) {
     cashToggle.addEventListener('change', function() {
       if (this.checked) {
-        // Enable cash account mode
-        partyIdField.value = 'cash';
-        partyInput.value = 'Cash Account';
-        partyInput.readOnly = true;
-        partyInput.classList.add('bg-light');
+        accountSelect.disabled = true;
+        accountSelect.value = '';
       } else {
-        // Disable cash account mode
-        partyIdField.value = '';
-        partyInput.value = '';
-        partyInput.readOnly = false;
-        partyInput.classList.remove('bg-light');
+        accountSelect.disabled = false;
       }
     });
   }
-
-  if (partyInput && partyInput.value.trim()) {
-    updateInvoicePreview();
+  
+  // Update invoice preview when account changes
+  if (accountSelect) {
+    accountSelect.addEventListener('change', updateInvoicePreview);
   }
 });
 
@@ -845,7 +663,7 @@ function updateInvoicePreview() {
   
   if (createInv) {
     const txnType = document.querySelector('select[name="txn_type"]').value;
-    const partyName = document.getElementById('partyName').value || 'Not Selected';
+    const accountName = document.querySelector('#partyId option:checked')?.text || 'Not Selected';
     const manualBillNo = document.querySelector('input[name="manual_bill_no"]').value;
     
     // Use manual invoice number if provided, otherwise show format
@@ -858,7 +676,7 @@ function updateInvoicePreview() {
       invoiceNo = `${prefix}/0001/25-26 (Auto)`;
     }
     
-    invoicePreview.innerHTML = `<strong>Invoice No:</strong> ${invoiceNo}<br><strong>Type:</strong> ${txnType} Invoice<br><strong>Party:</strong> ${partyName}<br><strong>Status:</strong> <span class="text-success">Will be created on save</span>`;
+    invoicePreview.innerHTML = `<strong>Invoice No:</strong> ${invoiceNo}<br><strong>Type:</strong> ${txnType} Invoice<br><strong>Account:</strong> ${accountName}<br><strong>Status:</strong> <span class="text-success">Will be created on save</span>`;
     invoiceInfo.className = 'alert alert-success py-2';
   } else {
     invoicePreview.innerHTML = 'No invoice will be created';
