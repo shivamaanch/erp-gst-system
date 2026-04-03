@@ -596,36 +596,19 @@ def create_app():
 
                 return FinancialYear.query.filter_by(company_id=cid).order_by(FinancialYear.year_name.desc()).all()
 
-            return []
-
         
 
         return dict(
-
             current_company_name=company_name,
-
             get_financial_years_for_company=get_financial_years_for_company
-
         )
-
-
-
-    with app.app_context():
-
-        try:
-
-            db.create_all()
-
-            print("[OK] Database tables created")
-
-        except Exception as e:
-
-            print(f"[WARNING]  Database setup: {e}")
-
-
+    
+    # Add favicon route to eliminate 404 errors
+    @app.route('/favicon.ico')
+    def favicon():
+        return '', 204  # Return no content
 
     @app.route("/")
-
     def index():
 
         # TEMPORARY BYPASS FOR NORTHFLANK DEPLOYMENT

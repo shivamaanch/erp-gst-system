@@ -307,12 +307,12 @@
                     <h3>Calculation Details:</h3>
                     <table class="calculation-table">
                         <tr>
-                            <td>BF ({{ (milk_transaction.qty_liters * milk_transaction.fat / 100) | round(3) }} kg) × ₹{{ ((milk_transaction.rate * 100 * 0.60 / 6.5) | round(2) if milk_transaction.rate else 0) }}</td>
-                            <td class="text-right">₹{{ ((milk_transaction.qty_liters * milk_transaction.fat / 100) * (milk_transaction.rate * 100 * 0.60 / 6.5)) | round(2) if milk_transaction.rate else 0 }}</td>
+                            <td>BF ({{ (milk_transaction.qty_liters * milk_transaction.fat / 100) | round(2) }} kg) × ₹{{ ((milk_transaction.rate * 0.60 / 6.5) | round(2) if milk_transaction.rate else 0) }}</td>
+                            <td class="text-right">₹{{ ((milk_transaction.qty_liters * milk_transaction.fat / 100) * (milk_transaction.rate * 0.60 / 6.5)) | round(2) if milk_transaction.rate else 0 }}</td>
                         </tr>
                         <tr>
-                            <td>SNF ({{ (milk_transaction.qty_liters * milk_transaction.snf / 100) | round(3) }} kg) × ₹{{ ((milk_transaction.rate * 100 * 0.40 / 8.5) | round(2) if milk_transaction.rate else 0) }}</td>
-                            <td class="text-right">₹{{ ((milk_transaction.qty_liters * milk_transaction.snf / 100) * (milk_transaction.rate * 100 * 0.40 / 8.5)) | round(2) if milk_transaction.rate else 0 }}</td>
+                            <td>SNF ({{ (milk_transaction.qty_liters * milk_transaction.snf / 100) | round(2) }} kg) × ₹{{ ((milk_transaction.rate * 0.40 / 8.5) | round(2) if milk_transaction.rate else 0) }}</td>
+                            <td class="text-right">₹{{ ((milk_transaction.qty_liters * milk_transaction.snf / 100) * (milk_transaction.rate * 0.40 / 8.5)) | round(2) if milk_transaction.rate else 0 }}</td>
                         </tr>
                         <tr>
                             <td><strong>Subtotal:</strong></td>

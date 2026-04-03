@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify
 from flask_login import login_required
 from extensions import db
-from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem
+from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem, JournalHeader, JournalLine, Party
 from datetime import date, datetime
 from sqlalchemy import text
+from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
 
 # Safe database execution wrapper to handle transaction errors
 def safe_db_execute(sql, params=None):
@@ -36,6 +37,75 @@ milk_bp = Blueprint("milk", __name__)
 
 def calc_rate(fat, snf, fat_rate, snf_rate):
     return round(float(fat)*float(fat_rate) + float(snf)*float(snf_rate), 4)
+
+
+def _round2(value):
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _round3(value):
+    return float(Decimal(str(value)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
+
+
+def _floor(value, decimals=2):
+    """Truncate towards zero at the given decimal places."""
+    quant = "0." + ("0" * (decimals - 1)) + "1" if decimals > 0 else "1"
+    return float(Decimal(str(value)).quantize(Decimal(quant), rounding=ROUND_DOWN))
+
+
+def compute_snf(clr, fat):
+    """Richmond formula with business rounding rules."""
+    clr_part = _floor(float(clr) / 4.0, 2)  # truncate CLR/4 to 2 decimals
+    snf = clr_part + (0.20 * float(fat)) + 0.14
+    snf = min(15.0, snf)
+    return _floor(snf, 2)  # truncate SNF to 2 decimals
+
+
+def compute_component_breakdown(qty, fat, snf, daily_rate):
+    """Single source of truth for milk amount calculation."""
+    qty = float(qty)
+    fat = float(fat)
+    snf = float(snf)
+    daily_rate = float(daily_rate)
+
+    fat_share = 0.60
+    snf_share = 0.40
+    std_fat_kg = 6.5
+    std_snf_kg = 8.5
+
+    # Calculate component rates
+    bf_rate_raw = (daily_rate * fat_share) / std_fat_kg
+    snf_rate_raw = (daily_rate * snf_share) / std_snf_kg
+
+    # Use rounded component rates for amount calculation (UI + backend match)
+    bf_rate_used = _round2(bf_rate_raw)
+    snf_rate_used = _round2(snf_rate_raw)
+
+    bf_kgs_raw = (qty * fat) / 100.0
+    snf_kgs_raw = (qty * snf) / 100.0
+
+    # Truncate component kgs for display (business rule) but use raw kgs for amount
+    bf_kgs_display = _floor(bf_kgs_raw, 2)
+    snf_kgs_display = _floor(snf_kgs_raw, 2)
+
+    # Round component amounts individually, then sum and round final amount
+    bf_amount = _round2(bf_kgs_raw * bf_rate_used)
+    snf_amount = _round2(snf_kgs_raw * snf_rate_used)
+    amount = _round2(bf_amount + snf_amount)
+
+    return {
+        "bf_rate": bf_rate_raw,
+        "snf_rate": snf_rate_raw,
+        "bf_kgs": bf_kgs_raw,
+        "snf_kgs": snf_kgs_raw,
+        "bf_rate_display": bf_rate_used,
+        "snf_rate_display": snf_rate_used,
+        "bf_kgs_display": bf_kgs_display,
+        "snf_kgs_display": snf_kgs_display,
+        "bf_amount": bf_amount,
+        "snf_amount": snf_amount,
+        "amount": amount,
+    }
 
 def next_bill_no(company_id, fin_year, bill_type):
     prefix = "MLK-S" if bill_type == "Sales" else "MLK-P"
@@ -602,32 +672,17 @@ def add_entry():
             fat_rate=float(request.form.get("fat_rate", 200))
             snf_rate=float(request.form.get("snf_rate", 100))
         
-        # Calculate SNF using Richmond's Formula with Milk Chief specific adjustment
+        # Calculate SNF using Richmond's formula
         if clr > 0 and fat > 0:
-            snf = (clr / 4) + (0.20 * fat) + 0.14
-            snf = round(snf, 3) - 0.005
-            snf = round(snf, 3)
-            snf = max(7.0, min(15.0, snf))
+            snf = compute_snf(clr, fat)
         else:
             snf = float(request.form.get("snf_auto", 8.5))
 
         # Always prefer user-entered Daily Rate (per 100kg) for storage & calculation
         daily_rate = float((request.form.get("rate_per_liter") or 0) or 0)
         if daily_rate > 0:
-            rate_per_100kg = daily_rate
-            fat_share = 0.60
-            snf_share = 0.40
-            std_fat_kg = 6.5
-            std_snf_kg = 8.5
-
-            bf_rate = (rate_per_100kg * fat_share) / std_fat_kg
-            snf_rate = (rate_per_100kg * snf_share) / std_snf_kg
-
-            bf_kgs = qty * fat / 100.0
-            snf_kgs = qty * snf / 100.0
-            bf_kgs = round(bf_kgs, 3)
-            snf_kgs = round(snf_kgs, 3)
-            amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
+            calc = compute_component_breakdown(qty, fat, snf, daily_rate)
+            amount = calc["amount"]
             rate = daily_rate
         else:
             amount_str = (request.form.get("amount") or "").strip()
@@ -658,7 +713,6 @@ def add_entry():
             print(f"DEBUG: Using cash account mode")
             
             # Get or create cash account
-            from models import Account
             cash_account = Account.query.filter_by(company_id=cid, name="Cash Account", account_type="Cash").first()
             if not cash_account:
                 cash_account = Account(
@@ -673,6 +727,7 @@ def add_entry():
                 db.session.add(cash_account)
                 db.session.flush()
                 print(f"DEBUG: Created cash account: {cash_account.name}")
+            account_id = cash_account.id
         else:
             # Use account
             account_id_str = request.form.get("party_id", "").strip()
@@ -937,12 +992,9 @@ def edit_entry(txn_id):
             clr_val = clr_val / 10.0
         actual_txn.clr = clr_val
 
-        # Always re-calc SNF from CLR/FAT (Milk Chief adjusted Richmond)
+        # Always re-calc SNF from CLR/FAT
         if actual_txn.clr > 0 and actual_txn.fat > 0:
-            calculated_snf = (actual_txn.clr / 4) + (0.20 * actual_txn.fat) + 0.14
-            calculated_snf = round(calculated_snf, 3) - 0.005
-            calculated_snf = round(calculated_snf, 3)
-            calculated_snf = max(7.0, min(15.0, calculated_snf))
+            calculated_snf = compute_snf(actual_txn.clr, actual_txn.fat)
             actual_txn.snf = calculated_snf
         else:
             actual_txn.snf = float(request.form.get("snf_auto", 8.5))
@@ -954,31 +1006,17 @@ def edit_entry(txn_id):
         if daily_rate_str and daily_rate_str != '0':
             daily_rate = float(daily_rate_str)
             print(f"DEBUG: Using traditional method with daily rate: {daily_rate}")
+            calc = compute_component_breakdown(qty, actual_txn.fat, actual_txn.snf, daily_rate)
+            bf_kgs = calc["bf_kgs"]
+            snf_kgs = calc["snf_kgs"]
+            ghee_rate = calc["bf_rate"]
+            powder_rate = calc["snf_rate"]
             
-            # Traditional 60:40 split between fat and SNF
-            fat_share = 0.60
-            snf_share = 0.40
-            std_fat_kg = 6.5
-            std_snf_kg = 8.5
+            print(f"DEBUG: Using calculated SNF: {actual_txn.snf:.2f} (stored SNF: {actual_txn.snf:.2f})")
             
-            # Calculate component rates (traditional method)
-            ghee_rate = (daily_rate * fat_share) / std_fat_kg  # ≈ ₹415/kg
-            powder_rate = (daily_rate * snf_share) / std_snf_kg # ≈ ₹211/kg
-            
-            # Use already calculated SNF stored on txn
-            calculated_snf = actual_txn.snf
-            
-            bf_kgs = qty * actual_txn.fat / 100
-            snf_kgs = qty * calculated_snf / 100
-            # Keep 3 decimal places to match Milk Chief exactly
-            bf_kgs = round(bf_kgs, 3)
-            snf_kgs = round(snf_kgs, 3)
-            
-            print(f"DEBUG: Using calculated SNF: {calculated_snf:.2f} (stored SNF: {actual_txn.snf:.2f})")
-            
-            ghee_amount = bf_kgs * ghee_rate
-            powder_amount = snf_kgs * powder_rate
-            final_amount = round(ghee_amount + powder_amount, 2)
+            ghee_amount = _round2(bf_kgs * ghee_rate)
+            powder_amount = _round2(snf_kgs * powder_rate)
+            final_amount = calc["amount"]
 
             # Store the daily rate as rate per 100kg (not calculated from amount)
             actual_txn.rate = daily_rate  # Store as rate per 100kg
@@ -1083,31 +1121,12 @@ def update_field(txn_id):
         
         # Recalculate SNF using Richmond's formula if CLR and FAT are available
         if hasattr(txn, 'clr') and hasattr(txn, 'fat') and txn.clr > 0 and txn.fat > 0:
-            calculated_snf = (txn.clr / 4) + (0.20 * txn.fat) + 0.14
-            # Milk Chief appears to use a slightly different rounding or precision
-            # Let's adjust to match their pattern: 8.375% → 8.370%
-            calculated_snf = round(calculated_snf, 3) - 0.005
-            calculated_snf = round(calculated_snf, 3)  # Ensure proper rounding
-            txn.snf = calculated_snf
+            txn.snf = compute_snf(txn.clr, txn.fat)
         
         # Recalculate amount using component method if daily rate is available
         if hasattr(txn, 'rate') and txn.rate > 0 and txn.qty_liters > 0:
-            # Use Milk Chief compatible component calculation
-            daily_rate = txn.rate  # This should be rate per 100kg
-            fat_share = 0.60
-            snf_share = 0.40
-            std_fat_kg = 6.5
-            std_snf_kg = 8.5
-            
-            bf_rate = (daily_rate * fat_share) / std_fat_kg
-            snf_rate = (daily_rate * snf_share) / std_snf_kg
-            
-            bf_kgs = txn.qty_liters * txn.fat / 100.0
-            snf_kgs = txn.qty_liters * txn.snf / 100.0
-            bf_kgs = round(bf_kgs, 3)
-            snf_kgs = round(snf_kgs, 3)
-            
-            txn.amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
+            calc = compute_component_breakdown(txn.qty_liters, txn.fat, txn.snf, txn.rate)
+            txn.amount = calc["amount"]
         
         db.session.commit()
         return jsonify({"success": True, "message": "Updated successfully"})
@@ -1140,12 +1159,9 @@ def update_all_milk_calculations():
                 elif 0 < txn.clr < 10:
                     txn.clr = txn.clr * 10.0
             
-            # Recalculate SNF using Richmond's formula with Milk Chief adjustment
+            # Recalculate SNF using Richmond's formula
             if hasattr(txn, 'clr') and txn.clr > 0 and txn.fat > 0:
-                calculated_snf = (txn.clr / 4) + (0.20 * txn.fat) + 0.14
-                calculated_snf = round(calculated_snf, 3) - 0.005
-                calculated_snf = round(calculated_snf, 3)
-                txn.snf = calculated_snf
+                txn.snf = compute_snf(txn.clr, txn.fat)
 
             # Fix stored daily rate (per 100kg)
             if txn.qty_liters and txn.qty_liters > 0:
@@ -1160,21 +1176,8 @@ def update_all_milk_calculations():
             
             # Recalculate amount using component method if rate is available
             if txn.rate > 0 and txn.qty_liters > 0:
-                daily_rate = txn.rate  # Should be rate per 100kg
-                fat_share = 0.60
-                snf_share = 0.40
-                std_fat_kg = 6.5
-                std_snf_kg = 8.5
-                
-                bf_rate = (daily_rate * fat_share) / std_fat_kg
-                snf_rate = (daily_rate * snf_share) / std_snf_kg
-                
-                bf_kgs = txn.qty_liters * txn.fat / 100.0
-                snf_kgs = txn.qty_liters * txn.snf / 100.0
-                bf_kgs = round(bf_kgs, 3)
-                snf_kgs = round(snf_kgs, 3)
-                
-                txn.amount = round(bf_kgs * bf_rate + snf_kgs * snf_rate, 2)
+                calc = compute_component_breakdown(txn.qty_liters, txn.fat, txn.snf, txn.rate)
+                txn.amount = calc["amount"]
             
             updated_count += 1
         
@@ -1444,3 +1447,91 @@ def debug_txns():
         )
 
     return "<pre>" + "\n".join(lines) + "</pre>"
+
+@milk_bp.route("/accounts/search")
+@login_required
+def search_accounts():
+    """Search accounts for autocomplete"""
+    cid = session.get("company_id")
+    query = request.args.get("q", "").strip()
+    
+    if len(query) < 1:
+        return jsonify({"success": False, "accounts": []})
+    
+    try:
+        accounts = Account.query.filter(
+            Account.company_id == cid,
+            Account.is_active == True,
+            Account.name.ilike(f"%{query}%")
+        ).limit(20).all()
+        
+        account_data = []
+        for account in accounts:
+            account_data.append({
+                "id": account.id,
+                "name": account.name,
+                "current_balance": 0.0,
+                "balance_display": "Dr 0.00"
+            })
+        
+        return jsonify({"success": True, "accounts": account_data})
+        
+    except Exception as e:
+        print(f"Error in account search: {e}")
+        return jsonify({"success": False, "accounts": []})
+
+@milk_bp.route("/accounts/create", methods=["POST"])
+@login_required
+def create_account():
+    """Create a new ledger account"""
+    cid = session.get("company_id")
+    
+    try:
+        name = request.form.get("name", "").strip()
+        group_name = request.form.get("group_name", "").strip()
+        opening_balance_str = request.form.get("opening_balance", "0")
+        balance_type = request.form.get("balance_type", "Dr")
+        account_type = request.form.get("account_type", "")
+        
+        # Fix opening balance conversion
+        try:
+            opening_balance = float(opening_balance_str) if opening_balance_str else 0.0
+        except (ValueError, TypeError):
+            opening_balance = 0.0
+        
+        if not name or not group_name:
+            return jsonify({"success": False, "message": "Name and Group are required"})
+        
+        # Check if account already exists
+        existing = Account.query.filter_by(company_id=cid, name=name).first()
+        if existing:
+            return jsonify({"success": False, "message": "Account with this name already exists"})
+        
+        # Create new account
+        account = Account(
+            company_id=cid,
+            name=name,
+            group_name=group_name,
+            opening_dr=opening_balance if balance_type == "Dr" else 0,
+            opening_cr=opening_balance if balance_type == "Cr" else 0,
+            account_type=account_type if account_type else None,
+            is_active=True
+        )
+        
+        db.session.add(account)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": "Account created successfully",
+            "account": {
+                "id": account.id,
+                "name": account.name,
+                "group_name": account.group_name
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating account: {e}")
+        return jsonify({"success": False, "message": f"Error creating account: {str(e)}"})
