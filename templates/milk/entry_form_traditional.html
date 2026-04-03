@@ -2,18 +2,40 @@
 {% block title %}Traditional Milk Entry{% endblock %}
 {% block content %}
 <style>
+#partySearchResults {
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
 #partySearchResults .list-group-item {
   color: #333 !important;
-  border: 1px solid #dee2e6;
-  padding: 8px 12px;
-  font-size: 0.9em;
+  border: 1px solid #dee2e6 !important;
+  padding: 4px 8px !important;
+  font-size: 0.8em !important;
+  line-height: 1.2 !important;
+  min-height: 28px !important;
+  height: auto !important;
 }
 #partySearchResults .compact-party-item {
-  padding: 6px 10px;
-  min-height: auto;
+  padding: 3px 6px !important;
 }
 #partySearchResults .compact-party-item strong {
-  font-size: 0.9em;
+  font-size: 0.85em !important;
+  display: block;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+#partySearchResults .d-flex {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+#partySearchResults .text-end {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+#partySearchResults .badge {
+  font-size: 0.7em !important;
+  padding: 2px 4px !important;
+  margin: 0 !important;
 }
 #partySearchResults .list-group-item:hover {
   background-color: #f8f9fa !important;
@@ -99,7 +121,7 @@
                    value="{% if edit_mode and txn and txn.party %}{{ txn.party.name }}{% elif default_party %}{{ default_party.name }}{% endif %}" 
                    required autocomplete="off" onkeyup="searchPartyWithBalance()" onfocus="searchPartyWithBalance(true)">
             <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn %}{{ txn.party_id }}{% elif default_party %}{{ default_party.id }}{% endif %}" required>
-            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#addPartyModal" title="Add New Party">
+            <button class="btn btn-outline-primary" type="button" onclick="openAddPartyModal()" title="Add New Party">
               <i class="fas fa-plus"></i>
             </button>
           </div>
@@ -634,6 +656,21 @@ function selectPartyFromSearch(partyId, partyName) {
   document.getElementById('partyId').value = partyId;
   document.getElementById('partySearchResults').style.display = 'none';
   console.log('Selected party:', partyName, 'ID:', partyId);
+}
+
+// Open add party modal with pre-filled name
+function openAddPartyModal() {
+  const partyNameInput = document.getElementById('partyName');
+  const modalNameInput = document.querySelector('#addPartyModal input[name="name"]');
+  
+  // Pre-fill the name if user has typed something
+  if (partyNameInput && partyNameInput.value.trim()) {
+    modalNameInput.value = partyNameInput.value.trim();
+  }
+  
+  // Show the modal
+  const modal = new bootstrap.Modal(document.getElementById('addPartyModal'));
+  modal.show();
 }
 
 // Hide search results when clicking outside
