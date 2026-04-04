@@ -120,7 +120,7 @@
         <tbody id="purchaseBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Purchase' %}
-          <tr data-transaction-id="{{ txn.id }}" data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
+          <tr data-transaction-id="{{ txn.id }}" data-account="{{ txn.account.name if txn.account else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -139,7 +139,7 @@
             <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
             <td>{{ txn.txn_date.strftime('%d-%b-%Y') }}</td>
             <td>{{ txn.shift }}</td>
-            <td>{{ txn.party.name if txn.party else '-' }}</td>
+            <td>{{ txn.account.name if txn.account else '-' }}</td>
             <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
             <td>{{ "%.2f"|format(txn.fat) }}</td>
             <td>{{ "%.2f"|format(txn.snf) }}</td>
@@ -236,7 +236,7 @@
         <tbody id="saleBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Sale' %}
-          <tr data-party="{{ txn.party.name if txn.party else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
+          <tr data-account="{{ txn.account.name if txn.account else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -252,7 +252,7 @@
             <td>{{ txn.bill.bill_no if txn.bill else '-' }}</td>
             <td>{{ txn.txn_date.strftime('%d-%b-%Y') }}</td>
             <td>{{ txn.shift }}</td>
-            <td>{{ txn.party.name if txn.party else '-' }}</td>
+            <td>{{ txn.account.name if txn.account else '-' }}</td>
             <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
             <td>{{ "%.2f"|format(txn.fat) }}</td>
             <td>{{ "%.2f"|format(txn.snf) }}</td>

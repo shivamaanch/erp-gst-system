@@ -62,8 +62,12 @@
             <td><strong>{{ bill.bill_no }}</strong></td>
             <td>{{ bill.bill_date.strftime('%d-%m-%Y') }}</td>
             <td>
-              {{ bill.party.name if bill.party else 'N/A' }}
-              {% if bill.party %}
+              {% if btype == 'Purchase' %}
+                {{ bill.supplier_name }}
+              {% else %}
+                {{ bill.party.name if bill.party else 'N/A' }}
+              {% endif %}
+              {% if btype == 'Sales' and bill.party %}
               <div class="btn-group btn-group-sm ms-2" role="group">
                 <a href="{{ url_for('clients.view', pid=bill.party.id) }}" class="btn btn-outline-secondary" title="View Client">
                   <i class="bi bi-person"></i>

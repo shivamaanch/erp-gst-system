@@ -169,7 +169,7 @@
           <td>{{ t.txn_date.strftime('%d-%b-%Y') }}</td>
           <td><span class="badge {{ 'bg-warning text-dark' if t.shift=='Evening' else 'bg-info' }}">{{ t.shift }}</span></td>
           <td><span class="badge {{ 'bg-success' if t.txn_type=='Sale' else 'bg-primary' }}">{{ t.txn_type }}</span></td>
-          <td>{{ t.party.name if t.party else '—' }}</td>
+          <td>{{ t.account.name if t.account else '—' }}</td>
           <td class="text-end editable-cell" data-field="qty_liters" data-id="{{ t.id }}">
             <span class="display-value">{{ t.qty_liters }}</span>
             <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.qty_liters }}" style="display: none;">

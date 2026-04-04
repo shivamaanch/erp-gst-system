@@ -2,9 +2,9 @@ from flask import Blueprint, render_template, request, session, flash, redirect,
 from flask_login import login_required
 from extensions import db
 from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem, JournalHeader, JournalLine, Party
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from sqlalchemy import text
-from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
+from decimal import Decimal, ROUND_HALF_UP
 
 # Safe database execution wrapper to handle transaction errors
 def safe_db_execute(sql, params=None):
@@ -47,18 +47,11 @@ def _round3(value):
     return float(Decimal(str(value)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
 
 
-def _floor(value, decimals=2):
-    """Truncate towards zero at the given decimal places."""
-    quant = "0." + ("0" * (decimals - 1)) + "1" if decimals > 0 else "1"
-    return float(Decimal(str(value)).quantize(Decimal(quant), rounding=ROUND_DOWN))
-
-
 def compute_snf(clr, fat):
-    """Richmond formula with business rounding rules."""
-    clr_part = _floor(float(clr) / 4.0, 2)  # truncate CLR/4 to 2 decimals
-    snf = clr_part + (0.20 * float(fat)) + 0.14
+    """Richmond formula using full precision; cap at 15."""
+    snf = (float(clr) / 4.0) + (0.20 * float(fat)) + 0.14
     snf = min(15.0, snf)
-    return _floor(snf, 2)  # truncate SNF to 2 decimals
+    return snf
 
 
 def compute_component_breakdown(qty, fat, snf, daily_rate):
@@ -73,25 +66,25 @@ def compute_component_breakdown(qty, fat, snf, daily_rate):
     std_fat_kg = 6.5
     std_snf_kg = 8.5
 
-    # Calculate component rates
+    # Calculate component rates (full precision)
     bf_rate_raw = (daily_rate * fat_share) / std_fat_kg
     snf_rate_raw = (daily_rate * snf_share) / std_snf_kg
 
-    # Use rounded component rates for amount calculation (UI + backend match)
-    bf_rate_used = _round2(bf_rate_raw)
-    snf_rate_used = _round2(snf_rate_raw)
+    # Use raw component rates and kgs for calculation
+    bf_rate_used = bf_rate_raw
+    snf_rate_used = snf_rate_raw
 
     bf_kgs_raw = (qty * fat) / 100.0
     snf_kgs_raw = (qty * snf) / 100.0
 
-    # Truncate component kgs for display (business rule) but use raw kgs for amount
-    bf_kgs_display = _floor(bf_kgs_raw, 2)
-    snf_kgs_display = _floor(snf_kgs_raw, 2)
+    # Compute component amounts with full precision; round only final display values
+    bf_amount_raw = bf_kgs_raw * bf_rate_used
+    snf_amount_raw = snf_kgs_raw * snf_rate_used
+    amount_raw = bf_amount_raw + snf_amount_raw
 
-    # Round component amounts individually, then sum and round final amount
-    bf_amount = _round2(bf_kgs_raw * bf_rate_used)
-    snf_amount = _round2(snf_kgs_raw * snf_rate_used)
-    amount = _round2(bf_amount + snf_amount)
+    bf_amount = _round2(bf_amount_raw)
+    snf_amount = _round2(snf_amount_raw)
+    amount = _round2(amount_raw)
 
     return {
         "bf_rate": bf_rate_raw,
@@ -100,11 +93,14 @@ def compute_component_breakdown(qty, fat, snf, daily_rate):
         "snf_kgs": snf_kgs_raw,
         "bf_rate_display": bf_rate_used,
         "snf_rate_display": snf_rate_used,
-        "bf_kgs_display": bf_kgs_display,
-        "snf_kgs_display": snf_kgs_display,
+        "bf_kgs_display": bf_kgs_raw,
+        "snf_kgs_display": snf_kgs_raw,
         "bf_amount": bf_amount,
         "snf_amount": snf_amount,
         "amount": amount,
+        "bf_amount_raw": bf_amount_raw,
+        "snf_amount_raw": snf_amount_raw,
+        "amount_raw": amount_raw,
     }
 
 def next_bill_no(company_id, fin_year, bill_type):
@@ -172,11 +168,11 @@ def entry_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, p.name as party_name, b.bill_no
+               t.bill_id, a.name as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -185,11 +181,11 @@ def entry_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, p.name as party_name, NULL as bill_no
+               NULL as bill_id, a.name as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -204,13 +200,13 @@ def entry_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.party_id = row.party_id
-                # Add party object for template compatibility
-                class SimpleParty:
+                self.account_id = row.account_id
+                # Add account object for template compatibility
+                class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.party = SimpleParty(row.party_name, row.party_id) if row.party_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -286,11 +282,11 @@ def purchase_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, p.name as party_name, b.bill_no
+               t.bill_id, a.name as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
         ORDER BY t.txn_date DESC 
@@ -299,11 +295,11 @@ def purchase_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, p.name as party_name, NULL as bill_no
+               NULL as bill_id, a.name as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -318,13 +314,13 @@ def purchase_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.party_id = row.party_id
-                # Add party object for template compatibility
-                class SimpleParty:
+                self.account_id = row.account_id
+                # Add account object for template compatibility
+                class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.party = SimpleParty(row.party_name, row.party_id) if row.party_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -385,11 +381,11 @@ def sale_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, p.name as party_name, b.bill_no
+               t.bill_id, a.name as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
@@ -398,11 +394,11 @@ def sale_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, p.name as party_name, NULL as bill_no
+               NULL as bill_id, a.name as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -417,13 +413,13 @@ def sale_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.party_id = row.party_id
-                # Add party object for template compatibility
-                class SimpleParty:
+                self.account_id = row.account_id
+                # Add account object for template compatibility
+                class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.party = SimpleParty(row.party_name, row.party_id) if row.party_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -484,11 +480,11 @@ def milk_statement():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, p.name as party_name, b.bill_no
+               t.bill_id, a.name as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -497,11 +493,11 @@ def milk_statement():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.party_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, p.name as party_name, NULL as bill_no
+               NULL as bill_id, a.name as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
+        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
         LIMIT 500
@@ -516,13 +512,13 @@ def milk_statement():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.party_id = row.party_id
-                # Add party object for template compatibility
-                class SimpleParty:
+                self.account_id = row.account_id
+                # Add account object for template compatibility
+                class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.party = SimpleParty(row.party_name, row.party_id) if row.party_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -579,6 +575,94 @@ def milk_statement():
                      sale_avg_fat=sale_avg_fat, sale_avg_snf=sale_avg_snf,
                      sale_total_bf_kgs=sale_total_bf_kgs, sale_total_snf_kgs=sale_total_snf_kgs,
                      parties=parties)
+
+@milk_bp.route("/milk/import")
+@login_required
+def milk_import():
+    # Initialize session if not set
+    if not session.get("company_id"):
+        session["company_id"] = 1
+        session["company_name"] = "Default Company"
+        session["fin_year"] = "2025-26"
+        session["user_role"] = "admin"
+    
+    cid = session.get("company_id"); fy = session.get("fin_year")
+    
+    # Get filter parameters
+    party_search = request.args.get("party_search", "").strip()
+    from_date = request.args.get("from_date", "")
+    to_date = request.args.get("to_date", "")
+    last_10_days = request.args.get("last_10_days") == "1"
+    
+    # Build base query for milk purchases
+    query = db.session.query(
+        MilkTransaction.id,
+        MilkTransaction.txn_date,
+        MilkTransaction.qty_liters,
+        MilkTransaction.fat,
+        MilkTransaction.snf,
+        MilkTransaction.clr,
+        MilkTransaction.rate,
+        MilkTransaction.amount,
+        Account.name.label('supplier_name')
+    ).join(Account, MilkTransaction.account_id == Account.id
+    ).filter(
+        MilkTransaction.company_id == cid,
+        MilkTransaction.fin_year == fy,
+        MilkTransaction.txn_type == 'Purchase'
+    )
+    
+    # Apply filters
+    if party_search:
+        query = query.filter(Account.name.ilike(f"%{party_search}%"))
+    
+    if from_date:
+        try:
+            query = query.filter(MilkTransaction.txn_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    
+    if to_date:
+        try:
+            query = query.filter(MilkTransaction.txn_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    
+    if last_10_days:
+        ten_days_ago = date.today() - timedelta(days=10)
+        query = query.filter(MilkTransaction.txn_date >= ten_days_ago)
+    
+    # Order by date descending
+    purchases = query.order_by(MilkTransaction.txn_date.desc()).all()
+    
+    # Calculate totals
+    total_qty = sum(p.qty_liters for p in purchases)
+    total_amount = sum(p.amount for p in purchases)
+    avg_rate = (total_amount / total_qty) if total_qty > 0 else 0  # This is already per liter
+    
+    # Prepare data for template
+    data = []
+    for i, p in enumerate(purchases, 1):
+        # Calculate rate per liter for this transaction
+        rate_per_liter = p.amount / p.qty_liters if p.qty_liters > 0 else 0
+        data.append({
+            'sr_no': i,
+            'date': p.txn_date.strftime('%d-%m-%Y'),
+            'supplier': p.supplier_name,
+            'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
+            'qty': p.qty_liters,
+            'rate': rate_per_liter,  # Use calculated rate per liter
+            'amount': p.amount
+        })
+    
+    return render_template("milk/milk_import.html", 
+                         data=data, 
+                         total_qty=total_qty,
+                         total_amount=total_amount,
+                         avg_rate=avg_rate,
+                         party_search=party_search,
+                         from_date=from_date,
+                         to_date=to_date)
 
 @milk_bp.route("/entry/add", methods=["GET","POST"])
 def add_entry():
@@ -652,6 +736,21 @@ def add_entry():
         last_entry = None
     
     if request.method == "POST":
+        # Validate that transaction date is within the selected financial year
+        from datetime import datetime
+        try:
+            txn_date = datetime.strptime(request.form["txn_date"], "%Y-%m-%d").date()
+        except (ValueError, KeyError):
+            flash("Invalid transaction date", "danger")
+            return redirect(url_for("milk.add_entry"))
+        
+        # Check if transaction date is within the selected FY
+        fy_start = date(int(fy[:4]), 4, 1)
+        fy_end = date(int(fy[:4]) + 1, 3, 31)
+        if not (fy_start <= txn_date <= fy_end):
+            flash(f"Transaction date {txn_date} is outside the selected financial year {fy}. Allowed dates: {fy_start} to {fy_end}", "danger")
+            return redirect(url_for("milk.add_entry"))
+        
         fat=float(request.form["fat"]) 
         if fat > 10:
             fat = fat / 10.0
@@ -698,7 +797,7 @@ def add_entry():
                 amount = round(rate * qty, 2)
         
         txn_type=request.form["txn_type"]; 
-        txn_date=datetime.strptime(request.form["txn_date"],"%Y-%m-%d").date()
+        # txn_date already parsed and validated above
         create_invoice=request.form.get("create_invoice")=="1"
         print(f"DEBUG: create_invoice = {create_invoice}")
         print(f"DEBUG: form data = {dict(request.form)}")
@@ -775,6 +874,8 @@ def add_entry():
             gst_rate=float(request.form.get("gst_rate") or 0)
             gst_amt=round(amount*gst_rate/100,2); total=round(amount+gst_amt,2)
             print(f"DEBUG: GST rate: {gst_rate}, GST amount: {gst_amt}, Total: {total}")
+
+            party_id = None
             
             bill=Bill(company_id=cid,fin_year=fy,party_id=party_id,bill_no=bill_no,
                 bill_date=txn_date,bill_type=bill_type,taxable_amount=amount,
@@ -799,6 +900,92 @@ def add_entry():
                 print(f"WARNING: Could not set bill_id (column may not exist): {e}")
             print(f"DEBUG: Invoice creation completed")
             
+            # Post to ledgers with correct debit/credit based on transaction type
+            try:
+                if txn_type == 'Purchase':
+                    # Purchase: Debit Milk Purchase (expense), Credit Supplier (you owe them)
+                    milk_purchase_acct = Account.query.filter_by(company_id=cid, name="Milk Purchase").first()
+                    if not milk_purchase_acct:
+                        milk_purchase_acct = Account(company_id=cid, name="Milk Purchase", group_name="Direct Expenses", opening_dr=0.0, opening_cr=0.0, is_active=True)
+                        db.session.add(milk_purchase_acct)
+                        db.session.flush()
+                    
+                    selected_acct = Account.query.get(account_id) if account_id else None
+                    if selected_acct:
+                        voucher_no = f"MLK-{txn.id}"
+                        header = JournalHeader(
+                            company_id=cid,
+                            fin_year=fy,
+                            voucher_type="Journal",
+                            voucher_no=voucher_no,
+                            voucher_date=txn_date,
+                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                        )
+                        db.session.add(header)
+                        db.session.flush()
+                        # Debit Milk Purchase (expense increases)
+                        db.session.add(JournalLine(
+                            journal_header_id=header.id,
+                            account_id=milk_purchase_acct.id,
+                            debit=amount,
+                            credit=0,
+                            narration=header.narration
+                        ))
+                        # Credit Supplier (you owe them, liability increases)
+                        db.session.add(JournalLine(
+                            journal_header_id=header.id,
+                            account_id=selected_acct.id,
+                            debit=0,
+                            credit=amount,
+                            narration=header.narration
+                        ))
+                        print(f"DEBUG: Purchase entry posted - Debit Milk Purchase: {amount}, Credit Supplier: {amount}")
+                        
+                elif txn_type == 'Sale':
+                    # Sale: Debit Supplier (they owe you), Credit Milk Sale (income)
+                    milk_sale_acct = Account.query.filter_by(company_id=cid, name="Milk Sale").first()
+                    if not milk_sale_acct:
+                        milk_sale_acct = Account(company_id=cid, name="Milk Sale", group_name="Direct Incomes", opening_dr=0.0, opening_cr=0.0, is_active=True)
+                        db.session.add(milk_sale_acct)
+                        db.session.flush()
+                    
+                    selected_acct = Account.query.get(account_id) if account_id else None
+                    if selected_acct:
+                        voucher_no = f"MLK-{txn.id}"
+                        header = JournalHeader(
+                            company_id=cid,
+                            fin_year=fy,
+                            voucher_type="Journal",
+                            voucher_no=voucher_no,
+                            voucher_date=txn_date,
+                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                        )
+                        db.session.add(header)
+                        db.session.flush()
+                        # Debit Supplier (they owe you, asset increases)
+                        db.session.add(JournalLine(
+                            journal_header_id=header.id,
+                            account_id=selected_acct.id,
+                            debit=amount,
+                            credit=0,
+                            narration=header.narration
+                        ))
+                        # Credit Milk Sale (income increases)
+                        db.session.add(JournalLine(
+                            journal_header_id=header.id,
+                            account_id=milk_sale_acct.id,
+                            debit=0,
+                            credit=amount,
+                            narration=header.narration
+                        ))
+                        print(f"DEBUG: Sale entry posted - Debit Supplier: {amount}, Credit Milk Sale: {amount}")
+                
+                db.session.commit()
+                print(f"DEBUG: Journal posting committed successfully")
+            except Exception as e:
+                print(f"DEBUG: Ledger posting failed: {e}")
+                db.session.rollback()
+            
             # Party ledger works via Bills + CashBook + JournalLines
             # No separate Account record needed - prevents duplicate entries
             
@@ -815,6 +1002,55 @@ def add_entry():
         session["last_txn_date"] = txn_date.isoformat()
         if account_id:
             session["last_milk_account_id"] = account_id
+        
+        # Post to ledgers: debit Milk Purchase, credit selected account
+        try:
+            print(f"DEBUG: Starting journal posting for account_id={account_id}")
+            milk_purchase_acct = Account.query.filter_by(company_id=cid, name="Milk Purchase").first()
+            if not milk_purchase_acct:
+                milk_purchase_acct = Account(company_id=cid, name="Milk Purchase", group_name="Direct Expenses", opening_dr=0.0, opening_cr=0.0, is_active=True)
+                db.session.add(milk_purchase_acct)
+                db.session.flush()
+                print(f"DEBUG: Created Milk Purchase account id={milk_purchase_acct.id}")
+            selected_acct = Account.query.get(account_id) if account_id else None
+            if selected_acct:
+                voucher_no = f"MLK-{txn.id}"
+                header = JournalHeader(
+                    company_id=cid,
+                    fin_year=session.get("fin_year"),  # Use session FY (validated to match txn date)
+                    voucher_type="Journal",
+                    voucher_no=voucher_no,
+                    voucher_date=txn_date,
+                    narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                )
+                db.session.add(header)
+                db.session.flush()
+                print(f"DEBUG: Created JournalHeader id={header.id}")
+                # Debit Milk Purchase
+                db.session.add(JournalLine(
+                    journal_header_id=header.id,
+                    account_id=milk_purchase_acct.id,
+                    debit=amount,
+                    credit=0,
+                    narration=header.narration
+                ))
+                # Credit selected account
+                db.session.add(JournalLine(
+                    journal_header_id=header.id,
+                    account_id=selected_acct.id,
+                    debit=0,
+                    credit=amount,
+                    narration=header.narration
+                ))
+                print(f"DEBUG: Created JournalLines for debit={amount} and credit={amount}")
+                db.session.commit()
+                print(f"DEBUG: Journal posting committed successfully")
+            else:
+                print(f"DEBUG: No selected account found for account_id={account_id}")
+        except Exception as e:
+            print(f"DEBUG: Ledger posting failed: {e}")
+            db.session.rollback()
+        
         msg=f"Saved {qty}L @ Rs{rate}/100kg = Rs{amount}"
         flash(msg,"success")
         return redirect(url_for("milk.add_entry"))  # Redirect back to add entry page
@@ -906,10 +1142,10 @@ def edit_entry(txn_id):
         print(f"DEBUG: Found transaction in database:")
         print(f"  ID: {row.id}, FAT: {row.fat}, SNF: {row.snf}, CLR: {getattr(row, 'clr', 'N/A')}, RATE: {row.rate}, AMOUNT: {row.amount}")
         
-        # Get party information for this transaction
-        party = Party.query.filter_by(id=row.party_id).first()
-        party_name = party.name if party else "Unknown Party"
-        print(f"  Party: {party_name} (ID: {row.party_id})")
+        # Get account information for this transaction
+        account = Account.query.filter_by(id=row.account_id).first()
+        account_name = account.name if account else "Cash Account"
+        print(f"  Account: {account_name} (ID: {row.account_id})")
 
         # Get associated bill (if any) so we can show / edit invoice number
         bill = None
@@ -926,13 +1162,13 @@ def edit_entry(txn_id):
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.party_id = row.party_id
-                # Add party object for template compatibility
-                class SimpleParty:
+                self.account_id = row.account_id
+                # Add account object for template compatibility
+                class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.party = SimpleParty(party_name, row.party_id)
+                self.account = SimpleAccount(account_name, row.account_id)
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -1211,8 +1447,13 @@ def view_invoice(bill_id):
     milk_transaction = MilkTransaction.query.filter_by(bill_id=bill_id).first()
     
     # Get company from session
-    from models import Company
+    from models import Company, Account
     company = Company.query.get(cid)
+    
+    # Get related account (supplier/buyer) from milk transaction
+    account = None
+    if milk_transaction and milk_transaction.account_id:
+        account = Account.query.get(milk_transaction.account_id)
     
     # Convert Decimal to float for template calculations
     def decimal_to_float(value):
@@ -1225,20 +1466,21 @@ def view_invoice(bill_id):
                          bill=bill, 
                          milk_transaction=milk_transaction,
                          company=company,
+                         account=account,
                          float=decimal_to_float)
 
 @milk_bp.route("/milk/summary")
 def summary():
     cid=session.get("company_id"); fy=session.get("fin_year")
     from sqlalchemy import func
-    data=db.session.query(MilkTransaction.txn_type,Party.name,
+    data=db.session.query(MilkTransaction.txn_type,Account.name,
         func.sum(MilkTransaction.qty_liters).label("total_qty"),
         func.sum(MilkTransaction.amount).label("total_amt"),
         func.avg(MilkTransaction.fat).label("avg_fat"),
         func.avg(MilkTransaction.snf).label("avg_snf"),
-    ).join(Party,MilkTransaction.party_id==Party.id).filter(
+    ).join(Account,MilkTransaction.account_id==Account.id).filter(
         MilkTransaction.company_id==cid,MilkTransaction.fin_year==fy
-    ).group_by(MilkTransaction.txn_type,Party.name).all()
+    ).group_by(MilkTransaction.txn_type,Account.name).all()
     # Calculate traditional summary data
     traditional_data = []
     for row in data:

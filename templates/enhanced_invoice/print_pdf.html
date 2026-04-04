@@ -23,6 +23,21 @@
         <div class="card-body">
           <!-- Invoice Header -->
           <div class="row mb-4">
+            {% if bill.bill_type == 'Purchase' %}
+            <!-- Purchase Invoice: Supplier in header -->
+            <div class="col-6">
+              <h5 class="text-primary">{{ account.name if account else 'Supplier' }}</h5>
+              {% if account %}<p class="mb-1">{{ account.address or '' }}</p>{% endif %}
+              {% if account %}<p class="mb-1">Phone: {{ account.phone or '' }}</p>{% endif %}
+            </div>
+            <div class="col-6 text-end">
+              <h3 class="text-success">PURCHASE INVOICE</h3>
+              <h5 class="text-muted">{{ bill.bill_no }}</h5>
+              <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
+              <p class="mb-0"><strong>Financial Year:</strong> {{ bill.fin_year }}</p>
+            </div>
+            {% else %}
+            <!-- Sale Invoice: Our company in header -->
             <div class="col-6">
               <h5 class="text-primary">{{ company.name }}</h5>
               <p class="mb-1">{{ company.address or 'Company Address' }}</p>
@@ -35,21 +50,26 @@
               <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
               <p class="mb-0"><strong>Financial Year:</strong> {{ bill.fin_year }}</p>
             </div>
+            {% endif %}
           </div>
 
-          <!-- Bill To -->
+          <!-- Bill To / From -->
           <div class="row mb-4">
             <div class="col-12">
+              {% if bill.bill_type == 'Purchase' %}
+              <h6 class="border-bottom pb-2">From:</h6>
+              <h5 class="text-primary">{{ company.name }}</h5>
+              <p class="mb-1">{{ company.address or 'Company Address' }}</p>
+              <p class="mb-1">GST: {{ company.gst_number or 'N/A' }}</p>
+              <p class="mb-0">Phone: {{ company.phone or 'N/A' }}</p>
+              {% else %}
               <h6 class="border-bottom pb-2">Bill To:</h6>
-              <h5 class="text-primary">{{ party.name }}</h5>
-              {% if party.address %}
-                <p class="mb-1">{{ party.address }}</p>
-              {% endif %}
-              {% if party.phone %}
-                <p class="mb-1"><strong>Phone:</strong> {{ party.phone }}</p>
-              {% endif %}
-              {% if party.gstin %}
-                <p class="mb-0"><strong>GST:</strong> {{ party.gstin }}</p>
+              <h5 class="text-primary">{{ account.name if account else (party.name if party else 'N/A') }}</h5>
+              {% if account %}<p class="mb-1">{{ account.address or '' }}</p>{% endif %}
+              {% if account %}<p class="mb-1"><strong>Phone:</strong> {{ account.phone or '' }}</p>{% endif %}
+              {% if party and party.address %}<p class="mb-1">{{ party.address }}</p>{% endif %}
+              {% if party and party.phone %}<p class="mb-1"><strong>Phone:</strong> {{ party.phone }}</p>{% endif %}
+              {% if party and party.gstin %}<p class="mb-0"><strong>GST:</strong> {{ party.gstin }}</p>{% endif %}
               {% endif %}
             </div>
           </div>

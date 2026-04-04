@@ -127,9 +127,9 @@
             <tr>
               <td>{{ item.date.strftime('%d-%m-%Y') }}</td>
               <td>
-                <strong>{{ entry.party.name }}</strong>
-                {% if entry.party.phone %}
-                <br><small class="text-muted">{{ entry.party.phone }}</small>
+                <strong>{{ entry.account.name }}</strong>
+                {% if entry.account.phone %}
+                <br><small class="text-muted">{{ entry.account.phone }}</small>
                 {% endif %}
               </td>
               <td class="text-end">{{ "{:.2f}".format(item.quantity) }}</td>
@@ -223,23 +223,27 @@ function exportToExcel() {
   // Add header row
   data.push(headers.join(','));
   
-  // Add data rows
-  {% for entry in milk_entries %}
-    {% for item in entry.items %}
-    data.push([
-      '{{ item.date.strftime('%d-%m-%Y') }}',
-      '{{ entry.party.name }}',
-      '{{ item.quantity | round(2) }}',
-      '{{ item.fat_percentage | round(2) }}',
-      '{{ item.snf_percentage | round(2) }}',
-      '{{ item.rate_per_liter | round(2) }}',
-      '{{ item.basic_amount | round(2) }}',
-      '{{ item.fat_value | round(2) }}',
-      '{{ item.snf_value | round(2) }}',
-      '{{ item.total_amount | round(2) }}'
-    ].join(','));
-    {% endfor %}
-  {% endfor %}
+  // Add data rows from table
+  const table = document.querySelector('table');
+  const rows = table.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 10) {
+      const rowData = [
+        cells[0].textContent.trim(),  // Date
+        cells[1].textContent.trim(),  // Farmer
+        cells[2].textContent.trim(),  // Quantity
+        cells[3].textContent.trim(),  // Fat %
+        cells[4].textContent.trim(),  // SNF %
+        cells[5].textContent.trim(),  // Rate/Ltr
+        cells[6].textContent.trim(),  // Basic Amount
+        cells[7].textContent.trim(),  // Fat Value
+        cells[8].textContent.trim(),  // SNF Value
+        cells[9].textContent.trim()   // Total Amount
+      ];
+      data.push(rowData.map(cell => `"${cell}"`).join(','));
+    }
+  });
   
   // Create CSV content
   const csvContent = data.join('\n');
@@ -249,7 +253,7 @@ function exportToExcel() {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'milk_statement_{{ request.args.get('period', current_date.strftime('%m-%Y')) }}.csv';
+  a.download = 'milk_statement.csv';
   a.click();
   window.URL.revokeObjectURL(url);
 }

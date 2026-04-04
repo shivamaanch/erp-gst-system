@@ -164,10 +164,137 @@ def edit(pid):
 def delete(pid):
     cid = session.get("company_id")
     p   = Party.query.filter_by(id=pid, company_id=cid).first_or_404()
-    p.is_active = False
-    db.session.commit()
-    flash(f"Party '{p.name}' deactivated.", "warning")
-    return redirect(url_for("clients.index"))
+    
+    try:
+        # Delete all bills associated with this party
+        from models import Bill, BillItem, JournalHeader, JournalLine, MilkTransaction
+        
+        # Get all bills for this party
+        bills = Bill.query.filter_by(party_id=pid, company_id=cid).all()
+        
+        for bill in bills:
+            print(f"DEBUG: Deleting bill {bill.id} - {bill.bill_no}")
+            
+            # Delete bill items
+            BillItem.query.filter_by(bill_id=bill.id).delete()
+            
+            # Find and delete journal entries linked to this bill
+            journal_headers = JournalHeader.query.filter(
+                JournalHeader.narration.like(f"%{bill.bill_no}%")
+            ).all()
+            
+            for header in journal_headers:
+                print(f"DEBUG: Deleting journal header {header.id} and its lines")
+                # Delete all journal lines for this header
+                JournalLine.query.filter_by(journal_header_id=header.id).delete()
+                # Delete the header
+                db.session.delete(header)
+            
+            # Delete the bill
+            db.session.delete(bill)
+        
+        # Delete any milk transactions linked to this party's account
+        # Find the account linked to this party
+        from models import Account
+        account = Account.query.filter_by(company_id=cid, name=p.name).first()
+        if account:
+            # Delete milk transactions for this account
+            milk_txns = MilkTransaction.query.filter_by(account_id=account.id).all()
+            for txn in milk_txns:
+                print(f"DEBUG: Deleting milk transaction {txn.id}")
+                db.session.delete(txn)
+        
+        # Delete any journal entries directly linked to this party's account
+        if account:
+            # Find all journal lines for this account
+            journal_lines = JournalLine.query.filter_by(account_id=account.id).all()
+            for line in journal_lines:
+                # Get the header and delete all lines for this header
+                header = JournalHeader.query.get(line.journal_header_id)
+                if header:
+                    print(f"DEBUG: Deleting journal header {header.id} (account cleanup)")
+                    JournalLine.query.filter_by(journal_header_id=header.id).delete()
+                    db.session.delete(header)
+        
+        # Finally delete the party
+        db.session.delete(p)
+        db.session.commit()
+        
+        flash(f"Party '{p.name}' and all associated transactions deleted permanently.", "success")
+        return redirect(url_for("clients.index"))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting party: {str(e)}", "danger")
+        return redirect(url_for("clients.index"))
+
+@clients_bp.route("/clients/delete-account/<int:aid>", methods=["POST"])
+@login_required
+def delete_account(aid):
+    cid = session.get("company_id")
+    from models import Account
+    account = Account.query.filter_by(id=aid, company_id=cid).first_or_404()
+    
+    try:
+        # Delete all associated transactions for this account
+        from models import Bill, BillItem, JournalHeader, JournalLine, MilkTransaction
+        
+        # Find bills linked to this account (by matching account name with party name)
+        # First find parties with this name
+        from models import Party
+        parties = Party.query.filter_by(name=account.name, company_id=cid).all()
+        party_ids = [p.id for p in parties]
+        
+        # Delete bills for these parties
+        if party_ids:
+            bills = Bill.query.filter(Bill.party_id.in_(party_ids), Bill.company_id == cid).all()
+            for bill in bills:
+                print(f"DEBUG: Deleting bill {bill.id} - {bill.bill_no}")
+                # Delete bill items
+                BillItem.query.filter_by(bill_id=bill.id).delete()
+                # Delete journal entries linked to this bill
+                journal_headers = JournalHeader.query.filter(
+                    JournalHeader.narration.like(f"%{bill.bill_no}%")
+                ).all()
+                for header in journal_headers:
+                    print(f"DEBUG: Deleting journal header {header.id} and its lines")
+                    JournalLine.query.filter_by(journal_header_id=header.id).delete()
+                    db.session.delete(header)
+                # Delete the bill
+                db.session.delete(bill)
+            
+            # Delete the party records themselves
+            for party in parties:
+                print(f"DEBUG: Deleting party {party.id} - {party.name}")
+                db.session.delete(party)
+        
+        # Delete milk transactions for this account
+        milk_txns = MilkTransaction.query.filter_by(account_id=account.id).all()
+        for txn in milk_txns:
+            print(f"DEBUG: Deleting milk transaction {txn.id}")
+            db.session.delete(txn)
+        
+        # Delete all journal entries for this account
+        journal_lines = JournalLine.query.filter_by(account_id=account.id).all()
+        for line in journal_lines:
+            # Get the header and delete all lines for this header
+            header = JournalHeader.query.get(line.journal_header_id)
+            if header:
+                print(f"DEBUG: Deleting journal header {header.id} (account cleanup)")
+                JournalLine.query.filter_by(journal_header_id=header.id).delete()
+                db.session.delete(header)
+        
+        # Finally delete the account
+        db.session.delete(account)
+        db.session.commit()
+        
+        flash(f"Account '{account.name}' and all associated transactions deleted permanently.", "success")
+        return redirect(url_for("clients.index"))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting account: {str(e)}", "danger")
+        return redirect(url_for("clients.index"))
 
 @clients_bp.route("/clients/view/<int:pid>")
 @login_required

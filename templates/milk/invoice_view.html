@@ -23,6 +23,22 @@
         <div class="card-body">
           <!-- Invoice Header -->
           <div class="row mb-4">
+            {% if bill.bill_type == 'Purchase' %}
+            <!-- Purchase Invoice: Supplier in header -->
+            <div class="col-6">
+              <h5 class="text-primary">{{ account.name or 'Supplier' }}</h5>
+              {% if account and account.group_name %}<p class="mb-1">{{ account.group_name }}</p>{% endif %}
+              {% if account and hasattr(account, 'address') and account.address %}<p class="mb-1">{{ account.address }}</p>{% endif %}
+              {% if account and hasattr(account, 'phone') and account.phone %}<p class="mb-1">Phone: {{ account.phone }}</p>{% endif %}
+            </div>
+            <div class="col-6 text-end">
+              <h3 class="text-success">PURCHASE INVOICE</h3>
+              <h5 class="text-muted">{{ bill.bill_no }}</h5>
+              <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
+              <p class="mb-0"><strong>Financial Year:</strong> {{ fy }}</p>
+            </div>
+            {% else %}
+            <!-- Sale Invoice: Our company in header -->
             <div class="col-6">
               <h5 class="text-primary">{{ company.name }}</h5>
               <p class="mb-1">{{ company.address or 'Company Address' }}</p>
@@ -35,21 +51,24 @@
               <p class="mb-1"><strong>Date:</strong> {{ bill.bill_date.strftime('%d-%b-%Y') }}</p>
               <p class="mb-0"><strong>Financial Year:</strong> {{ fy }}</p>
             </div>
+            {% endif %}
           </div>
 
-          <!-- Bill To -->
+          <!-- Bill To / From -->
           <div class="row mb-4">
             <div class="col-12">
+              {% if bill.bill_type == 'Purchase' %}
+              <h6 class="border-bottom pb-2">From:</h6>
+              <h5 class="text-primary">{{ company.name }}</h5>
+              <p class="mb-1">{{ company.address or 'Company Address' }}</p>
+              <p class="mb-1">GST: {{ company.gst_number or 'N/A' }}</p>
+              <p class="mb-0">Phone: {{ company.phone or 'N/A' }}</p>
+              {% else %}
               <h6 class="border-bottom pb-2">Bill To:</h6>
-              <h5 class="text-primary">{{ bill.party.name }}</h5>
-              {% if bill.party.address %}
-                <p class="mb-1">{{ bill.party.address }}</p>
-              {% endif %}
-              {% if bill.party.phone %}
-                <p class="mb-1"><strong>Phone:</strong> {{ bill.party.phone }}</p>
-              {% endif %}
-              {% if bill.party.gst_number %}
-                <p class="mb-0"><strong>GST:</strong> {{ bill.party.gst_number }}</p>
+              <h5 class="text-primary">{{ account.name or 'Customer' }}</h5>
+              {% if account and account.group_name %}<p class="mb-1">{{ account.group_name }}</p>{% endif %}
+              {% if account and hasattr(account, 'address') and account.address %}<p class="mb-1">{{ account.address }}</p>{% endif %}
+              {% if account and hasattr(account, 'phone') and account.phone %}<p class="mb-1"><strong>Phone:</strong> {{ account.phone }}</p>{% endif %}
               {% endif %}
             </div>
           </div>
@@ -143,17 +162,35 @@
 
           <!-- Signature -->
           <div class="row mt-5">
+            {% if bill.bill_type == 'Purchase' %}
             <div class="col-6">
               <div class="border-top pt-3">
                 <p class="mb-0"><strong>Receiver's Signature</strong></p>
+                <p class="mb-0 mt-1 small text-muted">({{ company.name }})</p>
+              </div>
+            </div>
+            <div class="col-6 text-end">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>For {{ account.name or 'Supplier' }}</strong></p>
+                <p class="mb-0 mt-3">Authorized Signatory</p>
+                <p class="mb-0 mt-1 small text-success fw-bold">SUPPLIER</p>
+              </div>
+            </div>
+            {% else %}
+            <div class="col-6">
+              <div class="border-top pt-3">
+                <p class="mb-0"><strong>Receiver's Signature</strong></p>
+                <p class="mb-0 mt-1 small text-muted">({{ account.name or 'Customer' }})</p>
               </div>
             </div>
             <div class="col-6 text-end">
               <div class="border-top pt-3">
                 <p class="mb-0"><strong>For {{ company.name }}</strong></p>
                 <p class="mb-0 mt-3">Authorized Signatory</p>
+                <p class="mb-0 mt-1 small text-primary fw-bold">SELLER</p>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
       </div>

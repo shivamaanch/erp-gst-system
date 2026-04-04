@@ -128,8 +128,8 @@
                   <i class="bi bi-pencil"></i>
                 </a>
                 <form action="{{ url_for('clients.delete', pid=entity.id) }}" method="POST" class="d-inline"
-                      onsubmit="return confirm('Deactivate {{ entity.name }}?')">
-                  <button class="btn btn-outline-danger" title="Delete">
+                      onsubmit="return confirm('WARNING: This will permanently delete {{ entity.name }} and ALL associated transactions (invoices, payments, journal entries). This action cannot be undone. Continue?')">
+                  <button class="btn btn-outline-danger" title="Delete Ledger & All Entries">
                     <i class="bi bi-trash"></i>
                   </button>
                 </form>
@@ -146,6 +146,13 @@
                   <i class="bi bi-pencil"></i>
                 </button>
                 {% endif %}
+                <!-- Add delete option for System Accounts -->
+                <form action="{{ url_for('clients.delete_account', aid=entity.id) }}" method="POST" class="d-inline"
+                      onsubmit="return confirm('WARNING: This will permanently delete account {{ entity.name }} and ALL associated transactions (journal entries, milk transactions). This action cannot be undone. Continue?')">
+                  <button class="btn btn-outline-danger" title="Delete Account & All Entries">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
               {% endif %}
             </div>
           </td>

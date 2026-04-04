@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Milk Import Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 Milk Import Report</h4>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-success" onclick="exportToExcel()">
+      <i class="bi bi-file-earmark-excel"></i> Export Excel
+    </button>
+    <button type="button" class="btn btn-danger" onclick="exportToPDF()">
+      <i class="bi bi-file-earmark-pdf"></i> Download PDF
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+      <i class="bi bi-printer"></i> Print
+    </button>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">🔍 Party Search</label>
+        <input type="text" name="party_search" class="form-control form-control-sm" value="{{ party_search }}" placeholder="Search supplier name...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">From Date</label>
+        <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">To Date</label>
+        <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+      </div>
+      <div class="col-md-5">
+        <div class="d-flex gap-2">
+          <button type="button" onclick="filterLast10Days()" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-calendar-week"></i> Last 10 Days
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-search"></i> Filter
+          </button>
+          <button type="button" onclick="clearFilters()" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x-circle"></i> Clear
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total Quantity (L)</div>
+      <div class="fw-bold fs-5">{{ "{:,.2f}".format(total_qty) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total Amount</div>
+      <div class="fw-bold fs-5 text-success">₹{{ "{:,.2f}".format(total_amount) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Avg Rate</div>
+      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(avg_rate) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3">
+      <div class="text-muted small">Total Records</div>
+      <div class="fw-bold fs-5">{{ data|length }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Data Table -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm align-middle mb-0" id="importTable">
+        <thead class="table-dark sticky-top">
+          <tr>
+            <th class="text-center" style="width: 60px;">Sr No</th>
+            <th class="text-center" style="width: 100px;">Date</th>
+            <th style="min-width: 150px;">Supplier</th>
+            <th style="min-width: 300px;">Description</th>
+            <th class="text-end" style="width: 90px;">Qty (L)</th>
+            <th class="text-end" style="width: 100px;">Rate</th>
+            <th class="text-end" style="width: 110px;">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td class="text-center">{{ row.sr_no }}</td>
+            <td class="text-center">{{ row.date }}</td>
+            <td class="ps-3">{{ row.supplier }}</td>
+            <td class="ps-3 small">{{ row.description }}</td>
+            <td class="text-end pe-3">{{ "{:,.2f}".format(row.qty) }}</td>
+            <td class="text-end pe-3">₹{{ "{:,.2f}".format(row.rate) }}</td>
+            <td class="text-end pe-3 fw-bold">₹{{ "{:,.2f}".format(row.amount) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">
+              <div class="py-3">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                No purchase records found for the selected criteria.
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold bg-light">
+          <tr>
+            <td colspan="4" class="text-end pe-3">TOTALS:</td>
+            <td class="text-end pe-3">{{ "{:,.2f}".format(total_qty) }}</td>
+            <td class="text-end pe-3">₹{{ "{:,.2f}".format(avg_rate) }}</td>
+            <td class="text-end pe-3">₹{{ "{:,.2f}".format(total_amount) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterLast10Days() {
+  // Clear existing dates
+  document.querySelector('input[name="from_date"]').value = '';
+  document.querySelector('input[name="to_date"]').value = '';
+  // Set last 10 days flag
+  const form = document.querySelector('form');
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'last_10_days';
+  input.value = '1';
+  form.appendChild(input);
+  form.submit();
+}
+
+function clearFilters() {
+  document.querySelector('input[name="party_search"]').value = '';
+  document.querySelector('input[name="from_date"]').value = '';
+  document.querySelector('input[name="to_date"]').value = '';
+  // Remove last_10_days flag if exists
+  const existing = document.querySelector('input[name="last_10_days"]');
+  if (existing) existing.remove();
+  window.location.href = "{{ url_for('milk.milk_import') }}";
+}
+
+function exportToPDF() {
+  // Create a clean filename
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `Milk_Import_Report_${today}`;
+  
+  // Set document title for clean filename
+  const originalTitle = document.title;
+  document.title = filename;
+  
+  // Add print-specific styles
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      .btn, .no-print { display: none !important; }
+      .card { box-shadow: none !important; border: 1px solid #000 !important; }
+      .form-control { display: none !important; }
+      .card-body { padding: 0.5rem !important; }
+      .table-responsive { overflow: visible !important; }
+      .sticky-top { position: static !important; }
+      @page { size: A4 landscape; margin: 0.5in; }
+      @page :header { display: none; }
+      @page :footer { display: none; }
+      body { font-size: 10pt; line-height: 1.2; }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Trigger print dialog
+  setTimeout(() => {
+    window.print();
+    
+    // Clean up
+    document.head.removeChild(style);
+    document.title = originalTitle;
+  }, 100);
+}
+
+function exportToExcel() {
+  // Get table data
+  const table = document.getElementById('importTable');
+  const headerRows = table.querySelectorAll('thead tr');
+  const bodyRows = table.querySelectorAll('tbody tr');
+  const footerRows = table.querySelectorAll('tfoot tr');
+  
+  let csvContent = [];
+  
+  // Headers
+  const headers = ['Sr No', 'Date', 'Supplier', 'Description', 'Qty (L)', 'Rate', 'Amount'];
+  csvContent.push(headers.join(','));
+  
+  // Data rows
+  bodyRows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    const rowData = Array.from(cells).map(cell => {
+      let text = cell.textContent.trim().replace(/,/g, ''); // Remove commas
+      // Remove ₹ symbol for Excel compatibility
+      text = text.replace(/₹/g, '');
+      return `"${text}"`;
+    });
+    csvContent.push(rowData.join(','));
+  });
+  
+  // Totals row - ensure it has 7 columns
+  if (footerRows.length > 0) {
+    const footerRow = footerRows[0];
+    const cells = footerRow.querySelectorAll('td');
+    
+    // Create 7 columns for totals
+    const footerData = [];
+    
+    // First 4 columns: empty, empty, empty, "TOTALS:"
+    footerData.push('""'); // Column A
+    footerData.push('""'); // Column B
+    footerData.push('""'); // Column C
+    footerData.push('"TOTALS:"'); // Column D
+    
+    // Last 3 columns: actual values from cells 4, 5, 6
+    // Get values directly from the template variables
+    const totalQty = "{{ '{:,.2f}'.format(total_qty) }}";
+    const avgRate = "{{ '{:,.2f}'.format(avg_rate) }}";
+    const totalAmount = "{{ '{:,.2f}'.format(total_amount) }}";
+    
+    footerData.push(`"${totalQty}"`); // Column E
+    footerData.push(`"${avgRate}"`); // Column F
+    footerData.push(`"${totalAmount}"`); // Column G
+    
+    csvContent.push(footerData.join(','));
+  }
+  
+  // Create blob and download
+  const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `milk_import_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+// Auto-refresh totals when party search changes (simulate live filtering)
+document.querySelector('input[name="party_search"]')?.addEventListener('input', function() {
+  // For live filtering, you could implement AJAX here
+  // For now, user needs to click Filter button
+});
+</script>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #000 !important; margin-bottom: 1rem !important; }
+  .btn { display: none !important; }
+  .form-control { display: none !important; }
+  .card-body { padding: 0.5rem !important; }
+  .table-responsive { overflow: visible !important; }
+  .sticky-top { position: static !important; }
+  
+  /* Hide URL and page numbers */
+  @page {
+    size: A4 landscape;
+    margin: 0.5in;
+  }
+  
+  /* Ensure clean filename */
+  @page :header {
+    display: none;
+  }
+  
+  @page :footer {
+    display: none;
+  }
+  
+  body {
+    font-size: 10pt;
+    line-height: 1.2;
+  }
+  
+  .table th {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .table-light {
+    background-color: #f9f9f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+</style>
+{% endblock %}

@@ -109,7 +109,7 @@
         <div class="col-auto"><strong>Date:</strong> {{ last_entry.txn_date.strftime('%d-%b-%Y') }}</div>
         <div class="col-auto"><strong>Shift:</strong> {{ last_entry.shift }}</div>
         <div class="col-auto"><strong>Type:</strong> {{ last_entry.txn_type }}</div>
-        <div class="col-auto"><strong>Party:</strong> {{ last_entry.party_name }}</div>
+        <div class="col-auto"><strong>Party:</strong> {{ last_entry.account_name or "Cash Account" }}</div>
         <div class="col-auto"><strong>Qty:</strong> {{ last_entry.qty_liters }}L</div>
         <div class="col-auto"><strong>FAT:</strong> {{ last_entry.fat }}%</div>
         <div class="col-auto"><strong>SNF:</strong> {{ last_entry.snf }}%</div>
@@ -479,11 +479,6 @@ function round3(value) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
-function floorTo(value, decimals) {
-  const factor = Math.pow(10, decimals);
-  return Math.trunc(value * factor) / factor;
-}
-
 function calculateSNF() {
   const clr = parseFloat(document.getElementById('clr').value) || 0;
   const fat = parseFloat(document.getElementById('fat').value) || 0;
@@ -491,11 +486,10 @@ function calculateSNF() {
   
   // Richmond's Formula: SNF = (CLR/4) + (0.20 × Fat) + 0.14
   if (clr > 0) {
-    const clrPart = floorTo(clr / 4, 2); // truncate CLR/4 to 2 decimals
+    const clrPart = clr / 4; // use full precision
     snf = clrPart + (0.20 * fat) + 0.14;
     // Cap at 15.0 to avoid unrealistic values (backend uses same cap)
     snf = Math.min(15.0, snf);
-    snf = floorTo(snf, 2); // truncate SNF to 2 decimals
   } else {
     snf = 0; // No SNF if CLR is 0
   }
@@ -533,9 +527,9 @@ function calculateMarketRates() {
     const stdFatKg = 6.5;   // Standard fat kg per 100kg milk
     const stdSnfKg = 8.5;   // Standard SNF kg per 100kg milk
     
-    // Calculate component rates
-    bfRate = round2((dailyRate * fatShare) / stdFatKg);
-    snfRate = round2((dailyRate * snfShare) / stdSnfKg);
+    // Calculate component rates (full precision)
+    bfRate = (dailyRate * fatShare) / stdFatKg;
+    snfRate = (dailyRate * snfShare) / stdSnfKg;
     
     console.log(`Component rates - BF: ₹${bfRate.toFixed(2)}/kg, SNF: ₹${snfRate.toFixed(2)}/kg`);
   }
@@ -548,8 +542,8 @@ function calculateMarketRates() {
   const dailyRateDisplay = document.getElementById('daily_rate_display');
   
   // Update old input fields (for compatibility)
-  if (fatRateElement) fatRateElement.value = bfRate.toFixed(2);
-  if (snfRateElement) snfRateElement.value = snfRate.toFixed(2);
+  if (fatRateElement) fatRateElement.value = bfRate.toString();
+  if (snfRateElement) snfRateElement.value = snfRate.toString();
   
   // Update new display elements
   if (fatRateDisplay) fatRateDisplay.textContent = bfRate.toFixed(2);
@@ -586,7 +580,7 @@ function calculateMilk() {
   // Always use component-based calculation for traditional method
   const bfAmount = bfKgs * fatRate;
   const snfAmount = snfKgs * snfRate;
-  finalAmount = round2(bfAmount + snfAmount);
+  finalAmount = bfAmount + snfAmount; // no intermediate rounding
   ratePerLiter = qty > 0 ? finalAmount / qty : 0;
   
   // Debug logging
@@ -602,11 +596,8 @@ function calculateMilk() {
   console.log('Debug - finalAmount:', finalAmount);
   
   // Update display with precise values
-  const bfKgsDisplayVal = floorTo(bfKgs, 2);
-  const snfKgsDisplayVal = floorTo(snfKgs, 2);
-
-  document.getElementById('bf_kgs').value = bfKgsDisplayVal.toFixed(2);
-  document.getElementById('snf_kgs').value = snfKgsDisplayVal.toFixed(2);
+  document.getElementById('bf_kgs').value = bfKgs.toString();
+  document.getElementById('snf_kgs').value = snfKgs.toString();
   document.getElementById('rate_per_liter_calc').value = (ratePerLiter * 100).toFixed(2); // Show as per 100kg
   document.getElementById('final_amount').value = finalAmount.toFixed(2);
   document.getElementById('amount').value = finalAmount.toFixed(2);
@@ -618,8 +609,8 @@ function calculateMilk() {
   const calcRateDisplay = document.getElementById('calc_rate_display');
   const flashAmountDisplay = document.getElementById('final_amount_flash');
   
-  if (bfKgsDisplayEl) bfKgsDisplayEl.textContent = bfKgsDisplayVal.toFixed(2);
-  if (snfKgsDisplayEl) snfKgsDisplayEl.textContent = snfKgsDisplayVal.toFixed(2);
+  if (bfKgsDisplayEl) bfKgsDisplayEl.textContent = bfKgs.toFixed(2);
+  if (snfKgsDisplayEl) snfKgsDisplayEl.textContent = snfKgs.toFixed(2);
   if (finalAmountDisplay) finalAmountDisplay.textContent = finalAmount.toFixed(2);
   if (calcRateDisplay) calcRateDisplay.textContent = (ratePerLiter * 100).toFixed(2);
   if (flashAmountDisplay) flashAmountDisplay.textContent = finalAmount.toFixed(2);

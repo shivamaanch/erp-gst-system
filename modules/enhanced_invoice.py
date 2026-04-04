@@ -199,6 +199,20 @@ def delete_invoice(bill_id):
         # Delete bill items first
         BillItem.query.filter_by(bill_id=bill_id).delete()
         
+        # Find and delete any journal entries linked to this bill
+        from models import JournalHeader, JournalLine
+        # Find journal headers with narration containing this bill's bill_no
+        journal_headers = JournalHeader.query.filter(
+            JournalHeader.narration.like(f"%{bill.bill_no}%")
+        ).all()
+        
+        for header in journal_headers:
+            print(f"DEBUG: Deleting journal header {header.id} and its lines")
+            # Delete all journal lines for this header
+            JournalLine.query.filter_by(journal_header_id=header.id).delete()
+            # Delete the header
+            db.session.delete(header)
+        
         # Find and delete any milk entry linked to this bill (not just clear bill_id)
         from models import MilkTransaction
         linked_milk = MilkTransaction.query.filter_by(bill_id=bill_id).first()
@@ -234,6 +248,17 @@ def list_invoices():
         q = q.filter(Bill.fin_year.in_(fy_list))
     bills = q.order_by(Bill.bill_date.desc()).all()
     
+    # Attach account name for milk bills (where bill comes from milk transaction)
+    from models import MilkTransaction, Account
+    for bill in bills:
+        # Check if this bill is linked to a milk transaction
+        milk_txn = MilkTransaction.query.filter_by(bill_id=bill.id).first()
+        if milk_txn and milk_txn.account_id:
+            account = Account.query.get(milk_txn.account_id)
+            bill.supplier_name = account.name if account else "N/A"
+        else:
+            bill.supplier_name = "N/A"
+    
     return render_template("enhanced_invoice/list.html", bills=bills, btype=btype)
 
 @enhanced_invoice_bp.route("/enhanced-invoice/print/<int:bill_id>")
@@ -247,9 +272,16 @@ def print_invoice(bill_id):
     # Get bill items
     items = BillItem.query.filter_by(bill_id=bill_id).all()
     
+    # Check if this is a milk bill and get account name
+    from models import MilkTransaction, Account
+    milk_txn = MilkTransaction.query.filter_by(bill_id=bill_id).first()
+    account = None
+    if milk_txn and milk_txn.account_id:
+        account = Account.query.get(milk_txn.account_id)
+    
     return render_template("enhanced_invoice/print_pdf.html",
                          bill=bill, party=party, company=company,
-                         items=items)
+                         items=items, account=account)
 
 @enhanced_invoice_bp.route("/enhanced-invoice/export/<int:bill_id>/<format>")
 @login_required

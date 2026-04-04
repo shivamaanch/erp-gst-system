@@ -25,6 +25,100 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 load_dotenv()
 
+def _ensure_sqlite_milk_transactions_schema(conn):
+    from sqlalchemy import text
+
+    exists = conn.execute(
+        text("SELECT name FROM sqlite_master WHERE type='table' AND name='milk_transactions'")
+    ).fetchone()
+
+    create_sql = """
+        CREATE TABLE milk_transactions (
+            id INTEGER PRIMARY KEY,
+            company_id INTEGER NOT NULL,
+            fin_year TEXT NOT NULL,
+            voucher_no TEXT,
+            account_id INTEGER NOT NULL,
+            txn_date DATE NOT NULL,
+            shift TEXT DEFAULT 'Morning',
+            txn_type TEXT NOT NULL,
+            qty_liters NUMERIC(10,2) NOT NULL,
+            fat NUMERIC(5,2) NOT NULL,
+            snf NUMERIC(5,2) NOT NULL,
+            clr NUMERIC(5,2) DEFAULT 0.0,
+            rate NUMERIC(10,4) NOT NULL,
+            amount NUMERIC(14,2) NOT NULL,
+            chart_id INTEGER,
+            narration TEXT,
+            bill_id INTEGER,
+            FOREIGN KEY (company_id) REFERENCES companies(id),
+            FOREIGN KEY (account_id) REFERENCES accounts(id),
+            FOREIGN KEY (chart_id) REFERENCES milk_rate_charts(id),
+            FOREIGN KEY (bill_id) REFERENCES bills(id)
+        )
+    """
+
+    if not exists:
+        conn.execute(text(create_sql))
+        print("✅ Created milk_transactions table (SQLite)")
+        return
+
+    cols = conn.execute(text("PRAGMA table_info(milk_transactions)")).fetchall()
+    col_names = [c[1] for c in cols]
+    if "party_id" not in col_names:
+        return
+
+    print("🔧 Migrating milk_transactions: removing legacy party_id column (SQLite)")
+
+    conn.execute(text("ALTER TABLE milk_transactions RENAME TO milk_transactions_old"))
+    conn.execute(text(create_sql))
+
+    old_cols = conn.execute(text("PRAGMA table_info(milk_transactions_old)")).fetchall()
+    old_col_names = {c[1] for c in old_cols}
+
+    new_cols = [
+        "id",
+        "company_id",
+        "fin_year",
+        "voucher_no",
+        "account_id",
+        "txn_date",
+        "shift",
+        "txn_type",
+        "qty_liters",
+        "fat",
+        "snf",
+        "clr",
+        "rate",
+        "amount",
+        "chart_id",
+        "narration",
+        "bill_id",
+    ]
+
+    select_expr = []
+    for col in new_cols:
+        if col in old_col_names:
+            if col == "clr":
+                select_expr.append("COALESCE(clr, 0) AS clr")
+            else:
+                select_expr.append(f"{col} AS {col}")
+        else:
+            if col == "shift":
+                select_expr.append("'Morning' AS shift")
+            elif col == "clr":
+                select_expr.append("0 AS clr")
+            else:
+                select_expr.append(f"NULL AS {col}")
+
+    insert_sql = (
+        f"INSERT INTO milk_transactions ({', '.join(new_cols)}) "
+        f"SELECT {', '.join(select_expr)} FROM milk_transactions_old"
+    )
+    conn.execute(text(insert_sql))
+    conn.execute(text("DROP TABLE milk_transactions_old"))
+    print("✅ Migration complete: milk_transactions.party_id removed")
+
 def emergency_database_fix():
     """Run emergency database fix with proper migration pattern - PostgreSQL only"""
     db_url = os.getenv('DATABASE_URL')
@@ -205,7 +299,9 @@ def create_sqlite_tables():
         engine = create_engine(db_url)
         
         # Create tables using raw SQL for better compatibility
-        with engine.connect() as conn:
+        with engine.begin() as conn:
+            _ensure_sqlite_milk_transactions_schema(conn)
+
             # Create fixed_assets table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS fixed_assets (
@@ -265,7 +361,7 @@ def add_missing_sqlite_columns():
         db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'erp.db')}")
         engine = create_engine(db_url)
         
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             # Check if fixed_assets table exists
             result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='fixed_assets'"))
             if result.fetchall():

@@ -100,6 +100,8 @@
       <i class="bi bi-droplet"></i> Milk Entry</a>
     <a href="{{ url_for('milk.milk_statement') }}" class="nav-link {{ 'active' if request.endpoint=='milk.milk_statement' }}">
       <i class="bi bi-journal-text"></i> Milk Statement</a>
+    <a href="{{ url_for('milk.milk_import') }}" class="nav-link {{ 'active' if request.endpoint=='milk.milk_import' }}">
+      <i class="bi bi-file-earmark-excel"></i> Milk Import</a>
     <a href="{{ url_for('milk.purchase_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.purchase_list' }}">
       <i class="bi bi-cart-arrow-down"></i> Milk Purchase</a>
     <a href="{{ url_for('milk.sale_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.sale_list' }}">
@@ -264,6 +266,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<style>
+.select2-container--open .select2-dropdown {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.select2-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+</style>
 <script>
 $(document).ready(function() {
     if (!$.fn || !$.fn.select2) return;
