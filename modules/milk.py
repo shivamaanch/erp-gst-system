@@ -919,8 +919,8 @@ def mobile_save_entry():
         if fat > 10:
             fat = fat / 10.0
         
-        # Calculate SNF using Richmond's formula
-        snf = (clr / 4) + (0.20 * fat) + 0.14
+        # Calculate SNF using Richmond's formula (SAME AS MAIN SYSTEM)
+        snf = compute_snf(clr, fat)
         
         # Calculate amount using system formula
         calc = compute_component_breakdown(qty, fat, snf, rate)
