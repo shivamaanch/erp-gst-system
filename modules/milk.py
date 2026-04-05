@@ -204,7 +204,20 @@ def entry_list():
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
+                
+                # Extract party name from narration
+                party_name = "Unknown"
+                if row.narration and "Party:" in row.narration:
+                    # Extract party name from "Mobile Purchase | Party: Party Name | ..."
+                    parts = row.narration.split("|")
+                    for part in parts:
+                        if "Party:" in part:
+                            party_name = part.split("Party:")[1].strip()
+                            break
+                elif row.account_name and row.account_name != "Unknown":
+                    party_name = row.account_name
+                
+                self.account = SimpleAccount(party_name, getattr(row, 'account_id', None))
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -974,8 +987,8 @@ def mobile_save_entry():
         milk_txn_id = milk_result.scalar()
         db.session.flush()
         
-        # Handle invoice creation (SAME AS MAIN SYSTEM)
-        create_invoice = data.get('create_invoice', False)
+        # Handle invoice creation (AUTO-CREATE BY DEFAULT like main system)
+        create_invoice = data.get('create_invoice', True)  # Default to True
         bill_no = None
         
         if create_invoice:
