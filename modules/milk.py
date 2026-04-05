@@ -975,33 +975,68 @@ def mobile_save_entry():
         # Create milk transaction using raw SQL to avoid account_id column issues
         from sqlalchemy import text
         
-        milk_txn_sql = """
-        INSERT INTO milk_transactions (
-            company_id, fin_year, txn_date, shift, txn_type, 
-            qty_liters, fat, snf, clr, rate, amount, chart_id, narration
-        ) VALUES (
-            :company_id, :fin_year, :txn_date, :shift, :txn_type,
-            :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration
-        ) RETURNING id
-        """
+        # Check if we're using SQLite or PostgreSQL
+        is_sqlite = db.engine.dialect.name == 'sqlite'
         
-        milk_result = db.session.execute(text(milk_txn_sql), {
-            "company_id": cid,
-            "fin_year": fy,
-            "txn_date": txn_date,
-            "shift": "Mobile",
-            "txn_type": txn_type,
-            "qty_liters": qty,
-            "fat": fat,
-            "snf": snf,
-            "clr": clr,
-            "rate": rate,
-            "amount": amount,
-            "chart_id": None,
-            "narration": f"Mobile {txn_type} | Party: {party_name} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
-        })
-        
-        milk_txn_id = milk_result.scalar()
+        if is_sqlite:
+            # SQLite version without RETURNING
+            milk_txn_sql = """
+            INSERT INTO milk_transactions (
+                company_id, fin_year, txn_date, shift, txn_type, 
+                qty_liters, fat, snf, clr, rate, amount, chart_id, narration
+            ) VALUES (
+                :company_id, :fin_year, :txn_date, :shift, :txn_type,
+                :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration
+            )
+            """
+            
+            db.session.execute(text(milk_txn_sql), {
+                "company_id": cid,
+                "fin_year": fy,
+                "txn_date": txn_date,
+                "shift": "Mobile",
+                "txn_type": txn_type,
+                "qty_liters": qty,
+                "fat": fat,
+                "snf": snf,
+                "clr": clr,
+                "rate": rate,
+                "amount": amount,
+                "chart_id": None,
+                "narration": f"Mobile {txn_type} | Party: {party_name} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+            })
+            
+            # Get the last inserted ID for SQLite
+            milk_txn_id = db.session.execute(text("SELECT last_insert_rowid()")).scalar()
+        else:
+            # PostgreSQL version with RETURNING
+            milk_txn_sql = """
+            INSERT INTO milk_transactions (
+                company_id, fin_year, txn_date, shift, txn_type, 
+                qty_liters, fat, snf, clr, rate, amount, chart_id, narration
+            ) VALUES (
+                :company_id, :fin_year, :txn_date, :shift, :txn_type,
+                :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration
+            ) RETURNING id
+            """
+            
+            milk_result = db.session.execute(text(milk_txn_sql), {
+                "company_id": cid,
+                "fin_year": fy,
+                "txn_date": txn_date,
+                "shift": "Mobile",
+                "txn_type": txn_type,
+                "qty_liters": qty,
+                "fat": fat,
+                "snf": snf,
+                "clr": clr,
+                "rate": rate,
+                "amount": amount,
+                "chart_id": None,
+                "narration": f"Mobile {txn_type} | Party: {party_name} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+            })
+            
+            milk_txn_id = milk_result.scalar()
         db.session.flush()
         
         # Handle invoice creation (AUTO-CREATE BY DEFAULT like main system)
