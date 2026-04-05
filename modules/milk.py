@@ -2275,23 +2275,30 @@ def delete_entry(txn_id):
     cid = session.get("company_id")
     fy = session.get("fin_year")
     
-    # Get the milk transaction
-    txn = MilkTransaction.query.filter_by(id=txn_id, company_id=cid, fin_year=fy).first()
-    if not txn:
-        flash("Milk entry not found", "error")
-        return redirect(url_for('milk.entry_list'))
-    
     try:
+        # Use raw SQL to avoid account_id column issues
+        from sqlalchemy import text
+        
+        # Get the milk transaction details first
+        result = db.session.execute(text("""
+            SELECT id, bill_id FROM milk_transactions 
+            WHERE id = :txn_id AND company_id = :company_id AND fin_year = :fin_year
+        """), {"txn_id": txn_id, "company_id": cid, "fin_year": fy})
+        
+        txn_row = result.fetchone()
+        if not txn_row:
+            flash("Milk entry not found", "error")
+            return redirect(url_for('milk.entry_list'))
+        
         # Delete associated bill if exists
-        if txn.bill_id:
-            bill = Bill.query.filter_by(id=txn.bill_id).first()
-            if bill:
-                # Delete bill items first
-                BillItem.query.filter_by(bill_id=bill.id).delete()
-                db.session.delete(bill)
+        if txn_row.bill_id:
+            # Delete bill items first
+            db.session.execute(text("DELETE FROM bill_items WHERE bill_id = :bill_id"), {"bill_id": txn_row.bill_id})
+            # Delete the bill
+            db.session.execute(text("DELETE FROM bills WHERE id = :bill_id"), {"bill_id": txn_row.bill_id})
         
         # Delete the milk transaction
-        db.session.delete(txn)
+        db.session.execute(text("DELETE FROM milk_transactions WHERE id = :txn_id"), {"txn_id": txn_id})
         db.session.commit()
         
         flash("Milk entry deleted successfully", "success")
