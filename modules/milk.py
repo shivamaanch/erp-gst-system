@@ -916,25 +916,36 @@ def mobile_save_entry():
                 db.session.flush()
             account_id = account.id
         
-        # Create milk transaction (SAME AS MAIN SYSTEM)
-        from models import MilkTransaction, JournalHeader, JournalLine, Bill, BillItem
+        # Create milk transaction using raw SQL to avoid account_id column issues
+        from sqlalchemy import text
         
-        milk_txn = MilkTransaction(
-            company_id=cid,
-            fin_year=fy,
-            txn_date=txn_date,
-            shift="Mobile",  # Indicate mobile entry
-            txn_type=txn_type,
-            qty_liters=qty,
-            fat=fat,
-            snf=snf,
-            clr=clr,
-            rate=rate,
-            amount=amount,
-            chart_id=None,  # Mobile doesn't use charts for simplicity
-            narration=f"Mobile {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
-        )
-        db.session.add(milk_txn)
+        milk_txn_sql = """
+        INSERT INTO milk_transactions (
+            company_id, fin_year, txn_date, shift, txn_type, 
+            qty_liters, fat, snf, clr, rate, amount, chart_id, narration
+        ) VALUES (
+            :company_id, :fin_year, :txn_date, :shift, :txn_type,
+            :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration
+        ) RETURNING id
+        """
+        
+        milk_result = db.session.execute(text(milk_txn_sql), {
+            "company_id": cid,
+            "fin_year": fy,
+            "txn_date": txn_date,
+            "shift": "Mobile",
+            "txn_type": txn_type,
+            "qty_liters": qty,
+            "fat": fat,
+            "snf": snf,
+            "clr": clr,
+            "rate": rate,
+            "amount": amount,
+            "chart_id": None,
+            "narration": f"Mobile {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+        })
+        
+        milk_txn_id = milk_result.scalar()
         db.session.flush()
         
         # Handle invoice creation (SAME AS MAIN SYSTEM)
@@ -987,14 +998,18 @@ def mobile_save_entry():
             )
             db.session.add(item)
             
-            # Link milk transaction to bill
+            # Link milk transaction to bill using raw SQL
             try:
-                milk_txn.bill_id = bill.id
+                db.session.execute(text("""
+                    UPDATE milk_transactions 
+                    SET bill_id = :bill_id 
+                    WHERE id = :milk_txn_id
+                """), {"bill_id": bill.id, "milk_txn_id": milk_txn_id})
             except Exception as e:
                 print(f"WARNING: Could not set bill_id (column may not exist): {e}")
         
         # Create journal entry (SAME AS MAIN SYSTEM)
-        voucher_no = f"MLK-{milk_txn.id}"
+        voucher_no = f"MLK-{milk_txn_id}"
         
         if txn_type == "Purchase":
             # Purchase: Debit Milk Purchase, Credit Supplier
@@ -1095,7 +1110,7 @@ def mobile_save_entry():
         return jsonify({
             "success": True,
             "message": "Entry saved successfully" + (f" | Invoice {bill_no} created" if create_invoice else ""),
-            "entry_id": milk_txn.id,
+            "entry_id": milk_txn_id,
             "amount": amount,
             "bill_no": bill_no,
             "voucher_no": voucher_no

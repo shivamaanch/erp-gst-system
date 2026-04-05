@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Milk Entry">
     <meta name="theme-color" content="#007bff">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Quick Milk Entry</title>
     
     <!-- PWA Manifest -->
@@ -88,24 +89,24 @@
         
         .form-label {
             font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
-            font-size: 0.9rem;
+            color: #495057;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
         
         .form-control {
-            font-size: 1.1rem;
+            font-size: 16px; /* Prevents zoom on iOS */
             padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
             transition: all 0.3s ease;
-            background: #f8f9fa;
+            background: white;
         }
         
         .form-control:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
-            background: white;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+            outline: none;
         }
         
         .form-control.is-invalid {
@@ -465,7 +466,7 @@
                 
                 <div class="form-group">
                     <label class="form-label">🧈 FAT %</label>
-                    <input type="number" name="fat" class="form-control" id="fatField" step="0.1" placeholder="0.0" required>
+                    <input type="number" name="fat" class="form-control" id="fatField" step="0.01" placeholder="0.00" required>
                 </div>
                 
                 <div class="form-group">
