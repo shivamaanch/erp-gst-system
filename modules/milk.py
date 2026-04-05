@@ -1300,11 +1300,10 @@ def add_entry():
     try:
         from sqlalchemy import text
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               a.name as account_name
+               'Unknown' as account_name
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id 
         ORDER BY t.txn_date DESC, t.id DESC
         LIMIT 1
@@ -2279,14 +2278,29 @@ def debug_txns():
     """Simple debug route to inspect saved milk transactions."""
     cid = session.get("company_id")
     fy = session.get("fin_year")
-    txns = (MilkTransaction.query
-            .filter_by(company_id=cid, fin_year=fy)
-            .order_by(MilkTransaction.id)
-            .all())
+    
+    # Use raw SQL to avoid account_id column issues
+    from sqlalchemy import text
+    sql = """
+    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.narration
+    FROM milk_transactions t
+    WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+    ORDER BY t.id
+    """
+    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    txns = result.fetchall()
 
     lines = []
     for t in txns:
-        party_name = t.party.name if getattr(t, "party", None) else "-"
+        # Extract party name from narration if available
+        party_name = "Unknown"
+        if t.narration and "Party:" in t.narration:
+            parts = t.narration.split("|")
+            for part in parts:
+                if "Party:" in part:
+                    party_name = part.split("Party:")[1].strip()
+                    break
+        
         lines.append(
             f"ID={t.id} date={t.txn_date} party={party_name} qty={t.qty_liters} "
             f"fat={t.fat} snf={t.snf} rate={t.rate} amount={t.amount}"

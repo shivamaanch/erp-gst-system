@@ -871,7 +871,12 @@ def create_app():
 
         return redirect(url_for("reports.hub"))
 
-
+    # Add session rollback handler to prevent InFailedSqlTransaction errors
+    @app.teardown_request
+    def handle_teardown(exception=None):
+        if exception:
+            db.session.rollback()
+        db.session.remove()
 
     return app
 

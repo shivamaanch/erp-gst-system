@@ -149,7 +149,11 @@ def switch_financial_year(fin_year):
 from extensions import login_manager
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return User.query.get(int(user_id))
+    except Exception:
+        db.session.rollback()
+        return None
 
 @auth_bp.route("/dev-login")
 def dev_login():
