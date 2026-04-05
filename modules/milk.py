@@ -485,13 +485,12 @@ def milk_statement():
     # Check if bill_id column exists in milk_transactions
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
-        # If bill_id exists, use the full query
+        # If bill_id exists, use the full query without account_id
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, a.name as account_name, b.bill_no
+               t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -500,11 +499,10 @@ def milk_statement():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, a.name as account_name, NULL as bill_no
+               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
         LIMIT 500
@@ -525,7 +523,20 @@ def milk_statement():
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
+                
+                # Extract party name from narration
+                party_name = "Unknown"
+                if row.narration and "Party:" in row.narration:
+                    # Extract party name from "Mobile Purchase | Party: Party Name | ..."
+                    parts = row.narration.split("|")
+                    for part in parts:
+                        if "Party:" in part:
+                            party_name = part.split("Party:")[1].strip()
+                            break
+                elif row.account_name and row.account_name != "Unknown":
+                    party_name = row.account_name
+                
+                self.account = SimpleAccount(party_name, getattr(row, 'account_id', None))
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -695,8 +706,11 @@ def milk_import():
                     supplier_name = part.split("Party:")[1].strip()
                     break
         elif p.narration:
-            # Fallback: use first part of narration
-            supplier_name = p.narration.split("|")[0].strip()
+            # Fallback: if no Party: tag, try to extract from the first part
+            first_part = p.narration.split("|")[0].strip()
+            # If it's "Mobile Purchase", we don't have a party name, keep "Unknown"
+            if not first_part.startswith("Mobile"):
+                supplier_name = first_part
         
         # Handle txn_date which might be string or date object
         if isinstance(p.txn_date, str):
@@ -828,8 +842,11 @@ def milk_sale_import():
                     buyer_name = part.split("Party:")[1].strip()
                     break
         elif p.narration:
-            # Fallback: use first part of narration
-            buyer_name = p.narration.split("|")[0].strip()
+            # Fallback: if no Party: tag, try to extract from the first part
+            first_part = p.narration.split("|")[0].strip()
+            # If it's "Mobile Sale", we don't have a party name, keep "Unknown"
+            if not first_part.startswith("Mobile"):
+                buyer_name = first_part
         
         # Handle txn_date which might be string or date object
         if isinstance(p.txn_date, str):
