@@ -1856,7 +1856,11 @@ def edit_entry(txn_id):
         actual_txn.txn_date = datetime.strptime(request.form["txn_date"], "%Y-%m-%d").date()
         actual_txn.shift = request.form["shift"]
         actual_txn.txn_type = request.form["txn_type"]
-        actual_txn.party_id = int(request.form["party_id"])
+        
+        # Handle party_id safely - can be None for mobile entries
+        party_id_raw = request.form.get("party_id")
+        actual_txn.party_id = int(party_id_raw) if party_id_raw and party_id_raw.strip() else None
+        
         actual_txn.qty_liters = float(request.form["qty_liters"])
         qty = actual_txn.qty_liters
 
