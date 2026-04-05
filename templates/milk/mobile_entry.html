@@ -12,6 +12,21 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -172,6 +187,77 @@
             animation: fadeOut 1s ease 6s forwards;
         }
         
+        .quick-nav {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 20px;
+            gap: 10px;
+        }
+        
+        .quick-nav-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 8px;
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #495057;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .quick-nav-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            text-decoration: none;
+        }
+        
+        .quick-nav-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .quick-nav-btn i {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+        
+        .quick-nav-btn span {
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+        }
+        
+        .quick-nav-btn small {
+            font-size: 0.7rem;
+            opacity: 0.8;
+        }
+        
+        .install-btn {
+            margin: 10px 0;
+            padding: 0 20px;
+        }
+        
+        .install-btn button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+        
+        .install-btn button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
         @keyframes fadeOut {
             to {
                 opacity: 0;
@@ -181,19 +267,17 @@
         
         .success-toast {
             position: fixed;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 20px;
+            right: 20px;
             background: var(--success-color);
             color: white;
             padding: 15px 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-            z-index: 2000;
-            animation: slideDown 0.3s ease;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
         }
         
-        @keyframes slideDown {
+        @keyframes slideIn {
             from {
                 transform: translate(-50%, -100%);
                 opacity: 0;
@@ -308,6 +392,32 @@
         <!-- Header -->
         <div class="header">
             <h1><i class="bi bi-droplet-fill"></i> Quick Milk Entry</h1>
+        </div>
+        
+        <!-- Quick Navigation Buttons -->
+        <div class="quick-nav">
+            <a href="{{ url_for('milk.mobile_entry') }}" class="quick-nav-btn active">
+                <i class="bi bi-lightning-fill"></i>
+                <span>QE</span>
+                <small>Quick Entry</small>
+            </a>
+            <a href="{{ url_for('milk.milk_import') }}" class="quick-nav-btn">
+                <i class="bi bi-download"></i>
+                <span>MIP</span>
+                <small>Milk Import</small>
+            </a>
+            <a href="{{ url_for('milk.milk_sale_import') }}" class="quick-nav-btn">
+                <i class="bi bi-upload"></i>
+                <span>MIS</span>
+                <small>Milk Sale</small>
+            </a>
+        </div>
+        
+        <!-- PWA Install Button -->
+        <div id="installButton" class="install-btn" style="display: none;">
+            <button class="btn btn-primary btn-lg w-100" onclick="installApp()">
+                <i class="bi bi-download"></i> Install App
+            </button>
         </div>
         
         <!-- Status Bar -->
@@ -871,14 +981,53 @@
         e.preventDefault();
         deferredPrompt = e;
         
-        // Show install button (optional)
+        // Show install button
+        document.getElementById('installButton').style.display = 'block';
         console.log('PWA install prompt ready');
     });
+    
+    function installApp() {
+        const installButton = document.getElementById('installButton');
+        
+        if (!deferredPrompt) {
+            updateStatus('Installation not available', 'error');
+            return;
+        }
+        
+        // Show the install prompt
+        deferredPrompt.prompt();
+        
+        // Wait for the user to respond to the prompt
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted the A2HS prompt');
+                updateStatus('Installing app...', 'success');
+                installButton.style.display = 'none';
+            } else {
+                console.log('User dismissed the A2HS prompt');
+                updateStatus('Installation cancelled', 'info');
+            }
+            deferredPrompt = null;
+        });
+    }
     
     // Handle app install
     window.addEventListener('appinstalled', () => {
         console.log('PWA was installed');
         updateStatus('App installed successfully!', 'success');
+        document.getElementById('installButton').style.display = 'none';
+        
+        // Show success message
+        showSuccessToast('🎉 App installed! You can now open it from your home screen.');
+    });
+    
+    // Check if app is already installed
+    window.addEventListener('load', () => {
+        // Hide install button if already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            document.getElementById('installButton').style.display = 'none';
+            updateStatus('App is installed', 'success');
+        }
     });
 </script>
 </body>
