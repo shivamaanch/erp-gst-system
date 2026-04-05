@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for
 from flask_login import login_required, current_user
 from extensions import db
-from models import Company, FinancialYear, User, Bill, MilkTransaction, JournalHeader
+from models import Company, FinancialYear, User, Bill, JournalHeader
 from werkzeug.security import generate_password_hash
 from sqlalchemy import text
 
@@ -211,7 +211,7 @@ def delete(company_id):
         tables_to_delete = [
             ("bill_items", "bill_id IN (SELECT id FROM bills WHERE company_id = :cid)"),
             ("bills", "company_id = :cid"),
-            ("milk_transactions", "company_id = :cid"),
+            ("milk_transactions", "company_id = :cid"),  # Keep as raw SQL
             ("journal_lines", "journal_header_id IN (SELECT id FROM journal_headers WHERE company_id = :cid)"),
             ("journal_headers", "company_id = :cid"),
             ("cash_book", "company_id = :cid"),
@@ -220,7 +220,7 @@ def delete(company_id):
             ("accounts", "company_id = :cid"),
             ("financial_years", "company_id = :cid"),
             ("user_companies", "company_id = :cid"),
-            ("company_access_log", "company_id = :cid"),  # Add this missing table
+            ("company_access_log", "company_id = :cid"),
             ("gst_returns", "company_id = :cid"),
             ("tds_returns", "company_id = :cid"),
             ("bank_accounts", "company_id = :cid"),

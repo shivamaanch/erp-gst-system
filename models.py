@@ -489,7 +489,7 @@ class MilkTransaction(db.Model):
     company_id  = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
     fin_year    = db.Column(db.String(10), nullable=False)
     voucher_no  = db.Column(db.String(50), index=True)  # Unique voucher number for tracking
-    account_id   = db.Column(db.Integer, db.ForeignKey("accounts.id"), nullable=False)  
+    account_id   = db.Column(db.Integer, db.ForeignKey("accounts.id"))  # Made optional for production compatibility  
     txn_date    = db.Column(db.Date, nullable=False)
     shift       = db.Column(db.String(10), default="Morning")     # Morning/Evening
     txn_type    = db.Column(db.String(20), nullable=False)        # Purchase/Sale

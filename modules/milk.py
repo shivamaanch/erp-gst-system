@@ -923,7 +923,6 @@ def mobile_save_entry():
         milk_txn = MilkTransaction(
             company_id=cid,
             fin_year=fy,
-            account_id=account_id,
             txn_date=txn_date,
             shift="Mobile",  # Indicate mobile entry
             txn_type=txn_type,
@@ -1125,9 +1124,8 @@ def get_last_entry():
         # Get last entry
         sql = """
         SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.clr, t.rate, t.amount, t.txn_type,
-               a.name as party_name
+               'Unknown' as party_name
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year
         ORDER BY t.txn_date DESC, t.id DESC
         LIMIT 1
