@@ -38,7 +38,6 @@ def _ensure_sqlite_milk_transactions_schema(conn):
             company_id INTEGER NOT NULL,
             fin_year TEXT NOT NULL,
             voucher_no TEXT,
-            account_id INTEGER NOT NULL,
             txn_date DATE NOT NULL,
             shift TEXT DEFAULT 'Morning',
             txn_type TEXT NOT NULL,
@@ -52,7 +51,6 @@ def _ensure_sqlite_milk_transactions_schema(conn):
             narration TEXT,
             bill_id INTEGER,
             FOREIGN KEY (company_id) REFERENCES companies(id),
-            FOREIGN KEY (account_id) REFERENCES accounts(id),
             FOREIGN KEY (chart_id) REFERENCES milk_rate_charts(id),
             FOREIGN KEY (bill_id) REFERENCES bills(id)
         )
@@ -65,36 +63,56 @@ def _ensure_sqlite_milk_transactions_schema(conn):
 
     cols = conn.execute(text("PRAGMA table_info(milk_transactions)")).fetchall()
     col_names = [c[1] for c in cols]
-    if "party_id" not in col_names:
+    
+    # Check if account_id exists and needs to be removed
+    if "account_id" in col_names:
+        print("🔧 Removing account_id column from milk_transactions (SQLite)")
+        # SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+        conn.execute(text("ALTER TABLE milk_transactions RENAME TO milk_transactions_old"))
+        conn.execute(text(create_sql))
+        
+        # Copy data excluding account_id
+        old_cols = conn.execute(text("PRAGMA table_info(milk_transactions_old)")).fetchall()
+        old_col_names = [c[1] for c in old_cols if c[1] != "account_id"]
+        
+        if old_col_names:
+            cols_str = ", ".join(old_col_names)
+            conn.execute(text(f"""
+                INSERT INTO milk_transactions ({cols_str})
+                SELECT {cols_str} FROM milk_transactions_old
+            """))
+        
+        conn.execute(text("DROP TABLE milk_transactions_old"))
+        print("✅ Removed account_id column from milk_transactions")
         return
+    
+    # Handle party_id migration if needed
+    if "party_id" in col_names:
+        print("🔧 Migrating milk_transactions: removing legacy party_id column (SQLite)")
+        conn.execute(text("ALTER TABLE milk_transactions RENAME TO milk_transactions_old"))
+        conn.execute(text(create_sql))
 
-    print("🔧 Migrating milk_transactions: removing legacy party_id column (SQLite)")
+        old_cols = conn.execute(text("PRAGMA table_info(milk_transactions_old)")).fetchall()
+        old_col_names = {c[1] for c in old_cols}
 
-    conn.execute(text("ALTER TABLE milk_transactions RENAME TO milk_transactions_old"))
-    conn.execute(text(create_sql))
-
-    old_cols = conn.execute(text("PRAGMA table_info(milk_transactions_old)")).fetchall()
-    old_col_names = {c[1] for c in old_cols}
-
-    new_cols = [
-        "id",
-        "company_id",
-        "fin_year",
-        "voucher_no",
-        "account_id",
-        "txn_date",
-        "shift",
-        "txn_type",
-        "qty_liters",
-        "fat",
-        "snf",
-        "clr",
-        "rate",
-        "amount",
-        "chart_id",
-        "narration",
-        "bill_id",
-    ]
+        new_cols = [
+            "id",
+            "company_id",
+            "fin_year",
+            "voucher_no",
+            "txn_date",
+            "shift",
+            "txn_type",
+            "qty_liters",
+            "fat",
+            "snf",
+            "clr",
+            "rate",
+            "amount",
+            "chart_id",
+            "narration",
+            "bill_id",
+        ]
 
     select_expr = []
     for col in new_cols:
