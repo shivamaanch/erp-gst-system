@@ -213,12 +213,16 @@ def delete_invoice(bill_id):
             # Delete the header
             db.session.delete(header)
         
-        # Find and delete any milk entry linked to this bill (not just clear bill_id)
-        from models import MilkTransaction
-        linked_milk = MilkTransaction.query.filter_by(bill_id=bill_id).first()
-        if linked_milk:
-            print(f"DEBUG: Deleting linked milk entry {linked_milk.id}")
-            db.session.delete(linked_milk)
+        # Find and delete any milk entry linked to this bill using raw SQL
+        from sqlalchemy import text
+        try:
+            db.session.execute(text("""
+                DELETE FROM milk_transactions 
+                WHERE bill_id = :bill_id
+            """), {"bill_id": bill_id})
+            print(f"DEBUG: Deleted linked milk entries for bill {bill_id}")
+        except Exception as e:
+            print(f"WARNING: Could not delete milk transactions for bill {bill_id}: {e}")
         
         # Delete the bill
         db.session.delete(bill)
@@ -249,14 +253,31 @@ def list_invoices():
     bills = q.order_by(Bill.bill_date.desc()).all()
     
     # Attach account name for milk bills (where bill comes from milk transaction)
-    from models import MilkTransaction, Account
+    from sqlalchemy import text
     for bill in bills:
-        # Check if this bill is linked to a milk transaction
-        milk_txn = MilkTransaction.query.filter_by(bill_id=bill.id).first()
-        if milk_txn and milk_txn.account_id:
-            account = Account.query.get(milk_txn.account_id)
-            bill.supplier_name = account.name if account else "N/A"
-        else:
+        # Check if this bill is linked to a milk transaction using raw SQL
+        try:
+            milk_result = db.session.execute(text("""
+                SELECT narration FROM milk_transactions 
+                WHERE bill_id = :bill_id LIMIT 1
+            """), {"bill_id": bill.id})
+            milk_row = milk_result.fetchone()
+            
+            if milk_row and milk_row.narration:
+                # Extract party name from narration
+                narration = milk_row.narration
+                if "Party:" in narration:
+                    parts = narration.split("|")
+                    for part in parts:
+                        if "Party:" in part:
+                            bill.supplier_name = part.split("Party:")[1].strip()
+                            break
+                else:
+                    bill.supplier_name = "Unknown"
+            else:
+                bill.supplier_name = "N/A"
+        except Exception as e:
+            print(f"Error getting milk transaction for bill {bill.id}: {e}")
             bill.supplier_name = "N/A"
     
     return render_template("enhanced_invoice/list.html", bills=bills, btype=btype)
@@ -272,16 +293,36 @@ def print_invoice(bill_id):
     # Get bill items
     items = BillItem.query.filter_by(bill_id=bill_id).all()
     
-    # Check if this is a milk bill and get account name
-    from models import MilkTransaction, Account
-    milk_txn = MilkTransaction.query.filter_by(bill_id=bill_id).first()
-    account = None
-    if milk_txn and milk_txn.account_id:
-        account = Account.query.get(milk_txn.account_id)
+    # Check if this is a milk bill and get account name using raw SQL
+    from sqlalchemy import text
+    try:
+        milk_result = db.session.execute(text("""
+            SELECT narration FROM milk_transactions 
+            WHERE bill_id = :bill_id LIMIT 1
+        """), {"bill_id": bill_id})
+        milk_row = milk_result.fetchone()
+        
+        if milk_row and milk_row.narration:
+            # Extract party name from narration
+            narration = milk_row.narration
+            if "Party:" in narration:
+                parts = narration.split("|")
+                for part in parts:
+                    if "Party:" in part:
+                        party_name = part.split("Party:")[1].strip()
+                        # Create a simple party-like object
+                        class SimpleParty:
+                            def __init__(self, name):
+                                self.name = name
+                        party = SimpleParty(party_name)
+                        break
+    except Exception as e:
+        print(f"Error getting milk transaction for bill {bill_id}: {e}")
+        party = None
     
     return render_template("enhanced_invoice/print_pdf.html",
                          bill=bill, party=party, company=company,
-                         items=items, account=account)
+                         items=items)
 
 @enhanced_invoice_bp.route("/enhanced-invoice/export/<int:bill_id>/<format>")
 @login_required
