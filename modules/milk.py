@@ -198,13 +198,13 @@ def entry_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = row.account_id
+                self.account_id = getattr(row, 'account_id', None)
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -310,13 +310,13 @@ def purchase_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = row.account_id
+                self.account_id = getattr(row, 'account_id', None)
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -407,13 +407,13 @@ def sale_list():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = row.account_id
+                self.account_id = getattr(row, 'account_id', None)
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -506,13 +506,13 @@ def milk_statement():
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = row.account_id
+                self.account_id = getattr(row, 'account_id', None)
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(row.account_name or "Cash Account", row.account_id) if row.account_name else None
+                self.account = SimpleAccount(row.account_name or "Cash Account", getattr(row, 'account_id', None)) if row.account_name else None
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
@@ -1714,9 +1714,12 @@ def edit_entry(txn_id):
         print(f"  ID: {row.id}, FAT: {row.fat}, SNF: {row.snf}, CLR: {getattr(row, 'clr', 'N/A')}, RATE: {row.rate}, AMOUNT: {row.amount}")
         
         # Get account information for this transaction
-        account = Account.query.filter_by(id=row.account_id).first()
-        account_name = account.name if account else "Cash Account"
-        print(f"  Account: {account_name} (ID: {row.account_id})")
+        account_id = getattr(row, 'account_id', None)
+        account_name = "Cash Account"
+        if account_id:
+            account = Account.query.filter_by(id=account_id).first()
+            account_name = account.name if account else "Cash Account"
+        print(f"  Account: {account_name} (ID: {account_id})")
 
         # Get associated bill (if any) so we can show / edit invoice number
         bill = None
@@ -1733,13 +1736,13 @@ def edit_entry(txn_id):
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = row.account_id
+                self.account_id = getattr(row, 'account_id', None)
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(account_name, row.account_id)
+                self.account = SimpleAccount(account_name, getattr(row, 'account_id', None))
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
