@@ -592,7 +592,7 @@ def milk_import():
     # Use raw SQL to avoid account_id column issues
     sql = """
     SELECT t.id, t.txn_date, t.shift, t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, 
-           t.rate, t.amount, t.chart_id, t.narration, 'Unknown' as supplier_name
+           t.rate, t.amount, t.chart_id, t.narration
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
     """
@@ -601,7 +601,7 @@ def milk_import():
     params = {"company_id": cid, "fin_year": fy}
     
     if party_search:
-        sql += " AND 'Unknown' ILIKE :party_search"
+        sql += " AND t.narration ILIKE :party_search"
         params["party_search"] = f"%{party_search}%"
     
     if from_date:
@@ -672,6 +672,19 @@ def milk_import():
         bf_kg = p.qty_liters * p.fat / 100
         snf_kg = p.qty_liters * p.snf / 100
         
+        # Extract party name from narration
+        supplier_name = "Unknown"
+        if p.narration and "Party:" in p.narration:
+            # Extract party name from "Mobile Purchase | Party: Party Name | ..."
+            parts = p.narration.split("|")
+            for part in parts:
+                if "Party:" in part:
+                    supplier_name = part.split("Party:")[1].strip()
+                    break
+        elif p.narration:
+            # Fallback: use first part of narration
+            supplier_name = p.narration.split("|")[0].strip()
+        
         # Handle txn_date which might be string or date object
         if isinstance(p.txn_date, str):
             txn_date_str = p.txn_date
@@ -681,7 +694,7 @@ def milk_import():
         data.append({
             'sr_no': i,
             'date': txn_date_str,
-            'supplier': p.supplier_name,
+            'supplier': supplier_name,
             'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
             'qty': p.qty_liters,
             'rate': rate_per_liter,  # Use calculated rate per liter
@@ -712,7 +725,7 @@ def milk_sale_import():
     # Build base query for milk sales using raw SQL
     sql = """
     SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, 
-           t.rate, t.amount, t.chart_id, 'Unknown' as supplier_name
+           t.rate, t.amount, t.chart_id, t.narration
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
     """
@@ -721,7 +734,7 @@ def milk_sale_import():
     params = {"company_id": cid, "fin_year": fy}
     
     if party_search:
-        sql += " AND 'Unknown' ILIKE :party_search"
+        sql += " AND t.narration ILIKE :party_search"
         params["party_search"] = f"%{party_search}%"
     
     if from_date:
@@ -792,6 +805,19 @@ def milk_sale_import():
         bf_kg = p.qty_liters * p.fat / 100
         snf_kg = p.qty_liters * p.snf / 100
         
+        # Extract buyer name from narration
+        buyer_name = "Unknown"
+        if p.narration and "Party:" in p.narration:
+            # Extract party name from "Mobile Sale | Party: Party Name | ..."
+            parts = p.narration.split("|")
+            for part in parts:
+                if "Party:" in part:
+                    buyer_name = part.split("Party:")[1].strip()
+                    break
+        elif p.narration:
+            # Fallback: use first part of narration
+            buyer_name = p.narration.split("|")[0].strip()
+        
         # Handle txn_date which might be string or date object
         if isinstance(p.txn_date, str):
             txn_date_str = p.txn_date
@@ -801,7 +827,7 @@ def milk_sale_import():
         data.append({
             'sr_no': i,
             'date': txn_date_str,
-            'buyer': p.supplier_name,
+            'buyer': buyer_name,
             'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
             'qty': p.qty_liters,
             'rate': rate_per_liter,  # Use calculated rate per liter
@@ -942,7 +968,7 @@ def mobile_save_entry():
             "rate": rate,
             "amount": amount,
             "chart_id": None,
-            "narration": f"Mobile {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+            "narration": f"Mobile {txn_type} | Party: {party_name} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
         })
         
         milk_txn_id = milk_result.scalar()
