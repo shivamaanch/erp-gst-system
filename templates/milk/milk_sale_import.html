@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Milk Sale Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold">📊 Milk Sale Report</h4>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-success" onclick="exportToExcel()">
+      <i class="bi bi-file-earmark-excel"></i> Export Excel
+    </button>
+    <button type="button" class="btn btn-danger" onclick="exportToPDF()">
+      <i class="bi bi-file-earmark-pdf"></i> Download PDF
+    </button>
+    <button type="button" class="btn btn-primary" onclick="window.print()">
+      <i class="bi bi-printer"></i> Print
+    </button>
+  </div>
+</div>
+
+<!-- Filter Section -->
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">🔍 Buyer Search</label>
+        <input type="text" name="party_search" class="form-control" placeholder="Search buyer..." value="{{ party_search }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">📅 From Date</label>
+        <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">📅 To Date</label>
+        <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i> Filter
+        </button>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">&nbsp;</label>
+        <div class="btn-group w-100">
+          <button type="button" class="btn btn-outline-secondary" onclick="setLast10Days()">
+            <i class="bi bi-calendar-week"></i> Last 10 Days
+          </button>
+          <button type="button" class="btn btn-outline-danger" onclick="clearFilters()">
+            <i class="bi bi-x-circle"></i> Clear
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-3">
+  <div class="col-md-3">
+    <div class="card border-primary">
+      <div class="card-body text-center">
+        <h6 class="text-primary mb-2">🥛 Total Quantity (L)</h6>
+        <h3 class="fw-bold text-primary">{{ "{:,.2f}".format(total_qty) }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-success">
+      <div class="card-body text-center">
+        <h6 class="text-success mb-2">💰 Total Amount</h6>
+        <h3 class="fw-bold text-success">₹{{ "{:,.2f}".format(total_amount) }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-warning">
+      <div class="card-body text-center">
+        <h6 class="text-warning mb-2">📊 Avg Rate/L</h6>
+        <h3 class="fw-bold text-warning">₹{{ "{:,.2f}".format(avg_rate) }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-info">
+      <div class="card-body text-center">
+        <h6 class="text-info mb-2">📋 Total Records</h6>
+        <h3 class="fw-bold text-info">{{ data|length }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-striped table-hover" id="saleTable">
+        <thead class="table-dark sticky-top">
+          <tr>
+            <th width="4%" class="text-center">Sr No</th>
+            <th width="8%" class="text-center">Date</th>
+            <th width="15%" class="text-start">Buyer</th>
+            <th width="35%" class="text-start">Description</th>
+            <th width="8%" class="text-center">Qty (L)</th>
+            <th width="10%" class="text-center">Rate</th>
+            <th width="12%" class="text-end">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in data %}
+          <tr>
+            <td class="text-center">{{ item.sr_no }}</td>
+            <td class="text-center">{{ item.date }}</td>
+            <td class="text-start">{{ item.buyer }}</td>
+            <td class="text-start">
+              <small class="text-muted">{{ item.description }}</small>
+            </td>
+            <td class="text-center">{{ "{:,.2f}".format(item.qty) }}</td>
+            <td class="text-center">₹{{ "{:,.2f}".format(item.rate) }}</td>
+            <td class="text-end fw-bold">₹{{ "{:,.2f}".format(item.amount) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox display-4 d-block mb-2"></i>
+              No milk sale records found. Try adjusting the filters.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-secondary fw-bold">
+          <tr>
+            <td colspan="4" class="text-end">TOTALS:</td>
+            <td class="text-center">{{ "{:,.2f}".format(total_qty) }}</td>
+            <td class="text-center">₹{{ "{:,.2f}".format(avg_rate) }}</td>
+            <td class="text-end">₹{{ "{:,.2f}".format(total_amount) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function setLast10Days() {
+  const today = new Date();
+  const tenDaysAgo = new Date(today);
+  tenDaysAgo.setDate(today.getDate() - 10);
+  
+  document.querySelector('input[name="from_date"]').value = tenDaysAgo.toISOString().split('T')[0];
+  document.querySelector('input[name="to_date"]').value = today.toISOString().split('T')[0];
+  
+  // Submit form
+  document.querySelector('form').submit();
+}
+
+function clearFilters() {
+  document.querySelector('input[name="party_search"]').value = '';
+  document.querySelector('input[name="from_date"]').value = '';
+  document.querySelector('input[name="to_date"]').value = '';
+  // Remove last_10_days flag if exists
+  const existing = document.querySelector('input[name="last_10_days"]');
+  if (existing) existing.remove();
+  window.location.href = "{{ url_for('milk.milk_sale_import') }}";
+}
+
+function exportToPDF() {
+  // Create a clean filename
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `Milk_Sale_Report_${today}`;
+  
+  // Set document title for clean filename
+  const originalTitle = document.title;
+  document.title = filename;
+  
+  // Add print-specific styles
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      .btn, .no-print { display: none !important; }
+      .card { box-shadow: none !important; border: 1px solid #000 !important; }
+      .form-control { display: none !important; }
+      .card-body { padding: 0.5rem !important; }
+      .table-responsive { overflow: visible !important; }
+      .sticky-top { position: static !important; }
+      @page { size: A4 landscape; margin: 0.5in; }
+      @page :header { display: none; }
+      @page :footer { display: none; }
+      body { font-size: 10pt; line-height: 1.2; }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Trigger print dialog
+  setTimeout(() => {
+    window.print();
+    
+    // Clean up
+    document.head.removeChild(style);
+    document.title = originalTitle;
+  }, 100);
+}
+
+function exportToExcel() {
+  // Get table data
+  const table = document.getElementById('saleTable');
+  const headerRows = table.querySelectorAll('thead tr');
+  const bodyRows = table.querySelectorAll('tbody tr');
+  const footerRows = table.querySelectorAll('tfoot tr');
+  
+  let csvContent = [];
+  
+  // Headers
+  const headers = ['Sr No', 'Date', 'Buyer', 'Description', 'Qty (L)', 'Rate', 'Amount'];
+  csvContent.push(headers.join(','));
+  
+  // Data rows
+  bodyRows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    const rowData = Array.from(cells).map(cell => {
+      let text = cell.textContent.trim().replace(/,/g, ''); // Remove commas
+      // Remove ₹ symbol for Excel compatibility
+      text = text.replace(/₹/g, '');
+      return `"${text}"`;
+    });
+    csvContent.push(rowData.join(','));
+  });
+  
+  // Totals row - ensure it has 7 columns
+  if (footerRows.length > 0) {
+    const footerRow = footerRows[0];
+    const cells = footerRow.querySelectorAll('td');
+    
+    // Create 7 columns for totals
+    const footerData = [];
+    
+    // First 4 columns: empty, empty, empty, "TOTALS:"
+    footerData.push('""'); // Column A
+    footerData.push('""'); // Column B
+    footerData.push('""'); // Column C
+    footerData.push('"TOTALS:"'); // Column D
+    
+    // Last 3 columns: actual values from template variables
+    const totalQty = "{{ '{:,.2f}'.format(total_qty) }}";
+    const avgRate = "{{ '{:,.2f}'.format(avg_rate) }}";
+    const totalAmount = "{{ '{:,.2f}'.format(total_amount) }}";
+    
+    footerData.push(`"${totalQty}"`); // Column E
+    footerData.push(`"${avgRate}"`); // Column F
+    footerData.push(`"${totalAmount}"`); // Column G
+    
+    csvContent.push(footerData.join(','));
+  }
+  
+  // Create blob and download
+  const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `milk_sale_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+  .table th {
+    background-color: #343a40 !important;
+    color: white !important;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
+    font-weight: 600;
+  }
+  
+  .table td {
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
+    vertical-align: middle;
+  }
+  
+  .sticky-top {
+    z-index: 1000;
+  }
+  
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+  
+  .form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .btn {
+    border-radius: 0.375rem;
+  }
+  
+  @media print {
+    .btn, .no-print { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #000 !important; }
+    .form-control { display: none !important; }
+    .card-body { padding: 0.5rem !important; }
+    .table-responsive { overflow: visible !important; }
+    .sticky-top { position: static !important; }
+    @page { size: A4 landscape; margin: 0.5in; }
+    @page :header { display: none; }
+    @page :footer { display: none; }
+    body { font-size: 10pt; line-height: 1.2; }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,27 @@
+{
+  "name": "Milk Entry - Quick ERP",
+  "short_name": "Milk Entry",
+  "description": "Fast milk entry system for dairy businesses",
+  "start_url": "/milk/mobile-entry",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007bff",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiByeD0iMjQiIGZpbGw9InVybCgjZ3JhZGllbnQwX2xpbmVhcl8xXzApIi8+CjxwYXRoIGQ9Ik05NiA0OEM3Ni4xMTg0IDQ4IDYwIDY0LjExODQgNjAgODRWNzJINjhWODRDNjggNzMuMDc4MiA3My4wNzgyIDY4IDg0IDY4SDEwOFY4MEMxMTguOTIyIDgwIDEyNCA3My4wNzgyIDEyNCA4NFYxMjhDMTI0IDEzNy44ODIgMTA3Ljg4MiAxNDQgOTYgMTQ0Qzg0LjExODQgMTQ0IDY4IDEzNy44ODIgNjggMTI4Vjg0QzY4IDY0LjExODQgNzYuMTE4NCA0OCA5NiA0OFoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik04NCA5NkgxMDhWMTIwSDg0Vjk2WiIgZmlsbD0id2hpdGUiLz4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZGllbnQwX2xpbmVhcl8xXzAiIHgxPSIwIiB5MT0iMCIgeDI9IjE5MiIgeTI9IjE5MiI+CjxzdG9wIHN0b3AtY29sb3I9IiM2NjdlZWEiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNzY0YmEyIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iNjQiIGZpbGw9InVybCgjZ3JhZGllbnQwX2xpbmVhcl8xXzApIi8+CjxwYXRoIGQ9Ik0yNTYgMTI4QzIwMy4wNSAxMjggMTYwIDE3MS4wNSAxNjAgMjI0VjE5MkgxOTJWMjI0QzE5MiAyMDIuMDUgMjAyLjA1IDE5MiAyMjQgMTkySDI4OFYyMjRDMjg4IDIwMi4wNSAyOTguMDUgMTkyIDMyMCAxOTJWMjI0QzMyMCAxNzEuMDUgMjc2Ljk1IDEyOCAyNTYgMTI4WiIgZmlsbD0id2hpdGUiLz4KPHA+PC9wPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJncmFkaWVudDBfbGluZWFyXzFfMCIgeDE9IjAiIHkxPSIwIiB4Mj0iNTEyIiB5Mj0iNTEyIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzY2N2VlYSIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM3NjRiYTIiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8L3N2Zz4=",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false
+}

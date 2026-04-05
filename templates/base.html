@@ -79,6 +79,11 @@
     {% endif %}
     {% endif %}
 
+    <div class="sidebar-section">📱 Quick Entry</div>
+    <a href="{{ url_for('milk.mobile_entry') }}" class="nav-link {{ 'active' if request.endpoint=='milk.mobile_entry' }}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
+      <i class="bi bi-lightning-fill"></i> Quick Entry
+    </a>
+    
     <div class="sidebar-section">Quick Entry</div>
     <a href="{{ url_for('cash_book.quick_entry') }}" class="nav-link {{ 'active' if request.endpoint=='cash_book.quick_entry' }}">
       <i class="bi bi-cash-stack"></i> Quick Cash Entry</a>
@@ -102,6 +107,8 @@
       <i class="bi bi-journal-text"></i> Milk Statement</a>
     <a href="{{ url_for('milk.milk_import') }}" class="nav-link {{ 'active' if request.endpoint=='milk.milk_import' }}">
       <i class="bi bi-file-earmark-excel"></i> Milk Import</a>
+    <a href="{{ url_for('milk.milk_sale_import') }}" class="nav-link {{ 'active' if request.endpoint=='milk.milk_sale_import' }}">
+      <i class="bi bi-file-earmark-arrow-up"></i> Milk Sale Import</a>
     <a href="{{ url_for('milk.purchase_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.purchase_list' }}">
       <i class="bi bi-cart-arrow-down"></i> Milk Purchase</a>
     <a href="{{ url_for('milk.sale_list') }}" class="nav-link {{ 'active' if request.endpoint=='milk.sale_list' }}">

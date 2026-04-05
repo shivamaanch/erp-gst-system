@@ -150,6 +150,15 @@ def quick_ledger():
         opening = float(account.opening_dr or 0) - float(account.opening_cr or 0)
         txn_bal = account_txn_bal.get(account.id, 0.0)
         
+        # Check if this is a milk-related account
+        is_milk = False
+        if account.name:
+            name_lower = account.name.lower()
+            if any(keyword in name_lower for keyword in ['milk', 'purchase', 'sale']):
+                is_milk = True
+        if account.group_name and 'milk' in account.group_name.lower():
+            is_milk = True
+        
         all_ledgers.append({
             'id': account.id,
             'name': account.name,
@@ -157,13 +166,21 @@ def quick_ledger():
             'entity': 'account',
             'group_name': account.group_name or '',
             'account_type': account.account_type or '',
-            'balance': round(opening + txn_bal, 2)
+            'balance': round(opening + txn_bal, 2),
+            'is_milk': is_milk
         })
     
     # Add parties with actual calculated balance
     for party in parties:
         opening = float(party.opening_balance or 0) * (1 if party.balance_type == 'Dr' else -1)
         bill_bal = party_bill_totals.get(party.id, 0.0)
+        
+        # Check if this party has milk transactions
+        is_milk = False
+        if party.name:
+            name_lower = party.name.lower()
+            if any(keyword in name_lower for keyword in ['milk', 'purchase', 'sale']):
+                is_milk = True
         
         all_ledgers.append({
             'id': party.id,
@@ -173,13 +190,112 @@ def quick_ledger():
             'party_type': party.party_type or '',
             'gstin': party.gstin or '',
             'phone': party.phone or '',
-            'balance': round(opening + bill_bal, 2)
+            'balance': round(opening + bill_bal, 2),
+            'is_milk': is_milk
         })
     
     # Sort by name
     all_ledgers.sort(key=lambda x: x['name'].lower())
     
     return render_template("reports/quick_ledger.html", accounts=all_ledgers)
+
+@reports_bp.route("/reports/delete-transaction", methods=["POST"])
+@login_required
+def delete_transaction():
+    """Delete a transaction completely from all places"""
+    try:
+        cid = session.get("company_id")
+        fy = session.get("fin_year")
+        
+        data = request.get_json()
+        voucher_no = data.get("voucher_no", "")
+        transaction_date = data.get("transaction_date", "")
+        entity_id = data.get("entity_id", 0)
+        entity_type = data.get("entity_type", "")
+        
+        if not voucher_no:
+            return jsonify({"success": False, "message": "Voucher number is required"})
+        
+        print(f"DEBUG: Deleting transaction - Voucher: {voucher_no}, Date: {transaction_date}, Entity: {entity_id} ({entity_type})")
+        
+        # Find the journal header for this voucher
+        from models import JournalHeader, JournalLine, Bill, BillItem, MilkTransaction, CashBook
+        
+        journal_header = JournalHeader.query.filter_by(
+            company_id=cid,
+            voucher_no=voucher_no
+        ).first()
+        
+        if not journal_header:
+            return jsonify({"success": False, "message": "Transaction not found"})
+        
+        print(f"DEBUG: Found journal header {journal_header.id}")
+        
+        # Delete all journal lines for this header
+        journal_lines = JournalLine.query.filter_by(journal_header_id=journal_header.id).all()
+        for line in journal_lines:
+            print(f"DEBUG: Deleting journal line {line.id}")
+            db.session.delete(line)
+        
+        # Delete the journal header
+        print(f"DEBUG: Deleting journal header {journal_header.id}")
+        db.session.delete(journal_header)
+        
+        # Find and delete any bills linked to this voucher
+        bills = Bill.query.filter(
+            Bill.company_id == cid,
+            Bill.narration.like(f"%{voucher_no}%")
+        ).all()
+        
+        for bill in bills:
+            print(f"DEBUG: Deleting bill {bill.id} - {bill.bill_no}")
+            # Delete bill items
+            BillItem.query.filter_by(bill_id=bill.id).delete()
+            # Find and delete milk transactions linked to this bill
+            milk_txns = MilkTransaction.query.filter_by(bill_id=bill.id).all()
+            for milk_txn in milk_txns:
+                print(f"DEBUG: Deleting milk transaction {milk_txn.id}")
+                db.session.delete(milk_txn)
+            # Delete the bill
+            db.session.delete(bill)
+        
+        # Find and delete milk transactions directly linked to this voucher (if no bill)
+        milk_txns = MilkTransaction.query.filter(
+            MilkTransaction.company_id == cid,
+            MilkTransaction.narration.like(f"%{voucher_no}%")
+        ).all()
+        
+        for milk_txn in milk_txns:
+            print(f"DEBUG: Deleting milk transaction {milk_txn.id} (direct)")
+            db.session.delete(milk_txn)
+        
+        # Find and delete cash book entries linked to this voucher
+        cash_entries = CashBook.query.filter(
+            CashBook.company_id == cid,
+            CashBook.voucher_no.like(f"%{voucher_no}%")
+        ).all()
+        
+        for cash_entry in cash_entries:
+            print(f"DEBUG: Deleting cash book entry {cash_entry.id}")
+            db.session.delete(cash_entry)
+        
+        # Commit all deletions
+        db.session.commit()
+        
+        print(f"DEBUG: Transaction {voucher_no} deleted successfully from all places")
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Transaction {voucher_no} deleted successfully from all records"
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"DEBUG: Error deleting transaction: {str(e)}")
+        return jsonify({
+            "success": False, 
+            "message": f"Error deleting transaction: {str(e)}"
+        })
 
 @reports_bp.route("/reports/account-ledger/<int:account_id>")
 @login_required
@@ -300,14 +416,61 @@ def account_ledger(account_id):
             else:
                 running_balance -= credit
             
+            # Check if this is a milk transaction and get details
+            qty_liters = None; fat = None; snf = None; rate = None; shift = None; bf_clr = None
+            fat_value = 0.0; snf_value = 0.0
+            
+            narration = line.narration or header.narration or ''
+            if 'milk' in narration.lower():
+                # Try to find milk transaction by matching narration pattern
+                try:
+                    # Extract voucher number from narration if it's a milk transaction
+                    import re
+                    mlk_match = re.search(r'MLK-(\d+)', narration)
+                    if mlk_match:
+                        milk_txn_id = int(mlk_match.group(1))
+                        milk_txn = MilkTransaction.query.filter_by(id=milk_txn_id, company_id=cid).first()
+                        if milk_txn:
+                            qty_liters = float(milk_txn.qty_liters) if milk_txn.qty_liters is not None else None
+                            fat = float(milk_txn.fat) if milk_txn.fat is not None else None
+                            snf = float(milk_txn.snf) if milk_txn.snf is not None else None
+                            rate = float(milk_txn.rate) if milk_txn.rate is not None else None
+                            shift = milk_txn.shift
+                            bf_clr = f"BF:{fat} / CLR:{milk_txn.clr}" if fat is not None and getattr(milk_txn, 'clr', None) is not None else None
+                            
+                            # Calculate fat and SNF values
+                            if qty_liters and (fat or snf):
+                                daily_rate = float(rate or 0)
+                                if daily_rate > 0:
+                                    try:
+                                        from modules.milk import compute_component_breakdown
+                                        calc = compute_component_breakdown(qty_liters, fat or 0, snf or 0, daily_rate)
+                                        fat_value = round(calc["bf_kgs"] * calc["bf_rate"], 2)
+                                        snf_value = round(calc["snf_kgs"] * calc["snf_rate"], 2)
+                                    except Exception:
+                                        fat_value = 0.0
+                                        snf_value = 0.0
+                except Exception:
+                    pass
+            
             transaction_data.append({
                 'date': header.voucher_date,
                 'voucher_no': header.voucher_no,
                 'type': header.voucher_type or 'Journal',
-                'narration': line.narration or header.narration or '',
+                'narration': narration,
                 'debit': debit,
                 'credit': credit,
-                'balance': running_balance
+                'balance': running_balance,
+                'qty_liters': qty_liters,
+                'fat_percentage': fat,
+                'snf_percentage': snf,
+                'rate': rate,
+                'basic_amount': debit + credit,
+                'fat_value': fat_value,
+                'snf_value': snf_value,
+                'total_amount': debit + credit,
+                'shift': shift,
+                'bf_clr': bf_clr
             })
     
     elif party:

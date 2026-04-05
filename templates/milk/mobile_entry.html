@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Milk Entry">
+    <meta name="theme-color" content="#007bff">
+    <title>Quick Milk Entry</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .mobile-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .entry-form {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .form-control {
+            font-size: 1.1rem;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+            background: white;
+        }
+        
+        .form-control.is-invalid {
+            border-color: var(--danger-color);
+            background: #fff5f5;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            padding: 12px 20px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: var(--success-color);
+            border: none;
+            padding: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+        
+        .amount-display {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+        }
+        
+        .amount-display h3 {
+            font-size: 2rem;
+            margin: 0;
+            font-weight: 700;
+        }
+        
+        .amount-display .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .last-entry {
+            background: #f8f9fa;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .fade-out {
+            animation: fadeOut 1s ease 6s forwards;
+        }
+        
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+        }
+        
+        .success-toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+            z-index: 2000;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+        
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3000;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            border-width: 0.3rem;
+        }
+        
+        .type-toggle {
+            display: flex;
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .type-toggle button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .type-toggle button.active {
+            background: white;
+            color: var(--primary-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .quick-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card .value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 480px) {
+            .mobile-container {
+                max-width: 100%;
+            }
+            
+            .header {
+                padding: 12px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .entry-form {
+                padding: 15px;
+            }
+            
+            .form-control {
+                font-size: 1rem;
+                padding: 10px 12px;
+            }
+        }
+        
+        /* PWA status bar */
+        .status-bar {
+            background: rgba(0,0,0,0.05);
+            padding: 5px 20px;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="bi bi-droplet-fill"></i> Quick Milk Entry</h1>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar" id="statusBar">
+            Ready for entry
+        </div>
+        
+        <!-- Entry Form -->
+        <div class="entry-form">
+            <!-- Last Entry Display -->
+            <div id="lastEntry" class="last-entry" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">Last Entry</small>
+                        <div id="lastEntryDetails" class="fw-bold"></div>
+                    </div>
+                    <div class="text-success">
+                        <i class="bi bi-check-circle-fill"></i> Saved
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Type Toggle -->
+            <div class="type-toggle">
+                <button type="button" class="active" id="purchaseBtn" onclick="setType('Purchase')">
+                    <i class="bi bi-cart-arrow-down"></i> Purchase
+                </button>
+                <button type="button" id="saleBtn" onclick="setType('Sale')">
+                    <i class="bi bi-cart-arrow-up"></i> Sale
+                </button>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <div class="value" id="todayCount">0</div>
+                    <div class="label">Today's Entries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="todayTotal">₹0</div>
+                    <div class="label">Today's Total</div>
+                </div>
+            </div>
+            
+            <!-- Form Fields -->
+            <form id="mobileEntryForm">
+                <div class="form-group">
+                    <label class="form-label">📅 Date</label>
+                    <input type="date" name="date" class="form-control" id="dateField" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">👤 Party</label>
+                    <div class="position-relative">
+                        <input type="text" name="party" class="form-control" id="partyField" placeholder="Type party name..." required>
+                        <div id="partySearchResults" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🥛 Qty (L)</label>
+                    <input type="number" name="qty" class="form-control" id="qtyField" step="0.01" placeholder="0.00" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🧈 FAT %</label>
+                    <input type="number" name="fat" class="form-control" id="fatField" step="0.1" placeholder="0.0" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🔬 CLR</label>
+                    <input type="number" name="clr" class="form-control" id="clrField" step="0.1" placeholder="0.0" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">💰 Rate (₹/100kg)</label>
+                    <input type="number" name="rate" class="form-control" id="rateField" step="0.01" placeholder="0.00" required>
+                </div>
+                
+                <!-- Live Amount Display -->
+                <div class="amount-display">
+                    <div class="label">Final Amount</div>
+                    <h3 id="finalAmount">₹0.00</h3>
+                </div>
+                
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="bi bi-check-circle"></i> Save Entry (Enter)
+                </button>
+            </form>
+        </div>
+        
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Saving...</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+    let currentType = 'Purchase';
+    let lastEntryData = null;
+    let searchTimeout;
+    let selectedAccountIndex = -1;
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeForm();
+        loadLastEntry();
+        loadTodayStats();
+        setupEnterKeyNavigation();
+        setupLiveCalculations();
+        setupPartySearch();
+        setupInputHandlers();
+    });
+    
+    function initializeForm() {
+        // Set today's date
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateField').value = today;
+        
+        // Focus on first field
+        document.getElementById('partyField').focus();
+    }
+    
+    function setupInputHandlers() {
+        // Handle FAT input - divide by 10 automatically
+        document.getElementById('fatField').addEventListener('input', function() {
+            const rawValue = this.value.trim();
+            const fatValue = parseFloat(rawValue);
+            
+            if (!rawValue || Number.isNaN(fatValue)) return;
+            // Preserve explicit decimal input (e.g. 3.85)
+            if (rawValue.includes('.')) return;
+            
+            // If user enters shorthand integer like 44, convert to 4.4
+            if (fatValue > 10) {
+                this.value = (fatValue / 10).toFixed(1);
+            }
+        });
+        
+        // Handle CLR input - divide by 10 automatically
+        document.getElementById('clrField').addEventListener('input', function() {
+            const rawValue = this.value.trim();
+            const clrValue = parseFloat(rawValue);
+            
+            if (!rawValue || Number.isNaN(clrValue)) return;
+            // Preserve explicit decimal input (e.g. 26.8)
+            if (rawValue.includes('.')) return;
+            
+            // If user enters 289, convert to 28.9
+            if (clrValue > 100) {
+                this.value = (clrValue / 10).toFixed(1);
+            }
+        });
+    }
+    
+    function setupPartySearch() {
+        const partyInput = document.getElementById('partyField');
+        const resultsDiv = document.getElementById('partySearchResults');
+        
+        partyInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            // Clear selection when search is forced or query is empty
+            selectedAccountIndex = -1;
+            
+            if (query.length < 1) {
+                resultsDiv.style.display = 'none';
+                selectedAccountIndex = -1;
+                return;
+            }
+            
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                console.log('Searching for:', query);
+                fetch(`/milk/accounts/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Search result:', data);
+                        if (data.success && data.accounts.length > 0) {
+                            let html = '';
+                            data.accounts.forEach((account, index) => {
+                                html += `
+                                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" 
+                                       style="padding: 8px 12px; border-bottom: 1px solid #eee;"
+                                       data-index="${index}" 
+                                       data-account-id="${account.id}" 
+                                       data-account-name="${account.name.replace(/'/g, "\\'")}"
+                                       onclick="selectPartyFromSearch(${account.id}, '${account.name.replace(/'/g, "\\'")}'); return false;">
+                                        <strong>${account.name}</strong>
+                                        <span class="badge bg-primary">${account.balance_display}</span>
+                                    </a>
+                                `;
+                            });
+                            resultsDiv.innerHTML = html;
+                            resultsDiv.style.display = 'block';
+                            selectedAccountIndex = -1;
+                        } else {
+                            resultsDiv.style.display = 'none';
+                            selectedAccountIndex = -1;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Account search error:', error);
+                        resultsDiv.style.display = 'none';
+                        selectedAccountIndex = -1;
+                    });
+            }, 300);
+        });
+        
+        // Keyboard navigation for party search
+        partyInput.addEventListener('keydown', function(e) {
+            const items = resultsDiv.querySelectorAll('.list-group-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedAccountIndex = Math.min(selectedAccountIndex + 1, items.length - 1);
+                updatePartySelection();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedAccountIndex = Math.max(selectedAccountIndex - 1, -1);
+                updatePartySelection();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedAccountIndex >= 0 && items[selectedAccountIndex]) {
+                    items[selectedAccountIndex].click();
+                } else {
+                    // Move to next field
+                    document.getElementById('qtyField').focus();
+                }
+            } else if (e.key === 'Escape') {
+                resultsDiv.style.display = 'none';
+                selectedAccountIndex = -1;
+            } else {
+                // For any other key, keep results visible if there are items
+                if (items.length > 0) {
+                    resultsDiv.style.display = 'block';
+                }
+            }
+        });
+        
+        // Hide results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!partyInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+                resultsDiv.style.display = 'none';
+                selectedAccountIndex = -1;
+            }
+        });
+    }
+    
+    function updatePartySelection() {
+        const resultsDiv = document.getElementById('partySearchResults');
+        const items = resultsDiv.querySelectorAll('.list-group-item');
+        
+        // Remove previous selection
+        items.forEach(item => item.classList.remove('active', 'bg-primary', 'text-white'));
+        
+        // Add selection to current item
+        if (selectedAccountIndex >= 0 && items[selectedAccountIndex]) {
+            items[selectedAccountIndex].classList.add('active', 'bg-primary', 'text-white');
+            items[selectedAccountIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+    
+    function selectPartyFromSearch(accountId, accountName) {
+        document.getElementById('partyField').value = accountName;
+        document.getElementById('partySearchResults').style.display = 'none';
+        console.log('Selected account:', accountName, 'ID:', accountId);
+        
+        // Move to next field
+        document.getElementById('qtyField').focus();
+    }
+    
+    function setType(type) {
+        currentType = type;
+        
+        // Update button states
+        document.getElementById('purchaseBtn').classList.toggle('active', type === 'Purchase');
+        document.getElementById('saleBtn').classList.toggle('active', type === 'Sale');
+        
+        // Update header
+        document.querySelector('.header h1').innerHTML = 
+            `<i class="bi bi-droplet-fill"></i> Quick Milk ${type}`;
+        
+        // Update status
+        updateStatus(`${type} mode - Ready for entry`);
+    }
+    
+    function setupEnterKeyNavigation() {
+        const fields = ['partyField', 'qtyField', 'fatField', 'clrField', 'rateField'];
+        
+        fields.forEach((fieldId, index) => {
+            const field = document.getElementById(fieldId);
+            
+            field.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    
+                    // Validate current field
+                    if (!field.value.trim()) {
+                        field.classList.add('is-invalid');
+                        setTimeout(() => field.classList.remove('is-invalid'), 2000);
+                        return;
+                    }
+                    
+                    // Move to next field or submit
+                    if (index < fields.length - 1) {
+                        document.getElementById(fields[index + 1]).focus();
+                    } else {
+                        // Last field - submit form
+                        submitForm();
+                    }
+                }
+            });
+            
+            // Remove invalid class on input
+            field.addEventListener('input', function() {
+                field.classList.remove('is-invalid');
+            });
+        });
+    }
+    
+    function setupLiveCalculations() {
+        const calcFields = ['qtyField', 'fatField', 'clrField', 'rateField'];
+        
+        calcFields.forEach(fieldId => {
+            document.getElementById(fieldId).addEventListener('input', calculateAmount);
+        });
+    }
+    
+    function calculateAmount() {
+        const qty = parseFloat(document.getElementById('qtyField').value) || 0;
+        const fat = parseFloat(document.getElementById('fatField').value) || 0;
+        const clr = parseFloat(document.getElementById('clrField').value) || 0;
+        const rate = parseFloat(document.getElementById('rateField').value) || 0;
+        
+        if (qty > 0 && fat > 0 && clr > 0 && rate > 0) {
+            // Calculate SNF using Richmond's formula
+            let snf;
+            if (clr > 0) {
+                const clrPart = clr / 4; // use full precision
+                snf = clrPart + (0.20 * fat) + 0.14;
+                // Cap at 15.0 to avoid unrealistic values
+                snf = Math.min(15.0, snf);
+            } else {
+                snf = 0; // No SNF if CLR is 0
+            }
+            
+            // Use same calculation as milk entry system
+            const fat_share = 0.60;
+            const snf_share = 0.40;
+            const std_fat_kg = 6.5;
+            const std_snf_kg = 8.5;
+            
+            // Calculate component rates
+            const bf_rate_raw = (rate * fat_share) / std_fat_kg;
+            const snf_rate_raw = (rate * snf_share) / std_snf_kg;
+            
+            // Calculate BF and SNF kgs
+            const bf_kgs = (qty * fat) / 100.0;
+            const snf_kgs = (qty * snf) / 100.0;
+            
+            // Calculate final amount
+            const bf_amount = bf_kgs * bf_rate_raw;
+            const snf_amount = snf_kgs * snf_rate_raw;
+            const final_amount = bf_amount + snf_amount;
+            
+            // Update display
+            document.getElementById('finalAmount').textContent = `₹${final_amount.toFixed(2)}`;
+        } else {
+            document.getElementById('finalAmount').textContent = '₹0.00';
+        }
+    }
+    
+    function submitForm() {
+        const form = document.getElementById('mobileEntryForm');
+        const formData = new FormData(form);
+        
+        // Validate all fields
+        const requiredFields = ['date', 'party', 'qty', 'fat', 'clr', 'rate'];
+        let isValid = true;
+        
+        requiredFields.forEach(fieldName => {
+            const field = document.getElementById(fieldName + 'Field');
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            }
+        });
+        
+        if (!isValid) {
+            updateStatus('Please fill all required fields', 'error');
+            return;
+        }
+        
+        // Show loading
+        document.getElementById('loadingSpinner').style.display = 'block';
+        updateStatus('Saving entry...', 'loading');
+        
+        // Prepare data
+        const data = {
+            date: formData.get('date'),
+            party: formData.get('party'),
+            qty: parseFloat(formData.get('qty')),
+            fat: parseFloat(formData.get('fat')),
+            clr: parseFloat(formData.get('clr')),
+            rate: parseFloat(formData.get('rate')),
+            type: currentType,
+            amount: parseFloat(document.getElementById('finalAmount').textContent.replace('₹', ''))
+        };
+        
+        // Send to server
+        fetch('/milk/mobile-save-entry', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            document.getElementById('loadingSpinner').style.display = 'none';
+            
+            if (result.success) {
+                // Show success
+                showSuccessToast();
+                updateStatus('Entry saved successfully!', 'success');
+                
+                // Update last entry display
+                showLastEntry(data);
+                
+                // Update stats
+                loadTodayStats();
+                
+                // Reset form
+                resetForm();
+                
+                // Focus on first field
+                setTimeout(() => {
+                    document.getElementById('partyField').focus();
+                }, 1000);
+            } else {
+                updateStatus('Error: ' + result.message, 'error');
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingSpinner').style.display = 'none';
+            updateStatus('Network error. Please try again.', 'error');
+            console.error('Error:', error);
+        });
+    }
+    
+    function resetForm() {
+        document.getElementById('mobileEntryForm').reset();
+        
+        // Keep the same date
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateField').value = today;
+        
+        // Reset amount display
+        document.getElementById('finalAmount').textContent = '₹0.00';
+        
+        // Remove any validation errors
+        document.querySelectorAll('.is-invalid').forEach(field => {
+            field.classList.remove('is-invalid');
+        });
+        
+        // Hide search results
+        document.getElementById('partySearchResults').style.display = 'none';
+    }
+    
+    function showLastEntry(data) {
+        const lastEntryDiv = document.getElementById('lastEntry');
+        const detailsDiv = document.getElementById('lastEntryDetails');
+        
+        detailsDiv.innerHTML = `
+            ${data.qty}L @ ${data.rate}/100kg | FAT: ${data.fat}% | CLR: ${data.clr}
+            <br><small>Amount: ₹${data.amount.toFixed(2)}</small>
+        `;
+        
+        lastEntryDiv.style.display = 'block';
+        lastEntryDiv.classList.add('fade-out');
+        
+        // Remove fade-out class after animation
+        setTimeout(() => {
+            lastEntryDiv.classList.remove('fade-out');
+        }, 7000);
+        
+        // Hide after 7 seconds
+        setTimeout(() => {
+            lastEntryDiv.style.display = 'none';
+        }, 7000);
+    }
+    
+    function showSuccessToast() {
+        const toast = document.createElement('div');
+        toast.className = 'success-toast';
+        toast.innerHTML = `
+            <i class="bi bi-check-circle-fill"></i> Entry saved successfully!
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    
+    function updateStatus(message, type = 'info') {
+        const statusBar = document.getElementById('statusBar');
+        statusBar.textContent = message;
+        
+        // Update color based on type
+        statusBar.style.color = type === 'error' ? 'var(--danger-color)' : 
+                              type === 'success' ? 'var(--success-color)' : 
+                              type === 'loading' ? 'var(--warning-color)' : '#666';
+    }
+    
+    function loadLastEntry() {
+        fetch('/milk/get-last-entry')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.entry) {
+                    showLastEntry(data.entry);
+                    
+                    // Update date to last entry date
+                    if (data.entry.date) {
+                        document.getElementById('dateField').value = data.entry.date;
+                    }
+                }
+            })
+            .catch(error => console.error('Error loading last entry:', error));
+    }
+    
+    function loadTodayStats() {
+        fetch('/milk/get-today-stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('todayCount').textContent = data.count;
+                    document.getElementById('todayTotal').textContent = `₹${data.total.toFixed(0)}`;
+                }
+            })
+            .catch(error => console.error('Error loading stats:', error));
+    }
+    
+    // Handle form submission
+    document.getElementById('mobileEntryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitForm();
+    });
+    
+    // PWA install prompt
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show install button (optional)
+        console.log('PWA install prompt ready');
+    });
+    
+    // Handle app install
+    window.addEventListener('appinstalled', () => {
+        console.log('PWA was installed');
+        updateStatus('App installed successfully!', 'success');
+    });
+</script>
+</body>
+</html>

@@ -604,6 +604,7 @@ def milk_import():
         MilkTransaction.clr,
         MilkTransaction.rate,
         MilkTransaction.amount,
+        MilkTransaction.chart_id,
         Account.name.label('supplier_name')
     ).join(Account, MilkTransaction.account_id == Account.id
     ).filter(
@@ -645,11 +646,45 @@ def milk_import():
     for i, p in enumerate(purchases, 1):
         # Calculate rate per liter for this transaction
         rate_per_liter = p.amount / p.qty_liters if p.qty_liters > 0 else 0
+        
+        # Get BF and SNF rates from chart if available, otherwise use the same calculation as milk entry
+        bf_rate = 0
+        snf_rate = 0
+        if p.chart_id:
+            chart = MilkRateChart.query.get(p.chart_id)
+            if chart:
+                bf_rate = chart.fat_rate
+                snf_rate = chart.snf_rate
+        else:
+            # Use the same calculation as compute_component_breakdown function
+            if p.rate > 0 and p.fat > 0 and p.snf > 0:
+                # Use the exact same formula as compute_component_breakdown
+                daily_rate = float(p.rate)
+                fat_share = 0.60
+                snf_share = 0.40
+                std_fat_kg = 6.5
+                std_snf_kg = 8.5
+                
+                # Calculate component rates (same as system formula)
+                bf_rate_raw = (daily_rate * fat_share) / std_fat_kg
+                snf_rate_raw = (daily_rate * snf_share) / std_snf_kg
+                
+                bf_rate = round(bf_rate_raw, 2)
+                snf_rate = round(snf_rate_raw, 2)
+            else:
+                # Default standard rates
+                bf_rate = 200  # Default fat rate
+                snf_rate = 100  # Default SNF rate
+        
+        # Calculate BF kg and SNF kg
+        bf_kg = p.qty_liters * p.fat / 100
+        snf_kg = p.qty_liters * p.snf / 100
+        
         data.append({
             'sr_no': i,
             'date': p.txn_date.strftime('%d-%m-%Y'),
             'supplier': p.supplier_name,
-            'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
+            'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
             'qty': p.qty_liters,
             'rate': rate_per_liter,  # Use calculated rate per liter
             'amount': p.amount
@@ -663,6 +698,504 @@ def milk_import():
                          party_search=party_search,
                          from_date=from_date,
                          to_date=to_date)
+
+@milk_bp.route("/milk/sale-import")
+@login_required
+def milk_sale_import():
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    # Get filters from request
+    party_search = request.args.get("party_search", "").strip()
+    from_date = request.args.get("from_date", "")
+    to_date = request.args.get("to_date", "")
+    last_10_days = request.args.get("last_10_days") == "1"
+    
+    # Build base query for milk sales
+    query = db.session.query(
+        MilkTransaction.id,
+        MilkTransaction.txn_date,
+        MilkTransaction.qty_liters,
+        MilkTransaction.fat,
+        MilkTransaction.snf,
+        MilkTransaction.clr,
+        MilkTransaction.rate,
+        MilkTransaction.amount,
+        MilkTransaction.chart_id,
+        Account.name.label('supplier_name')
+    ).join(Account, MilkTransaction.account_id == Account.id
+    ).filter(
+        MilkTransaction.company_id == cid,
+        MilkTransaction.fin_year == fy,
+        MilkTransaction.txn_type == 'Sale'
+    )
+    
+    # Apply filters
+    if party_search:
+        query = query.filter(Account.name.ilike(f"%{party_search}%"))
+    
+    if from_date:
+        try:
+            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            query = query.filter(MilkTransaction.txn_date >= from_date_obj)
+        except ValueError:
+            pass
+    
+    if to_date:
+        try:
+            to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+            query = query.filter(MilkTransaction.txn_date <= to_date_obj)
+        except ValueError:
+            pass
+    
+    if last_10_days:
+        ten_days_ago = date.today() - timedelta(days=10)
+        query = query.filter(MilkTransaction.txn_date >= ten_days_ago)
+    
+    # Order by date (newest first)
+    sales = query.order_by(MilkTransaction.txn_date.desc()).all()
+    
+    # Calculate totals
+    total_qty = sum(p.qty_liters for p in sales)
+    total_amount = sum(p.amount for p in sales)
+    avg_rate = (total_amount / total_qty) if total_qty > 0 else 0  # This is already per liter
+    
+    # Prepare data for template
+    data = []
+    for i, p in enumerate(sales, 1):
+        # Calculate rate per liter for this transaction
+        rate_per_liter = p.amount / p.qty_liters if p.qty_liters > 0 else 0
+        
+        # Get BF and SNF rates from chart if available, otherwise use the same calculation as milk entry
+        bf_rate = 0
+        snf_rate = 0
+        if p.chart_id:
+            chart = MilkRateChart.query.get(p.chart_id)
+            if chart:
+                bf_rate = chart.fat_rate
+                snf_rate = chart.snf_rate
+        else:
+            # Use the same calculation as compute_component_breakdown function
+            if p.rate > 0 and p.fat > 0 and p.snf > 0:
+                # Use the exact same formula as compute_component_breakdown
+                daily_rate = float(p.rate)
+                fat_share = 0.60
+                snf_share = 0.40
+                std_fat_kg = 6.5
+                std_snf_kg = 8.5
+                
+                # Calculate component rates (same as system formula)
+                bf_rate_raw = (daily_rate * fat_share) / std_fat_kg
+                snf_rate_raw = (daily_rate * snf_share) / std_snf_kg
+                
+                bf_rate = round(bf_rate_raw, 2)
+                snf_rate = round(snf_rate_raw, 2)
+            else:
+                # Default standard rates
+                bf_rate = 200  # Default fat rate
+                snf_rate = 100  # Default SNF rate
+        
+        # Calculate BF kg and SNF kg
+        bf_kg = p.qty_liters * p.fat / 100
+        snf_kg = p.qty_liters * p.snf / 100
+        
+        data.append({
+            'sr_no': i,
+            'date': p.txn_date.strftime('%d-%m-%Y'),
+            'buyer': p.supplier_name,
+            'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
+            'qty': p.qty_liters,
+            'rate': rate_per_liter,  # Use calculated rate per liter
+            'amount': p.amount
+        })
+    
+    return render_template("milk/milk_sale_import.html", 
+                         data=data, 
+                         total_qty=total_qty,
+                         total_amount=total_amount,
+                         avg_rate=avg_rate,
+                         party_search=party_search,
+                         from_date=from_date,
+                         to_date=to_date)
+
+@milk_bp.route("/mobile-entry")
+@login_required
+def mobile_entry():
+    """Mobile-optimized quick entry page"""
+    return render_template("milk/mobile_entry.html")
+
+@milk_bp.route("/mobile-save-entry", methods=["POST"])
+@login_required
+def mobile_save_entry():
+    """Save milk entry from mobile interface with ALL features from main system"""
+    try:
+        cid = session.get("company_id")
+        fy = session.get("fin_year")
+        
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['date', 'party', 'qty', 'fat', 'clr', 'rate', 'type']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({"success": False, "message": f"Missing required field: {field}"})
+        
+        # Parse and validate data
+        from datetime import datetime
+        txn_date = datetime.strptime(data['date'], "%Y-%m-%d").date()
+        qty = float(data['qty'])
+        fat = float(data['fat'])
+        clr = float(data['clr'])
+        rate = float(data['rate'])
+        party_name = data['party'].strip()
+        txn_type = data['type']
+        
+        # Validate transaction date is within financial year
+        fy_start = date(int(fy[:4]), 4, 1)
+        fy_end = date(int(fy[:4]) + 1, 3, 31)
+        if not (fy_start <= txn_date <= fy_end):
+            return jsonify({"success": False, "message": f"Date {txn_date} is outside financial year {fy}"})
+        
+        # Handle CLR conversion (if > 100, divide by 10)
+        if clr > 100:
+            clr = clr / 10.0
+        
+        # Handle FAT conversion (if > 10, divide by 10)
+        if fat > 10:
+            fat = fat / 10.0
+        
+        # Calculate SNF using Richmond's formula
+        snf = (clr / 4) + (0.20 * fat) + 0.14
+        
+        # Calculate amount using system formula
+        calc = compute_component_breakdown(qty, fat, snf, rate)
+        amount = calc["amount"]
+        
+        # Handle cash account or party account logic (SAME AS MAIN SYSTEM)
+        is_cash_account = data.get('is_cash_account', False)
+        
+        if is_cash_account:
+            # Use cash account
+            party_id = None
+            party_name = "Cash Account"
+            
+            # Get or create cash account
+            cash_account = Account.query.filter_by(company_id=cid, name="Cash Account", account_type="Cash").first()
+            if not cash_account:
+                cash_account = Account(
+                    company_id=cid,
+                    name="Cash Account",
+                    account_type="Cash",
+                    group_name="Cash-in-Hand",
+                    opening_dr=0.0,
+                    opening_cr=0.0,
+                    is_active=True
+                )
+                db.session.add(cash_account)
+                db.session.flush()
+            account_id = cash_account.id
+            account = cash_account
+        else:
+            # Find or create party account (SAME AS MAIN SYSTEM)
+            account = Account.query.filter_by(
+                company_id=cid, 
+                name=party_name,
+                is_active=True
+            ).first()
+            
+            if not account:
+                # Create new account with proper group assignment
+                account = Account(
+                    company_id=cid,
+                    name=party_name,
+                    group_name="Sundry Creditors" if txn_type == "Purchase" else "Sundry Debtors",
+                    opening_dr=0.0 if txn_type == "Purchase" else 0.0,
+                    opening_cr=0.0 if txn_type == "Purchase" else 0.0,
+                    is_active=True
+                )
+                db.session.add(account)
+                db.session.flush()
+            account_id = account.id
+        
+        # Create milk transaction (SAME AS MAIN SYSTEM)
+        from models import MilkTransaction, JournalHeader, JournalLine, Bill, BillItem
+        
+        milk_txn = MilkTransaction(
+            company_id=cid,
+            fin_year=fy,
+            account_id=account_id,
+            txn_date=txn_date,
+            shift="Mobile",  # Indicate mobile entry
+            txn_type=txn_type,
+            qty_liters=qty,
+            fat=fat,
+            snf=snf,
+            clr=clr,
+            rate=rate,
+            amount=amount,
+            chart_id=None,  # Mobile doesn't use charts for simplicity
+            narration=f"Mobile {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+        )
+        db.session.add(milk_txn)
+        db.session.flush()
+        
+        # Handle invoice creation (SAME AS MAIN SYSTEM)
+        create_invoice = data.get('create_invoice', False)
+        bill_no = None
+        
+        if create_invoice:
+            bill_type = "Sales" if txn_type == "Sale" else "Purchase"
+            
+            # Generate bill number in P/0001/25-26 format
+            last_bill = Bill.query.filter_by(company_id=cid, bill_type=bill_type).order_by(Bill.id.desc()).first()
+            next_num = (last_bill.id + 1) if last_bill else 1
+            prefix = "P" if bill_type == "Purchase" else "S"
+            bill_no = f"{prefix}/{str(next_num).zfill(4)}/{fy}"
+            
+            # Handle GST (mobile defaults to 0% for simplicity)
+            gst_rate = float(data.get('gst_rate', 0))
+            gst_amt = round(amount * gst_rate / 100, 2)
+            total = round(amount + gst_amt, 2)
+            
+            # Create bill
+            bill = Bill(
+                company_id=cid,
+                fin_year=fy,
+                party_id=None,  # Mobile entries don't link to party_id
+                bill_no=bill_no,
+                bill_date=txn_date,
+                bill_type=bill_type,
+                taxable_amount=amount,
+                cgst=gst_amt/2,
+                sgst=gst_amt/2,
+                igst=0,
+                total_amount=total,
+                narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg {'(Cash)' if is_cash_account else ''}",
+                is_cancelled=False
+            )
+            db.session.add(bill)
+            db.session.flush()
+            
+            # Create bill item
+            item = BillItem(
+                bill_id=bill.id,
+                qty=qty,
+                rate=rate,
+                taxable_amount=amount,
+                gst_rate=gst_rate,
+                cgst=gst_amt/2,
+                sgst=gst_amt/2,
+                igst=0
+            )
+            db.session.add(item)
+            
+            # Link milk transaction to bill
+            try:
+                milk_txn.bill_id = bill.id
+            except Exception as e:
+                print(f"WARNING: Could not set bill_id (column may not exist): {e}")
+        
+        # Create journal entry (SAME AS MAIN SYSTEM)
+        voucher_no = f"MLK-{milk_txn.id}"
+        
+        if txn_type == "Purchase":
+            # Purchase: Debit Milk Purchase, Credit Supplier
+            milk_purchase_acct = Account.query.filter_by(company_id=cid, name="Milk Purchase").first()
+            if not milk_purchase_acct:
+                milk_purchase_acct = Account(
+                    company_id=cid, 
+                    name="Milk Purchase", 
+                    group_name="Direct Expenses", 
+                    opening_dr=0.0, 
+                    opening_cr=0.0, 
+                    is_active=True
+                )
+                db.session.add(milk_purchase_acct)
+                db.session.flush()
+            
+            header = JournalHeader(
+                company_id=cid,
+                fin_year=fy,
+                voucher_type="Journal",
+                voucher_no=voucher_no,
+                voucher_date=txn_date,
+                narration=f"Mobile Milk Purchase | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg | {voucher_no}"
+            )
+            db.session.add(header)
+            db.session.flush()
+            
+            # Debit Milk Purchase
+            db.session.add(JournalLine(
+                journal_header_id=header.id,
+                account_id=milk_purchase_acct.id,
+                debit=amount,
+                credit=0,
+                narration=header.narration
+            ))
+            
+            # Credit Supplier
+            db.session.add(JournalLine(
+                journal_header_id=header.id,
+                account_id=account.id,
+                debit=0,
+                credit=amount,
+                narration=header.narration
+            ))
+            
+        else:  # Sale
+            # Sale: Debit Customer, Credit Milk Sale
+            milk_sale_acct = Account.query.filter_by(company_id=cid, name="Milk Sale").first()
+            if not milk_sale_acct:
+                milk_sale_acct = Account(
+                    company_id=cid, 
+                    name="Milk Sale", 
+                    group_name="Direct Incomes", 
+                    opening_dr=0.0, 
+                    opening_cr=0.0, 
+                    is_active=True
+                )
+                db.session.add(milk_sale_acct)
+                db.session.flush()
+            
+            header = JournalHeader(
+                company_id=cid,
+                fin_year=fy,
+                voucher_type="Journal",
+                voucher_no=voucher_no,
+                voucher_date=txn_date,
+                narration=f"Mobile Milk Sale | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg | {voucher_no}"
+            )
+            db.session.add(header)
+            db.session.flush()
+            
+            # Debit Customer
+            db.session.add(JournalLine(
+                journal_header_id=header.id,
+                account_id=account.id,
+                debit=amount,
+                credit=0,
+                narration=header.narration
+            ))
+            
+            # Credit Milk Sale
+            db.session.add(JournalLine(
+                journal_header_id=header.id,
+                account_id=milk_sale_acct.id,
+                debit=0,
+                credit=amount,
+                narration=header.narration
+            ))
+        
+        # Update session with last entry date and account (SAME AS MAIN SYSTEM)
+        session["last_txn_date"] = txn_date.isoformat()
+        if not is_cash_account:
+            session["last_milk_account_id"] = account_id
+        
+        # Commit all changes
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Entry saved successfully" + (f" | Invoice {bill_no} created" if create_invoice else ""),
+            "entry_id": milk_txn.id,
+            "amount": amount,
+            "bill_no": bill_no,
+            "voucher_no": voucher_no
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error saving mobile entry: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error saving entry: {str(e)}"
+        })
+
+@milk_bp.route("/get-last-entry")
+@login_required
+def get_last_entry():
+    """Get the last milk entry for mobile display"""
+    try:
+        cid = session.get("company_id")
+        fy = session.get("fin_year")
+        
+        from models import MilkTransaction, Account
+        from sqlalchemy import text
+        
+        # Get last entry
+        sql = """
+        SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.clr, t.rate, t.amount, t.txn_type,
+               a.name as party_name
+        FROM milk_transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+        ORDER BY t.txn_date DESC, t.id DESC
+        LIMIT 1
+        """
+        
+        result = db.session.execute(text(sql), {
+            "company_id": cid,
+            "fin_year": fy
+        })
+        row = result.fetchone()
+        
+        if row:
+            return jsonify({
+                "success": True,
+                "entry": {
+                    "date": row.txn_date.isoformat() if row.txn_date else None,
+                    "party": row.party_name or "",
+                    "qty": float(row.qty_liters),
+                    "fat": float(row.fat),
+                    "clr": float(row.clr),
+                    "rate": float(row.rate),
+                    "amount": float(row.amount),
+                    "type": row.txn_type
+                }
+            })
+        else:
+            return jsonify({"success": False, "message": "No entries found"})
+            
+    except Exception as e:
+        print(f"Error getting last entry: {str(e)}")
+        return jsonify({"success": False, "message": str(e)})
+
+@milk_bp.route("/get-today-stats")
+@login_required
+def get_today_stats():
+    """Get today's entry statistics for mobile display"""
+    try:
+        cid = session.get("company_id")
+        fy = session.get("fin_year")
+        
+        from models import MilkTransaction
+        from sqlalchemy import text
+        
+        today = date.today()
+        
+        sql = """
+        SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
+        FROM milk_transactions
+        WHERE company_id = :company_id AND fin_year = :fin_year 
+              AND DATE(txn_date) = :today
+        """
+        
+        result = db.session.execute(text(sql), {
+            "company_id": cid,
+            "fin_year": fy,
+            "today": today
+        })
+        row = result.fetchone()
+        
+        return jsonify({
+            "success": True,
+            "count": row.count if row else 0,
+            "total": float(row.total) if row and row.total else 0.0
+        })
+        
+    except Exception as e:
+        print(f"Error getting today stats: {str(e)}")
+        return jsonify({"success": False, "message": str(e)})
 
 @milk_bp.route("/entry/add", methods=["GET","POST"])
 def add_entry():
@@ -919,7 +1452,7 @@ def add_entry():
                             voucher_type="Journal",
                             voucher_no=voucher_no,
                             voucher_date=txn_date,
-                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg | {voucher_no}"
                         )
                         db.session.add(header)
                         db.session.flush()
@@ -958,7 +1491,7 @@ def add_entry():
                             voucher_type="Journal",
                             voucher_no=voucher_no,
                             voucher_date=txn_date,
-                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                            narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg | {voucher_no}"
                         )
                         db.session.add(header)
                         db.session.flush()
@@ -1021,7 +1554,7 @@ def add_entry():
                     voucher_type="Journal",
                     voucher_no=voucher_no,
                     voucher_date=txn_date,
-                    narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+                    narration=f"Milk {txn_type} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg | {voucher_no}"
                 )
                 db.session.add(header)
                 db.session.flush()
