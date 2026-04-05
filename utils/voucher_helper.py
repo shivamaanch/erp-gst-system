@@ -3,7 +3,7 @@ Voucher Number Generation Helper
 Generates unique voucher numbers for all transaction types
 """
 
-from models import Bill, MilkTransaction, JournalHeader
+from models import Bill, JournalHeader
 from extensions import db
 from sqlalchemy import func
 
@@ -45,12 +45,19 @@ def generate_voucher_number(company_id, fin_year, voucher_type):
             Bill.voucher_no.like(f'{prefix}/{fin_year}/%')
         ).scalar()
     elif voucher_type == 'Milk':
-        # For Milk Transactions
-        last_voucher = db.session.query(func.max(MilkTransaction.voucher_no)).filter(
-            MilkTransaction.company_id == company_id,
-            MilkTransaction.fin_year == fin_year,
-            MilkTransaction.voucher_no.like(f'{prefix}/{fin_year}/%')
-        ).scalar()
+        # For Milk Transactions - use raw SQL to avoid model issues
+        from sqlalchemy import text
+        result = db.session.execute(text("""
+            SELECT MAX(voucher_no) as last_voucher 
+            FROM milk_transactions 
+            WHERE company_id = :company_id AND fin_year = :fin_year 
+            AND voucher_no LIKE :prefix_pattern
+        """), {
+            "company_id": company_id,
+            "fin_year": fin_year,
+            "prefix_pattern": f'{prefix}/{fin_year}/%'
+        })
+        last_voucher = result.scalar()
     elif voucher_type == 'Journal':
         # For Journal Entries
         last_voucher = db.session.query(func.max(JournalHeader.voucher_no)).filter(

@@ -5,7 +5,7 @@ Utilities Module - System maintenance and data fixing tools
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_login import login_required
 from extensions import db
-from models import Bill, MilkTransaction, JournalHeader, Company
+from models import Bill, JournalHeader, Company
 from utils.voucher_helper import generate_voucher_number
 from sqlalchemy import text
 from datetime import datetime
@@ -23,16 +23,33 @@ def index():
     fy = session.get("fin_year")
     
     # Get statistics
+    from sqlalchemy import text
+    
+    # Get milk entries count using raw SQL
+    milk_result = db.session.execute(text("""
+        SELECT COUNT(*) as count 
+        FROM milk_transactions 
+        WHERE company_id = :company_id AND fin_year = :fin_year
+    """), {"company_id": cid, "fin_year": fy})
+    milk_count = milk_result.scalar()
+    
+    # Get milk entries without voucher using raw SQL
+    milk_no_voucher_result = db.session.execute(text("""
+        SELECT COUNT(*) as count 
+        FROM milk_transactions 
+        WHERE company_id = :company_id AND fin_year = :fin_year 
+        AND (voucher_no IS NULL OR voucher_no = '')
+    """), {"company_id": cid, "fin_year": fy})
+    milk_no_voucher_count = milk_no_voucher_result.scalar()
+    
     stats = {
         'bills': Bill.query.filter_by(company_id=cid, fin_year=fy).count(),
-        'milk_entries': MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).count(),
+        'milk_entries': milk_count,
         'journals': JournalHeader.query.filter_by(company_id=cid, fin_year=fy).count(),
         'bills_no_voucher': Bill.query.filter_by(company_id=cid, fin_year=fy).filter(
             (Bill.voucher_no == None) | (Bill.voucher_no == '')
         ).count(),
-        'milk_no_voucher': MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).filter(
-            (MilkTransaction.voucher_no == None) | (MilkTransaction.voucher_no == '')
-        ).count(),
+        'milk_no_voucher': milk_no_voucher_count,
     }
     
     return render_template("utilities/index.html", stats=stats)
@@ -73,14 +90,22 @@ def reindex_vouchers():
                 bill.voucher_no = voucher_no
                 results['purchase'] += 1
             
-            # Reindex Milk Transactions
-            milk_txns = MilkTransaction.query.filter_by(
-                company_id=cid, fin_year=fy
-            ).order_by(MilkTransaction.txn_date, MilkTransaction.id).all()
+            # Reindex Milk Transactions using raw SQL
+            milk_result = db.session.execute(text("""
+                SELECT id, txn_date 
+                FROM milk_transactions 
+                WHERE company_id = :company_id AND fin_year = :fin_year 
+                ORDER BY txn_date, id
+            """), {"company_id": cid, "fin_year": fy})
+            milk_txns = milk_result.fetchall()
             
             for txn in milk_txns:
                 voucher_no = generate_voucher_number(cid, fy, 'Milk')
-                txn.voucher_no = voucher_no
+                db.session.execute(text("""
+                    UPDATE milk_transactions 
+                    SET voucher_no = :voucher_no 
+                    WHERE id = :id
+                """), {"voucher_no": voucher_no, "id": txn.id})
                 results['milk'] += 1
             
             # Reindex Journal Entries
@@ -137,12 +162,20 @@ def renumber_vouchers():
                     count += 1
             
             elif voucher_type == "Milk":
-                txns = MilkTransaction.query.filter_by(
-                    company_id=cid, fin_year=fy
-                ).order_by(MilkTransaction.txn_date, MilkTransaction.id).all()
+                milk_result = db.session.execute(text("""
+                    SELECT id 
+                    FROM milk_transactions 
+                    WHERE company_id = :company_id AND fin_year = :fin_year 
+                    ORDER BY txn_date, id
+                """), {"company_id": cid, "fin_year": fy})
+                milk_txns = milk_result.fetchall()
                 
-                for i, txn in enumerate(txns, start=start_number):
-                    txn.voucher_no = f"MV/{fy}/{i:04d}"
+                for i, txn in enumerate(milk_txns, start=start_number):
+                    db.session.execute(text("""
+                        UPDATE milk_transactions 
+                        SET voucher_no = :voucher_no 
+                        WHERE id = :id
+                    """), {"voucher_no": f"MV/{fy}/{i:04d}", "id": txn.id})
                     count += 1
             
             elif voucher_type == "Journal":
@@ -188,13 +221,22 @@ def fix_data():
                     bill.voucher_no = generate_voucher_number(cid, fy, bill.bill_type)
                     count += 1
                 
-                # Fix Milk Transactions
-                milk_txns = MilkTransaction.query.filter_by(company_id=cid, fin_year=fy).filter(
-                    (MilkTransaction.voucher_no == None) | (MilkTransaction.voucher_no == '')
-                ).all()
+                # Fix Milk Transactions using raw SQL
+                milk_result = db.session.execute(text("""
+                    SELECT id 
+                    FROM milk_transactions 
+                    WHERE company_id = :company_id AND fin_year = :fin_year 
+                    AND (voucher_no IS NULL OR voucher_no = '')
+                """), {"company_id": cid, "fin_year": fy})
+                milk_txns = milk_result.fetchall()
                 
                 for txn in milk_txns:
-                    txn.voucher_no = generate_voucher_number(cid, fy, 'Milk')
+                    voucher_no = generate_voucher_number(cid, fy, 'Milk')
+                    db.session.execute(text("""
+                        UPDATE milk_transactions 
+                        SET voucher_no = :voucher_no 
+                        WHERE id = :id
+                    """), {"voucher_no": voucher_no, "id": txn.id})
                     count += 1
                 
                 db.session.commit()

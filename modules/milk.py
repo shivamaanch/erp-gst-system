@@ -168,11 +168,10 @@ def entry_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, a.name as account_name, b.bill_no
+               t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -181,11 +180,10 @@ def entry_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, a.name as account_name, NULL as bill_no
+               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -282,11 +280,10 @@ def purchase_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, a.name as account_name, b.bill_no
+               t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
         ORDER BY t.txn_date DESC 
@@ -295,11 +292,10 @@ def purchase_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, a.name as account_name, NULL as bill_no
+               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -381,11 +377,10 @@ def sale_list():
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, a.name as account_name, b.bill_no
+               t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
@@ -394,11 +389,10 @@ def sale_list():
     except Exception:
         # If bill_id doesn't exist, use query without it
         sql = """
-        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.account_id, t.txn_date, t.shift, 
+        SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, a.name as account_name, NULL as bill_no
+               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
         LIMIT 200
@@ -595,46 +589,44 @@ def milk_import():
     last_10_days = request.args.get("last_10_days") == "1"
     
     # Build base query for milk purchases
-    query = db.session.query(
-        MilkTransaction.id,
-        MilkTransaction.txn_date,
-        MilkTransaction.qty_liters,
-        MilkTransaction.fat,
-        MilkTransaction.snf,
-        MilkTransaction.clr,
-        MilkTransaction.rate,
-        MilkTransaction.amount,
-        MilkTransaction.chart_id,
-        Account.name.label('supplier_name')
-    ).join(Account, MilkTransaction.account_id == Account.id
-    ).filter(
-        MilkTransaction.company_id == cid,
-        MilkTransaction.fin_year == fy,
-        MilkTransaction.txn_type == 'Purchase'
-    )
+    # Use raw SQL to avoid account_id column issues
+    sql = """
+    SELECT t.id, t.txn_date, t.shift, t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, 
+           t.rate, t.amount, t.chart_id, t.narration, 'Unknown' as supplier_name
+    FROM milk_transactions t
+    WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
+    """
     
     # Apply filters
+    params = {"company_id": cid, "fin_year": fy}
+    
     if party_search:
-        query = query.filter(Account.name.ilike(f"%{party_search}%"))
+        sql += " AND 'Unknown' ILIKE :party_search"
+        params["party_search"] = f"%{party_search}%"
     
     if from_date:
         try:
-            query = query.filter(MilkTransaction.txn_date >= datetime.strptime(from_date, "%Y-%m-%d").date())
+            sql += " AND t.txn_date >= :from_date"
+            params["from_date"] = datetime.strptime(from_date, "%Y-%m-%d").date()
         except ValueError:
             pass
     
     if to_date:
         try:
-            query = query.filter(MilkTransaction.txn_date <= datetime.strptime(to_date, "%Y-%m-%d").date())
+            sql += " AND t.txn_date <= :to_date"
+            params["to_date"] = datetime.strptime(to_date, "%Y-%m-%d").date()
         except ValueError:
             pass
     
     if last_10_days:
         ten_days_ago = date.today() - timedelta(days=10)
-        query = query.filter(MilkTransaction.txn_date >= ten_days_ago)
+        sql += " AND t.txn_date >= :last_10_days"
+        params["last_10_days"] = ten_days_ago
     
-    # Order by date descending
-    purchases = query.order_by(MilkTransaction.txn_date.desc()).all()
+    sql += " ORDER BY t.txn_date DESC"
+    
+    result = db.session.execute(text(sql), params)
+    purchases = result.fetchall()
     
     # Calculate totals
     total_qty = sum(p.qty_liters for p in purchases)
@@ -680,9 +672,15 @@ def milk_import():
         bf_kg = p.qty_liters * p.fat / 100
         snf_kg = p.qty_liters * p.snf / 100
         
+        # Handle txn_date which might be string or date object
+        if isinstance(p.txn_date, str):
+            txn_date_str = p.txn_date
+        else:
+            txn_date_str = p.txn_date.strftime('%d-%m-%Y')
+        
         data.append({
             'sr_no': i,
-            'date': p.txn_date.strftime('%d-%m-%Y'),
+            'date': txn_date_str,
             'supplier': p.supplier_name,
             'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
             'qty': p.qty_liters,
@@ -711,49 +709,44 @@ def milk_sale_import():
     to_date = request.args.get("to_date", "")
     last_10_days = request.args.get("last_10_days") == "1"
     
-    # Build base query for milk sales
-    query = db.session.query(
-        MilkTransaction.id,
-        MilkTransaction.txn_date,
-        MilkTransaction.qty_liters,
-        MilkTransaction.fat,
-        MilkTransaction.snf,
-        MilkTransaction.clr,
-        MilkTransaction.rate,
-        MilkTransaction.amount,
-        MilkTransaction.chart_id,
-        Account.name.label('supplier_name')
-    ).join(Account, MilkTransaction.account_id == Account.id
-    ).filter(
-        MilkTransaction.company_id == cid,
-        MilkTransaction.fin_year == fy,
-        MilkTransaction.txn_type == 'Sale'
-    )
+    # Build base query for milk sales using raw SQL
+    sql = """
+    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, 
+           t.rate, t.amount, t.chart_id, 'Unknown' as supplier_name
+    FROM milk_transactions t
+    WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
+    """
     
     # Apply filters
+    params = {"company_id": cid, "fin_year": fy}
+    
     if party_search:
-        query = query.filter(Account.name.ilike(f"%{party_search}%"))
+        sql += " AND 'Unknown' ILIKE :party_search"
+        params["party_search"] = f"%{party_search}%"
     
     if from_date:
         try:
-            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            query = query.filter(MilkTransaction.txn_date >= from_date_obj)
+            sql += " AND t.txn_date >= :from_date"
+            params["from_date"] = datetime.strptime(from_date, "%Y-%m-%d").date()
         except ValueError:
             pass
     
     if to_date:
         try:
-            to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            query = query.filter(MilkTransaction.txn_date <= to_date_obj)
+            sql += " AND t.txn_date <= :to_date"
+            params["to_date"] = datetime.strptime(to_date, "%Y-%m-%d").date()
         except ValueError:
             pass
     
     if last_10_days:
         ten_days_ago = date.today() - timedelta(days=10)
-        query = query.filter(MilkTransaction.txn_date >= ten_days_ago)
+        sql += " AND t.txn_date >= :last_10_days"
+        params["last_10_days"] = ten_days_ago
     
-    # Order by date (newest first)
-    sales = query.order_by(MilkTransaction.txn_date.desc()).all()
+    sql += " ORDER BY t.txn_date DESC"
+    
+    result = db.session.execute(text(sql), params)
+    sales = result.fetchall()
     
     # Calculate totals
     total_qty = sum(p.qty_liters for p in sales)
@@ -799,9 +792,15 @@ def milk_sale_import():
         bf_kg = p.qty_liters * p.fat / 100
         snf_kg = p.qty_liters * p.snf / 100
         
+        # Handle txn_date which might be string or date object
+        if isinstance(p.txn_date, str):
+            txn_date_str = p.txn_date
+        else:
+            txn_date_str = p.txn_date.strftime('%d-%m-%Y')
+        
         data.append({
             'sr_no': i,
-            'date': p.txn_date.strftime('%d-%m-%Y'),
+            'date': txn_date_str,
             'buyer': p.supplier_name,
             'description': f"Qty:{p.qty_liters}L | FAT:{p.fat}% | SNF:{p.snf}% | CLR:{p.clr} | BF:{bf_kg:.2f}kg | SNF:{snf_kg:.2f}kg | BF Rate:{bf_rate} | SNF Rate:{snf_rate} | Rate:{int(p.rate) if p.rate == int(p.rate) else p.rate}",
             'qty': p.qty_liters,

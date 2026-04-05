@@ -394,25 +394,6 @@
             <h1><i class="bi bi-droplet-fill"></i> Quick Milk Entry</h1>
         </div>
         
-        <!-- Quick Navigation Buttons -->
-        <div class="quick-nav">
-            <a href="{{ url_for('milk.mobile_entry') }}" class="quick-nav-btn active">
-                <i class="bi bi-lightning-fill"></i>
-                <span>QE</span>
-                <small>Quick Entry</small>
-            </a>
-            <a href="{{ url_for('milk.milk_import') }}" class="quick-nav-btn">
-                <i class="bi bi-download"></i>
-                <span>MIP</span>
-                <small>Milk Import</small>
-            </a>
-            <a href="{{ url_for('milk.milk_sale_import') }}" class="quick-nav-btn">
-                <i class="bi bi-upload"></i>
-                <span>MIS</span>
-                <small>Milk Sale</small>
-            </a>
-        </div>
-        
         <!-- PWA Install Button -->
         <div id="installButton" class="install-btn" style="display: none;">
             <button class="btn btn-primary btn-lg w-100" onclick="installApp()">
@@ -515,6 +496,25 @@
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Saving...</span>
             </div>
+        </div>
+        
+        <!-- Quick Navigation Buttons -->
+        <div class="quick-nav">
+            <a href="{{ url_for('milk.mobile_entry') }}" class="quick-nav-btn active">
+                <i class="bi bi-lightning-fill"></i>
+                <span>QE</span>
+                <small>Quick Entry</small>
+            </a>
+            <a href="{{ url_for('milk.milk_import') }}" class="quick-nav-btn">
+                <i class="bi bi-download"></i>
+                <span>MIP</span>
+                <small>Milk Import</small>
+            </a>
+            <a href="{{ url_for('milk.milk_sale_import') }}" class="quick-nav-btn">
+                <i class="bi bi-upload"></i>
+                <span>MIS</span>
+                <small>Milk Sale</small>
+            </a>
         </div>
     </div>
     
@@ -981,9 +981,13 @@
         e.preventDefault();
         deferredPrompt = e;
         
-        // Show install button
-        document.getElementById('installButton').style.display = 'block';
-        console.log('PWA install prompt ready');
+        // Show install button after 7 seconds
+        setTimeout(() => {
+            if (deferredPrompt) {
+                document.getElementById('installButton').style.display = 'block';
+                console.log('PWA install prompt ready');
+            }
+        }, 7000);
     });
     
     function installApp() {

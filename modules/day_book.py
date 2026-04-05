@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, make_response
 from flask_login import login_required
 from extensions import db
-from models import DayBook, Account, Company, Bill, MilkTransaction, Party, JournalHeader, JournalLine, CashBook
+from models import DayBook, Account, Company, Bill, Party, JournalHeader, JournalLine, CashBook
 from datetime import date, datetime
 from sqlalchemy import text, or_, and_
 import csv
