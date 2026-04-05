@@ -502,7 +502,6 @@ class MilkTransaction(db.Model):
     narration   = db.Column(db.Text)
     bill_id     = db.Column(db.Integer, db.ForeignKey("bills.id"))
     company     = db.relationship("Company", backref="milk_transactions")
-    account     = db.relationship("Account", backref="milk_transactions")  
     chart       = db.relationship("MilkRateChart", backref="transactions")
     bill        = db.relationship("Bill", backref="milk_transactions", foreign_keys=[bill_id])
 
