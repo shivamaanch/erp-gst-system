@@ -205,10 +205,11 @@ def entry_list():
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, 'Unknown' as account_name, b.bill_no
+               t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
@@ -217,10 +218,11 @@ def entry_list():
         """
     except Exception:
         # If bill_id doesn't exist, use query without it
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
+               NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -330,10 +332,11 @@ def purchase_list():
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, 'Unknown' as account_name, b.bill_no
+               t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
@@ -342,10 +345,11 @@ def purchase_list():
         """
     except Exception:
         # If bill_id doesn't exist, use query without it
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
+               NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
         ORDER BY t.txn_date DESC 
@@ -427,22 +431,11 @@ def sale_list():
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, 
-               CASE 
-                 WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
-                          CASE 
-                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                          END
-                   )
-                 ELSE 'Unknown'
-               END as account_name, 
-               b.bill_no
+               t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
@@ -451,22 +444,11 @@ def sale_list():
         """
     except Exception:
         # If bill_id doesn't exist, use query without it
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, 
-               CASE 
-                 WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
-                          CASE 
-                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                          END
-                   )
-                 ELSE 'Unknown'
-               END as account_name, 
-               NULL as bill_no
+               NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
@@ -1416,10 +1398,11 @@ def add_entry():
     last_entry = None
     try:
         from sqlalchemy import text
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
-               'Unknown' as account_name
+               {party_name_sql} as account_name
         FROM milk_transactions t
         WHERE t.company_id = :company_id 
         ORDER BY t.txn_date DESC, t.id DESC
@@ -2138,6 +2121,30 @@ def edit_entry(txn_id):
         else:
             print(f"DEBUG: No journal lines found for MLK-{actual_txn.id}")
         
+        # Update related Bill/BillItem records for purchase invoices
+        print("DEBUG: Updating Bill/BillItem records for purchase invoices...")
+        if actual_txn.bill_id:
+            bill = Bill.query.filter_by(id=actual_txn.bill_id, company_id=cid).first()
+            if bill:
+                print(f"DEBUG: Found Bill {bill.id} to update")
+                # Update bill amounts
+                bill.taxable_amount = actual_txn.amount
+                bill.total_amount = actual_txn.amount  # No GST for milk transactions
+                bill.narration = actual_txn.narration
+                print(f"DEBUG: Bill amounts updated to ₹{actual_txn.amount}")
+                
+                # Update related BillItem if exists
+                bill_item = BillItem.query.filter_by(bill_id=bill.id).first()
+                if bill_item:
+                    bill_item.qty = actual_txn.qty_liters
+                    bill_item.rate = actual_txn.rate
+                    bill_item.taxable_amount = actual_txn.amount
+                    print(f"DEBUG: BillItem updated")
+            else:
+                print(f"DEBUG: No Bill found with ID {actual_txn.bill_id}")
+        else:
+            print("DEBUG: No bill_id associated with this milk transaction")
+        
         print("DEBUG: Committing to database...")
         db.session.commit()
         session["last_txn_date"] = actual_txn.txn_date.isoformat()
@@ -2219,6 +2226,30 @@ def update_field(txn_id):
             print("DEBUG: Journal line amounts updated")
         else:
             print(f"DEBUG: No journal lines found for MLK-{txn.id}")
+        
+        # Update related Bill/BillItem records for purchase invoices
+        print(f"DEBUG: Updating Bill/BillItem records for field {field} update...")
+        if txn.bill_id:
+            bill = Bill.query.filter_by(id=txn.bill_id, company_id=cid).first()
+            if bill:
+                print(f"DEBUG: Found Bill {bill.id} to update")
+                # Update bill amounts
+                bill.taxable_amount = txn.amount
+                bill.total_amount = txn.amount  # No GST for milk transactions
+                bill.narration = txn.narration
+                print(f"DEBUG: Bill amounts updated to ₹{txn.amount}")
+                
+                # Update related BillItem if exists
+                bill_item = BillItem.query.filter_by(bill_id=bill.id).first()
+                if bill_item:
+                    bill_item.qty = txn.qty_liters
+                    bill_item.rate = txn.rate
+                    bill_item.taxable_amount = txn.amount
+                    print(f"DEBUG: BillItem updated")
+            else:
+                print(f"DEBUG: No Bill found with ID {txn.bill_id}")
+        else:
+            print("DEBUG: No bill_id associated with this milk transaction")
         
         db.session.commit()
         return jsonify({"success": True, "message": "Updated successfully"})
