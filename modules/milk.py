@@ -35,6 +35,41 @@ def to_int_or_none(val):
 
 milk_bp = Blueprint("milk", __name__)
 
+def get_party_name_sql():
+    """Get party name extraction SQL based on database type"""
+    # Detect database type
+    try:
+        # Test for PostgreSQL
+        db.session.execute(text("SELECT STRPOS('test', 't')"))
+        # PostgreSQL detected
+        return """
+        CASE 
+          WHEN t.narration LIKE '%Party:%' THEN 
+            SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
+                   CASE 
+                     WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                     THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                     ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
+                   END
+            )
+          ELSE 'Unknown'
+        END"""
+    except:
+        # SQLite detected
+        return """
+        CASE 
+          WHEN t.narration LIKE '%Party:%' THEN 
+            SUBSTR(t.narration, 
+                   INSTR(t.narration, 'Party:') + 7, 
+                   CASE 
+                     WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                     THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                     ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                   END
+            )
+          ELSE 'Unknown'
+        END"""
+
 def calc_rate(fat, snf, fat_rate, snf_rate):
     return round(float(fat)*float(fat_rate) + float(snf)*float(snf_rate), 4)
 
@@ -513,21 +548,12 @@ def milk_statement():
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
         # If bill_id exists, use the full query without account_id
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                t.bill_id, 
-               CASE 
-                 WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
-                          CASE 
-                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                          END
-                   )
-                 ELSE 'Unknown'
-               END as account_name, 
+               {party_name_sql} as account_name, 
                b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
@@ -537,21 +563,12 @@ def milk_statement():
         """
     except Exception:
         # If bill_id doesn't exist, use query without it
-        sql = """
+        party_name_sql = get_party_name_sql()
+        sql = f"""
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, 
-               CASE 
-                 WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
-                          CASE 
-                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                          END
-                   )
-                 ELSE 'Unknown'
-               END as account_name, 
+               {party_name_sql} as account_name, 
                NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
@@ -665,21 +682,11 @@ def milk_import():
     
     # Build base query for milk purchases
     # Use raw SQL to avoid account_id column issues
-    sql = """
+    party_name_sql = get_party_name_sql()
+    sql = f"""
     SELECT t.id, t.txn_date, t.shift, t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, 
            t.rate, t.amount, t.chart_id, t.narration,
-           CASE 
-             WHEN t.narration LIKE '%Party:%' THEN 
-               SUBSTRING(t.narration, 
-                      STRPOS(t.narration, 'Party:') + 7, 
-                      CASE 
-                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                      END
-               )
-             ELSE 'Unknown'
-           END as party_name
+           {party_name_sql} as party_name
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
     """
@@ -813,21 +820,11 @@ def milk_sale_import():
     last_10_days = request.args.get("last_10_days") == "1"
     
     # Build base query for milk sales using raw SQL
-    sql = """
+    party_name_sql = get_party_name_sql()
+    sql = f"""
     SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, 
            t.rate, t.amount, t.chart_id, t.narration,
-           CASE 
-             WHEN t.narration LIKE '%Party:%' THEN 
-               SUBSTRING(t.narration, 
-                      STRPOS(t.narration, 'Party:') + 7, 
-                      CASE 
-                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
-                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
-                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
-                      END
-               )
-             ELSE 'Unknown'
-           END as party_name
+           {party_name_sql} as party_name
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
     """
@@ -1864,7 +1861,6 @@ def edit_entry(txn_id):
     
     # Add CLR column if it doesn't exist
     try:
-        from sqlalchemy import text
         check_sql = "SELECT clr FROM milk_transactions LIMIT 1"
         db.session.execute(text(check_sql))
         print("DEBUG: CLR column already exists")
@@ -1879,6 +1875,7 @@ def edit_entry(txn_id):
             print(f"DEBUG: Error adding CLR column: {e2}")
             db.session.rollback()
     
+    from models import Account  # Ensure Account is imported
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
     # Add default account if none exist
@@ -2121,10 +2118,11 @@ def edit_entry(txn_id):
         from models import JournalHeader, JournalLine, Account
         
         # Find journal entries related to this milk transaction
+        # Journal entries use MLK-{txn_id} format in narration
         related_journal_lines = db.session.query(JournalLine).join(JournalHeader).filter(
             JournalHeader.company_id == cid,
             JournalHeader.fin_year == fy,
-            JournalHeader.narration.like(f"%{actual_txn.voucher_no}%")
+            JournalHeader.narration.like(f"%MLK-{actual_txn.id}%")
         ).all()
         
         if related_journal_lines:
@@ -2137,6 +2135,8 @@ def edit_entry(txn_id):
                     line.credit = actual_txn.amount
                 line.narration = actual_txn.narration
             print("DEBUG: Journal line amounts updated")
+        else:
+            print(f"DEBUG: No journal lines found for MLK-{actual_txn.id}")
         
         print("DEBUG: Committing to database...")
         db.session.commit()
@@ -2204,7 +2204,7 @@ def update_field(txn_id):
         related_journal_lines = db.session.query(JournalLine).join(JournalHeader).filter(
             JournalHeader.company_id == cid,
             JournalHeader.fin_year == fy,
-            JournalHeader.narration.like(f"%{txn.voucher_no}%")
+            JournalHeader.narration.like(f"%MLK-{txn.id}%")
         ).all()
         
         if related_journal_lines:
@@ -2215,7 +2215,10 @@ def update_field(txn_id):
                     line.debit = txn.amount
                 elif line.credit > 0:
                     line.credit = txn.amount
+                line.narration = txn.narration
             print("DEBUG: Journal line amounts updated")
+        else:
+            print(f"DEBUG: No journal lines found for MLK-{txn.id}")
         
         db.session.commit()
         return jsonify({"success": True, "message": "Updated successfully"})
