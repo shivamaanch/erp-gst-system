@@ -57,6 +57,7 @@
             <th>Quantity (Ltrs)</th>
             <th>Fat %</th>
             <th>SNF %</th>
+            <th>CLR %</th>
             <th>Daily Rate</th>
             <th>Basic Amount</th>
             <th>Fat Value</th>
@@ -72,6 +73,7 @@
             <td class="text-end">{{ "{:.2f}".format(item.quantity) }}</td>
             <td class="text-end">{{ "{:.2f}".format(item.fat_percentage) }}</td>
             <td class="text-end">{{ "{:.2f}".format(item.snf_percentage) }}</td>
+            <td class="text-end">{{ "{:.2f}".format(item.clr_percentage or 0) }}</td>
             <td class="text-end">₹{{ "{:.2f}".format(item.rate_per_liter * 100) }}</td>
             <td class="text-end">₹{{ "{:.2f}".format(item.basic_amount) }}</td>
             <td class="text-end">₹{{ "{:.2f}".format(item.fat_value) }}</td>

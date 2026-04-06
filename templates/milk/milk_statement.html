@@ -110,6 +110,7 @@
             <th>Qty (L)</th>
             <th>FAT%</th>
             <th>SNF%</th>
+            <th>CLR%</th>
             <th>BF Kgs</th>
             <th>SNF Kgs</th>
             <th>Ratio</th>
@@ -143,6 +144,7 @@
             <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
             <td>{{ "%.2f"|format(txn.fat) }}</td>
             <td>{{ "%.2f"|format(txn.snf) }}</td>
+            <td>{{ "%.2f"|format(txn.clr) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
             <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
@@ -226,6 +228,7 @@
             <th>Qty (L)</th>
             <th>FAT%</th>
             <th>SNF%</th>
+            <th>CLR%</th>
             <th>BF Kgs</th>
             <th>SNF Kgs</th>
             <th>Ratio</th>
@@ -256,6 +259,7 @@
             <td>{{ "%.2f"|format(txn.qty_liters) }}</td>
             <td>{{ "%.2f"|format(txn.fat) }}</td>
             <td>{{ "%.2f"|format(txn.snf) }}</td>
+            <td>{{ "%.2f"|format(txn.clr) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.fat / 100) }}</td>
             <td>{{ "%.3f"|format(txn.qty_liters * txn.snf / 100) }}</td>
             <td>{{ "%.2f"|format(txn.snf/txn.fat if txn.fat > 0 else 0) }}</td>
@@ -287,9 +291,10 @@ function applyFilters() {
     const qty = parseFloat(row.cells[5].textContent) || 0;
     const fat = parseFloat(row.cells[6].textContent) || 0;
     const snf = parseFloat(row.cells[7].textContent) || 0;
-    const bfKgs = parseFloat(row.cells[8].textContent) || 0;
-    const snfKgs = parseFloat(row.cells[9].textContent) || 0;
-    const amount = parseFloat(row.cells[12].textContent.replace('₹', '').replace(/,/g, '')) || 0;
+    const clr = parseFloat(row.cells[8].textContent) || 0;
+    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(/,/g, '')) || 0;
     
     let show = true;
     
@@ -329,9 +334,10 @@ function applyFilters() {
     const qty = parseFloat(row.cells[5].textContent) || 0;
     const fat = parseFloat(row.cells[6].textContent) || 0;
     const snf = parseFloat(row.cells[7].textContent) || 0;
-    const bfKgs = parseFloat(row.cells[8].textContent) || 0;
-    const snfKgs = parseFloat(row.cells[9].textContent) || 0;
-    const amount = parseFloat(row.cells[12].textContent.replace('₹', '').replace(/,/g, '')) || 0;
+    const clr = parseFloat(row.cells[8].textContent) || 0;
+    const bfKgs = parseFloat(row.cells[9].textContent) || 0;
+    const snfKgs = parseFloat(row.cells[10].textContent) || 0;
+    const amount = parseFloat(row.cells[13].textContent.replace('₹', '').replace(/,/g, '')) || 0;
     
     let show = true;
     

@@ -169,7 +169,7 @@ def entry_list():
         # If bill_id exists, use the full query
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
@@ -181,7 +181,7 @@ def entry_list():
         # If bill_id doesn't exist, use query without it
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
@@ -229,7 +229,7 @@ def entry_list():
                 self.qty_liters = row.qty_liters
                 self.fat = row.fat
                 self.snf = row.snf
-                self.clr = 0.0  # Default CLR value
+                self.clr = row.clr
                 self.rate = row.rate
                 self.amount = row.amount
                 self.chart_id = row.chart_id
@@ -294,7 +294,7 @@ def purchase_list():
         # If bill_id exists, use the full query
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                t.bill_id, 'Unknown' as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
@@ -306,7 +306,7 @@ def purchase_list():
         # If bill_id doesn't exist, use query without it
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
@@ -341,7 +341,7 @@ def purchase_list():
                 self.qty_liters = row.qty_liters
                 self.fat = row.fat
                 self.snf = row.snf
-                self.clr = 0.0  # Default CLR value
+                self.clr = row.clr
                 self.rate = row.rate
                 self.amount = row.amount
                 self.chart_id = row.chart_id
@@ -391,7 +391,7 @@ def sale_list():
         # If bill_id exists, use the full query
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                t.bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
@@ -416,7 +416,7 @@ def sale_list():
         # If bill_id doesn't exist, use query without it
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
@@ -464,7 +464,7 @@ def sale_list():
                 self.qty_liters = row.qty_liters
                 self.fat = row.fat
                 self.snf = row.snf
-                self.clr = 0.0  # Default CLR value
+                self.clr = row.clr
                 self.rate = row.rate
                 self.amount = row.amount
                 self.chart_id = row.chart_id
@@ -514,7 +514,7 @@ def milk_statement():
         # If bill_id exists, use the full query without account_id
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                t.bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
@@ -539,7 +539,7 @@ def milk_statement():
         # If bill_id doesn't exist, use query without it
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
-               t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
+               t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
@@ -600,7 +600,7 @@ def milk_statement():
                 self.qty_liters = row.qty_liters
                 self.fat = row.fat
                 self.snf = row.snf
-                self.clr = 0.0  # Default CLR value
+                self.clr = row.clr
                 self.rate = row.rate
                 self.amount = row.amount
                 self.chart_id = row.chart_id
@@ -2514,7 +2514,7 @@ def debug_txns():
     # Use raw SQL to avoid account_id column issues
     from sqlalchemy import text
     sql = """
-    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.narration,
+    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.narration,
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTRING(t.narration, 
