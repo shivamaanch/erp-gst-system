@@ -2580,6 +2580,69 @@ def delete_entry(txn_id):
         flash(f"Error deleting entry: {str(e)}", "error")
         return redirect(url_for('milk.entry_list'))
 
+@milk_bp.route("/milk/debug/journal-entries")
+def debug_journal_entries():
+    """Debug route to examine journal entries for milk transactions"""
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    from sqlalchemy import text
+    
+    # Get recent journal entries related to milk transactions
+    sql = """
+    SELECT jh.id, jh.voucher_no, jh.voucher_date, jh.narration,
+           jl.account_id, a.name as account_name, a.group_name,
+           jl.debit, jl.credit
+    FROM journal_headers jh
+    JOIN journal_lines jl ON jl.journal_header_id = jh.id
+    LEFT JOIN accounts a ON jl.account_id = a.id
+    WHERE jh.company_id = :company_id AND jh.fin_year = :fin_year
+    AND (jh.narration LIKE '%Milk%' OR jh.narration LIKE '%MLK-%')
+    ORDER BY jh.voucher_date DESC, jh.id DESC
+    LIMIT 20
+    """
+    
+    try:
+        result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+        rows = result.fetchall()
+        
+        output = """
+        <h3>Journal Entries for Milk Transactions</h3>
+        <table border='1' style='border-collapse: collapse;'>
+        <tr style='background: #f0f0f0;'>
+            <th>Voucher No</th>
+            <th>Date</th>
+            <th>Narration</th>
+            <th>Account Name</th>
+            <th>Group</th>
+            <th>Debit</th>
+            <th>Credit</th>
+        </tr>
+        """
+        
+        for row in rows:
+            output += f"""
+            <tr>
+                <td>{row.voucher_no}</td>
+                <td>{row.voucher_date}</td>
+                <td>{row.narration}</td>
+                <td>{row.account_name or 'N/A'}</td>
+                <td>{row.group_name or 'N/A'}</td>
+                <td>₹{row.debit if row.debit > 0 else ''}</td>
+                <td>₹{row.credit if row.credit > 0 else ''}</td>
+            </tr>
+            """
+        
+        output += "</table>"
+        
+        if not rows:
+            output += "<p><strong>No journal entries found for milk transactions!</strong></p>"
+        
+        return output
+        
+    except Exception as e:
+        return f"<h3>Error fetching journal entries</h3><p>{str(e)}</p>"
+
 @milk_bp.route("/milk/debug/journal-links/<int:txn_id>")
 def debug_journal_links(txn_id):
     """Debug route to verify journal entry linking for milk transactions"""
