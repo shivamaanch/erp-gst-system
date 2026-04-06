@@ -48,8 +48,11 @@ def _round3(value):
 
 
 def compute_snf(clr, fat):
-    """Richmond formula using full precision; cap at 15."""
-    snf = (float(clr) / 4.0) + (0.20 * float(fat)) + 0.14
+    """Richmond formula with proper CLR truncation; cap at 15."""
+    import math
+    # Truncate CLR/4 to 2 decimal places (no rounding)
+    clr_div_truncated = math.floor((float(clr) / 4.0) * 100) / 100
+    snf = clr_div_truncated + (0.20 * float(fat)) + 0.14
     snf = min(15.0, snf)
     return snf
 
