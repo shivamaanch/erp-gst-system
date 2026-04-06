@@ -392,7 +392,20 @@ def sale_list():
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, 'Unknown' as account_name, b.bill_no
+               t.bill_id, 
+               CASE 
+                 WHEN t.narration LIKE '%Party:%' THEN 
+                   SUBSTR(t.narration, 
+                          INSTR(t.narration, 'Party:') + 6, 
+                          CASE 
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                          END
+                   )
+                 ELSE 'Unknown'
+               END as account_name, 
+               b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
@@ -404,7 +417,20 @@ def sale_list():
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
+               NULL as bill_id, 
+               CASE 
+                 WHEN t.narration LIKE '%Party:%' THEN 
+                   SUBSTR(t.narration, 
+                          INSTR(t.narration, 'Party:') + 6, 
+                          CASE 
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                          END
+                   )
+                 ELSE 'Unknown'
+               END as account_name, 
+               NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
         ORDER BY t.txn_date DESC 
@@ -489,7 +515,20 @@ def milk_statement():
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               t.bill_id, 'Unknown' as account_name, b.bill_no
+               t.bill_id, 
+               CASE 
+                 WHEN t.narration LIKE '%Party:%' THEN 
+                   SUBSTR(t.narration, 
+                          INSTR(t.narration, 'Party:') + 6, 
+                          CASE 
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                          END
+                   )
+                 ELSE 'Unknown'
+               END as account_name, 
+               b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
@@ -501,7 +540,20 @@ def milk_statement():
         sql = """
         SELECT t.id, t.company_id, t.fin_year, t.voucher_no, t.txn_date, t.shift, 
                t.txn_type, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.chart_id, t.narration,
-               NULL as bill_id, 'Unknown' as account_name, NULL as bill_no
+               NULL as bill_id, 
+               CASE 
+                 WHEN t.narration LIKE '%Party:%' THEN 
+                   SUBSTR(t.narration, 
+                          INSTR(t.narration, 'Party:') + 6, 
+                          CASE 
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                          END
+                   )
+                 ELSE 'Unknown'
+               END as account_name, 
+               NULL as bill_no
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
         ORDER BY t.txn_date DESC 
@@ -616,7 +668,19 @@ def milk_import():
     # Use raw SQL to avoid account_id column issues
     sql = """
     SELECT t.id, t.txn_date, t.shift, t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, 
-           t.rate, t.amount, t.chart_id, t.narration
+           t.rate, t.amount, t.chart_id, t.narration,
+           CASE 
+             WHEN t.narration LIKE '%Party:%' THEN 
+               SUBSTR(t.narration, 
+                      INSTR(t.narration, 'Party:') + 6, 
+                      CASE 
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                      END
+               )
+             ELSE 'Unknown'
+           END as party_name
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
     """
@@ -752,7 +816,19 @@ def milk_sale_import():
     # Build base query for milk sales using raw SQL
     sql = """
     SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, 
-           t.rate, t.amount, t.chart_id, t.narration
+           t.rate, t.amount, t.chart_id, t.narration,
+           CASE 
+             WHEN t.narration LIKE '%Party:%' THEN 
+               SUBSTR(t.narration, 
+                      INSTR(t.narration, 'Party:') + 6, 
+                      CASE 
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                      END
+               )
+             ELSE 'Unknown'
+           END as party_name
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
     """
@@ -1229,7 +1305,18 @@ def get_last_entry():
         # Get last entry
         sql = """
         SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.clr, t.rate, t.amount, t.txn_type,
-               'Unknown' as party_name
+               CASE 
+                 WHEN t.narration LIKE '%Party:%' THEN 
+                   SUBSTR(t.narration, 
+                          INSTR(t.narration, 'Party:') + 6, 
+                          CASE 
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                          END
+                   )
+                 ELSE 'Unknown'
+               END as party_name
         FROM milk_transactions t
         WHERE t.company_id = :company_id AND t.fin_year = :fin_year
         ORDER BY t.txn_date DESC, t.id DESC
@@ -2371,22 +2458,44 @@ def delete_entry(txn_id):
             flash("Milk entry not found", "error")
             return redirect(url_for('milk.entry_list'))
         
+        print(f"DEBUG: Deleting milk transaction {txn_id}")
+        
         # Delete associated bill if exists
         if txn_row.bill_id:
+            print(f"DEBUG: Deleting associated bill {txn_row.bill_id}")
             # Delete bill items first
             db.session.execute(text("DELETE FROM bill_items WHERE bill_id = :bill_id"), {"bill_id": txn_row.bill_id})
             # Delete the bill
             db.session.execute(text("DELETE FROM bills WHERE id = :bill_id"), {"bill_id": txn_row.bill_id})
         
+        # Delete any journal entries related to this milk transaction
+        # Journal entries might reference this transaction in their narration
+        print(f"DEBUG: Checking for related journal entries...")
+        journal_result = db.session.execute(text("""
+            SELECT jh.id FROM journal_headers jh 
+            WHERE jh.narration LIKE :txn_pattern
+        """), {"txn_pattern": f"%MLK-{txn_id}%"})
+        
+        journal_headers = journal_result.fetchall()
+        for jh in journal_headers:
+            print(f"DEBUG: Deleting journal header {jh.id} and its lines")
+            # Delete journal lines first
+            db.session.execute(text("DELETE FROM journal_lines WHERE journal_header_id = :jh_id"), {"jh_id": jh.id})
+            # Delete journal header
+            db.session.execute(text("DELETE FROM journal_headers WHERE id = :jh_id"), {"jh_id": jh.id})
+        
         # Delete the milk transaction
+        print(f"DEBUG: Deleting milk transaction {txn_id}")
         db.session.execute(text("DELETE FROM milk_transactions WHERE id = :txn_id"), {"txn_id": txn_id})
         db.session.commit()
         
+        print(f"DEBUG: Milk transaction {txn_id} deleted successfully")
         flash("Milk entry deleted successfully", "success")
         return redirect(url_for('milk.entry_list'))
     
     except Exception as e:
         db.session.rollback()
+        print(f"DEBUG: Error deleting milk entry {txn_id}: {str(e)}")
         flash(f"Error deleting entry: {str(e)}", "error")
         return redirect(url_for('milk.entry_list'))
 
@@ -2405,7 +2514,19 @@ def debug_txns():
     # Use raw SQL to avoid account_id column issues
     from sqlalchemy import text
     sql = """
-    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.narration
+    SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.rate, t.amount, t.narration,
+           CASE 
+             WHEN t.narration LIKE '%Party:%' THEN 
+               SUBSTR(t.narration, 
+                      INSTR(t.narration, 'Party:') + 6, 
+                      CASE 
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                      END
+               )
+             ELSE 'Unknown'
+           END as party_name
     FROM milk_transactions t
     WHERE t.company_id = :company_id AND t.fin_year = :fin_year
     ORDER BY t.id
@@ -2415,14 +2536,8 @@ def debug_txns():
 
     lines = []
     for t in txns:
-        # Extract party name from narration if available
-        party_name = "Unknown"
-        if t.narration and "Party:" in t.narration:
-            parts = t.narration.split("|")
-            for part in parts:
-                if "Party:" in part:
-                    party_name = part.split("Party:")[1].strip()
-                    break
+        # Use party_name from SQL query
+        party_name = getattr(t, 'party_name', 'Unknown')
         
         lines.append(
             f"ID={t.id} date={t.txn_date} party={party_name} qty={t.qty_liters} "
