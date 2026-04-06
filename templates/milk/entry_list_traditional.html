@@ -132,6 +132,7 @@
           <th class="text-end">Qty (L)</th>
           <th class="text-center">FAT%</th>
           <th class="text-center">SNF%</th>
+          <th class="text-center">CLR%</th>
           <th class="text-end">BF Kgs</th>
           <th class="text-end">SNF Kgs</th>
           <th class="text-center">Ratio</th>
@@ -181,6 +182,10 @@
           <td class="text-center editable-cell" data-field="snf" data-id="{{ t.id }}">
             <span class="display-value">{{ "{:.3f}".format(t.snf) }}%</span>
             <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.snf }}" style="display: none;">
+          </td>
+          <td class="text-center editable-cell" data-field="clr" data-id="{{ t.id }}">
+            <span class="display-value">{{ "{:.2f}".format(t.clr) }}%</span>
+            <input type="number" class="form-control form-control-sm edit-input" step="0.01" value="{{ t.clr }}" style="display: none;">
           </td>
           <td class="text-end" data-bf-kgs="{{ t.qty_liters * t.fat / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.fat / 100) }}</td>
           <td class="text-end" data-snf-kgs="{{ t.qty_liters * t.snf / 100 }}">{{ "{:,.3f}".format(t.qty_liters * t.snf / 100) }}</td>
