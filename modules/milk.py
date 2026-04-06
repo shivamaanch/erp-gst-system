@@ -2022,7 +2022,7 @@ def edit_entry(txn_id):
         
         # Handle party_id safely - can be None for mobile entries
         party_id_raw = request.form.get("party_id")
-        actual_txn.party_id = int(party_id_raw) if party_id_raw and party_id_raw.strip() else None
+        actual_txn.party_id = int(party_id_raw) if party_id_raw and party_id_raw.strip() and party_id_raw != 'None' else None
         
         actual_txn.qty_liters = float(request.form["qty_liters"])
         qty = actual_txn.qty_liters
