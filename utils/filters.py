@@ -7,6 +7,19 @@ def fy_dates(fy):
     y1 = int(fy[:4])
     return date(y1, 4, 1), date(y1+1, 3, 31)
 
+def get_current_fy():
+    """Get current fiscal year based on today's date (FY runs Apr 1 to Mar 31)"""
+    today = date.today()
+    current_year = today.year
+    current_month = today.month
+    
+    # If month is April or later, FY is current_year to current_year+1
+    # If month is Jan-Mar, FY is previous_year to current_year
+    if current_month >= 4:
+        return f"{current_year}-{current_year+1}"
+    else:
+        return f"{current_year-1}-{current_year}"
+
 def get_month_options():
     """Generate month options for dropdown"""
     months = [

@@ -188,18 +188,37 @@ def edit_company(company_id):
 @company_bp.route("/company/delete/<int:company_id>", methods=["POST"])
 @login_required
 def delete(company_id):
-    # Prevent deleting current company
-    if company_id == session.get("company_id"):
-        flash("Cannot delete the currently active company!", "danger")
-        return redirect(url_for("company.index"))
+    company = Company.query.get_or_404(company_id)
     
     # Check if user has access to delete this company
-    if current_user.is_super_admin:
-        company = Company.query.get_or_404(company_id)
-    else:
+    if not current_user.is_super_admin:
         company = current_user.accessible_companies.filter_by(id=company_id).first_or_404()
     
     print(f"[DEBUG] Deleting company: {company.name} (ID: {company_id})")
+    
+    # Check if this is the only company for the user
+    user_companies = current_user.accessible_companies.all() if not current_user.is_super_admin else Company.query.all()
+    
+    if len(user_companies) == 1:
+        flash("Cannot delete the only available company! Create another company first.", "danger")
+        return redirect(url_for("company.index"))
+    
+    # Prevent deleting current company if there are other companies available
+    if company_id == session.get("company_id"):
+        # Find another company to switch to
+        other_company = [c for c in user_companies if c.id != company_id][0]
+        
+        # Switch to the other company
+        session["company_id"] = other_company.id
+        session["company_name"] = other_company.name
+        
+        # Find the active financial year for the new company
+        from models import FinancialYear
+        fy = FinancialYear.query.filter_by(company_id=other_company.id, is_active=True).first()
+        from utils.filters import get_current_fy
+        session["fin_year"] = fy.year_name if fy else get_current_fy()
+        
+        flash(f"Switched to '{other_company.name}' before deleting '{company.name}'", "info")
     
     try:
         # Delete ALL associated data for this company

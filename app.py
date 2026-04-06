@@ -8,6 +8,8 @@ from extensions import db, login_manager, migrate
 
 from dotenv import load_dotenv
 
+from utils.filters import get_current_fy
+
 import os
 
 import warnings
@@ -544,7 +546,7 @@ def create_app():
 
                     session["company_name"] = company.name
 
-                    session["fin_year"] = fy.year_name if fy else "2025-26"
+                    session["fin_year"] = fy.year_name if fy else get_current_fy()
 
                     session["user_role"] = "admin"
 
@@ -757,7 +759,7 @@ def create_app():
 
                     session["company_name"] = company.name
 
-                    session["fin_year"] = fy.year_name if fy else "2025-26"
+                    session["fin_year"] = fy.year_name if fy else get_current_fy()
 
                     session["user_role"] = "admin"
 
@@ -881,7 +883,7 @@ def create_app():
 
                 session["company_name"] = company.name
 
-                session["fin_year"] = fy.year_name if fy else "2025-26"
+                session["fin_year"] = fy.year_name if fy else get_current_fy()
 
                 session["user_role"] = "admin"
 

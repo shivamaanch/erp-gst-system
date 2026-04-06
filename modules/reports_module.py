@@ -713,7 +713,11 @@ def account_ledger(account_id):
         print(f"DEBUG: Account {account_id} not found")
         return "Account not found", 404
     
+    # Get company details
+    company = Company.query.get(cid)
+    
     print(f"DEBUG: Found account: {account.name}, group: {account.group_name}")
+    print(f"DEBUG: Found company: {company.name if company else 'N/A'}")
     
     entity_name = account.name
     entity_group = account.group_name or "Default Group"
@@ -863,6 +867,7 @@ def account_ledger(account_id):
     
     return render_template("reports/account_ledger.html",
                          account=account,
+                         company=company,
                          party=None,  # No Party logic
                          entity_name=entity_name,
                          entity_group=entity_group,
