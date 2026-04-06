@@ -1474,16 +1474,84 @@ def add_entry():
                 flash("Invalid account selected", "error")
                 return render_template("milk/entry_form_traditional.html", accounts=accounts, charts=charts, today=default_date, edit_mode=False, default_account=last_account)
         
-        txn=MilkTransaction(company_id=cid,fin_year=fy,account_id=account_id,txn_date=txn_date,
-            shift=request.form.get("shift","Morning"),txn_type=txn_type,
-            qty_liters=qty,fat=fat,snf=snf,clr=clr,  # Store converted CLR
-            rate=rate,amount=amount,  # Store rate per 100kg (already correct)
-            chart_id=chart_id,narration=request.form.get("narration","").strip())
-        db.session.add(txn)
-        db.session.flush()  # Get the transaction ID
+        # Create milk transaction using raw SQL to avoid account_id column issues
+        from sqlalchemy import text
+        
+        # Check if we're using SQLite or PostgreSQL
+        is_sqlite = db.engine.dialect.name == 'sqlite'
+        
+        # Build narration with party info
+        party_name = "Cash Account"
+        if not is_cash_account and account:
+            party_name = account.name
+        
+        narration = f"Mobile Purchase | Party: {party_name} | FAT:{fat}% SNF:{snf}% | {qty}L @ Rs{rate}/100kg"
+        if request.form.get("narration", "").strip():
+            narration = request.form.get("narration", "").strip()
+        
+        # Insert milk transaction
+        if is_sqlite:
+            # SQLite version
+            sql = """
+            INSERT INTO milk_transactions 
+            (company_id, fin_year, voucher_no, txn_date, shift, txn_type, 
+             qty_liters, fat, snf, clr, rate, amount, chart_id, narration)
+            VALUES 
+            (:company_id, :fin_year, :voucher_no, :txn_date, :shift, :txn_type,
+             :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration)
+            """
+            result = db.session.execute(text(sql), {
+                "company_id": cid,
+                "fin_year": fy,
+                "voucher_no": f"MKT{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "txn_date": txn_date,
+                "shift": request.form.get("shift", "Morning"),
+                "txn_type": txn_type,
+                "qty_liters": qty,
+                "fat": fat,
+                "snf": snf,
+                "clr": clr,
+                "rate": rate,
+                "amount": amount,
+                "chart_id": chart_id,
+                "narration": narration
+            })
+            txn_id = result.lastrowid
+        else:
+            # PostgreSQL version
+            sql = """
+            INSERT INTO milk_transactions 
+            (company_id, fin_year, voucher_no, txn_date, shift, txn_type, 
+             qty_liters, fat, snf, clr, rate, amount, chart_id, narration)
+            VALUES 
+            (:company_id, :fin_year, :voucher_no, :txn_date, :shift, :txn_type,
+             :qty_liters, :fat, :snf, :clr, :rate, :amount, :chart_id, :narration)
+            RETURNING id
+            """
+            result = db.session.execute(text(sql), {
+                "company_id": cid,
+                "fin_year": fy,
+                "voucher_no": f"MKT{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "txn_date": txn_date,
+                "shift": request.form.get("shift", "Morning"),
+                "txn_type": txn_type,
+                "qty_liters": qty,
+                "fat": fat,
+                "snf": snf,
+                "clr": clr,
+                "rate": rate,
+                "amount": amount,
+                "chart_id": chart_id,
+                "narration": narration
+            })
+            row = result.fetchone()
+            txn_id = row.id
+        
+        print(f"DEBUG: Created milk transaction with ID: {txn_id}")
+        
         bill_no=None
         if create_invoice:
-            print(f"DEBUG: Creating invoice for transaction {txn.id}")
+            print(f"DEBUG: Creating invoice for transaction {txn_id}")
             print(f"DEBUG: create_invoice = {create_invoice}")
             print(f"DEBUG: form data = {dict(request.form)}")
             
@@ -1528,11 +1596,16 @@ def add_entry():
                 gst_rate=gst_rate,cgst=gst_amt/2,sgst=gst_amt/2,igst=0)
             print(f"DEBUG: Creating bill item...")
             db.session.add(item)
-            print(f"DEBUG: Setting txn.bill_id = {bill.id}")
-            try:
-                txn.bill_id = bill.id
-            except Exception as e:
-                print(f"WARNING: Could not set bill_id (column may not exist): {e}")
+            print(f"DEBUG: Setting milk transaction bill_id = {bill.id}")
+            
+            # Update milk transaction with bill_id
+            if is_sqlite:
+                db.session.execute(text("UPDATE milk_transactions SET bill_id = :bill_id WHERE id = :txn_id"), 
+                                 {"bill_id": bill.id, "txn_id": txn_id})
+            else:
+                db.session.execute(text("UPDATE milk_transactions SET bill_id = :bill_id WHERE id = :txn_id"), 
+                                 {"bill_id": bill.id, "txn_id": txn_id})
+            
             print(f"DEBUG: Invoice creation completed")
             
             # Post to ledgers with correct debit/credit based on transaction type
@@ -1547,7 +1620,7 @@ def add_entry():
                     
                     selected_acct = Account.query.get(account_id) if account_id else None
                     if selected_acct:
-                        voucher_no = f"MLK-{txn.id}"
+                        voucher_no = f"MLK-{txn_id}"
                         header = JournalHeader(
                             company_id=cid,
                             fin_year=fy,
@@ -1586,7 +1659,7 @@ def add_entry():
                     
                     selected_acct = Account.query.get(account_id) if account_id else None
                     if selected_acct:
-                        voucher_no = f"MLK-{txn.id}"
+                        voucher_no = f"MLK-{txn_id}"
                         header = JournalHeader(
                             company_id=cid,
                             fin_year=fy,
@@ -1649,7 +1722,7 @@ def add_entry():
                 print(f"DEBUG: Created Milk Purchase account id={milk_purchase_acct.id}")
             selected_acct = Account.query.get(account_id) if account_id else None
             if selected_acct:
-                voucher_no = f"MLK-{txn.id}"
+                voucher_no = f"MLK-{txn_id}"
                 header = JournalHeader(
                     company_id=cid,
                     fin_year=session.get("fin_year"),  # Use session FY (validated to match txn date)
