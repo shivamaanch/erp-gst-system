@@ -396,11 +396,11 @@ def sale_list():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTRING(t.narration, 
-                          POSITION('Party:' IN t.narration) + 6, 
+                          STRPOS(t.narration, 'Party:') + 6, 
                           CASE 
-                            WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                            THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                            ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                            WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                           END
                    )
                  ELSE 'Unknown'
@@ -421,11 +421,11 @@ def sale_list():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTRING(t.narration, 
-                          POSITION('Party:' IN t.narration) + 6, 
+                          STRPOS(t.narration, 'Party:') + 6, 
                           CASE 
-                            WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                            THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                            ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                            WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                           END
                    )
                  ELSE 'Unknown'
@@ -519,11 +519,11 @@ def milk_statement():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTRING(t.narration, 
-                          POSITION('Party:' IN t.narration) + 6, 
+                          STRPOS(t.narration, 'Party:') + 6, 
                           CASE 
-                            WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                            THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                            ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                            WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                           END
                    )
                  ELSE 'Unknown'
@@ -544,11 +544,11 @@ def milk_statement():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTRING(t.narration, 
-                          POSITION('Party:' IN t.narration) + 6, 
+                          STRPOS(t.narration, 'Party:') + 6, 
                           CASE 
-                            WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                            THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                            ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                            WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                           END
                    )
                  ELSE 'Unknown'
@@ -672,11 +672,11 @@ def milk_import():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTRING(t.narration, 
-                      POSITION('Party:' IN t.narration) + 6, 
+                      STRPOS(t.narration, 'Party:') + 6, 
                       CASE 
-                        WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                        THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                        ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                        WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                       END
                )
              ELSE 'Unknown'
@@ -820,11 +820,11 @@ def milk_sale_import():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTRING(t.narration, 
-                      POSITION('Party:' IN t.narration) + 6, 
+                      STRPOS(t.narration, 'Party:') + 6, 
                       CASE 
-                        WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                        THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                        ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                        WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                       END
                )
              ELSE 'Unknown'
@@ -1308,11 +1308,11 @@ def get_last_entry():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTRING(t.narration, 
-                          POSITION('Party:' IN t.narration) + 6, 
+                          STRPOS(t.narration, 'Party:') + 6, 
                           CASE 
-                            WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                            THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                            ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                            WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                           END
                    )
                  ELSE 'Unknown'
@@ -2518,11 +2518,11 @@ def debug_txns():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTRING(t.narration, 
-                      POSITION('Party:' IN t.narration) + 6, 
+                      STRPOS(t.narration, 'Party:') + 6, 
                       CASE 
-                        WHEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) > 0 
-                        THEN POSITION('|' IN SUBSTRING(t.narration, POSITION('Party:' IN t.narration) + 6)) - 1
-                        ELSE LENGTH(t.narration) - POSITION('Party:' IN t.narration) - 5
+                        WHEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration, STRPOS(t.narration, 'Party:') + 6), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 5
                       END
                )
              ELSE 'Unknown'
