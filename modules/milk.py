@@ -2549,6 +2549,60 @@ def delete_entry(txn_id):
         flash(f"Error deleting entry: {str(e)}", "error")
         return redirect(url_for('milk.entry_list'))
 
+@milk_bp.route("/milk/debug/journal-links/<int:txn_id>")
+def debug_journal_links(txn_id):
+    """Debug route to verify journal entry linking for milk transactions"""
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    from sqlalchemy import text
+    
+    # Get the milk transaction
+    milk_txn = MilkTransaction.query.filter_by(id=txn_id, company_id=cid, fin_year=fy).first()
+    if not milk_txn:
+        return f"<h3>Milk Transaction {txn_id} not found</h3>"
+    
+    # Find related journal entries
+    related_journal_lines = db.session.query(JournalLine).join(JournalHeader).filter(
+        JournalHeader.company_id == cid,
+        JournalHeader.fin_year == fy,
+        JournalHeader.narration.like(f"%MLK-{milk_txn.id}%")
+    ).all()
+    
+    output = f"""
+    <h3>Journal Entry Debug for Milk Transaction {txn_id}</h3>
+    <table border='1'>
+        <tr><th colspan='2'>Milk Transaction Details</th></tr>
+        <tr><td>ID</td><td>{milk_txn.id}</td></tr>
+        <tr><td>Voucher No</td><td>{milk_txn.voucher_no}</td></tr>
+        <tr><td>Amount</td><td>₹{milk_txn.amount}</td></tr>
+        <tr><td>Narration</td><td>{milk_txn.narration}</td></tr>
+    </table>
+    
+    <h4>Related Journal Entries ({len(related_journal_lines)} found)</h4>
+    <table border='1'>
+        <tr><th>Journal ID</th><th>Account ID</th><td>Debit</td><th>Credit</th><th>Narration</th></tr>
+    """
+    
+    for line in related_journal_lines:
+        output += f"""
+        <tr>
+            <td>{line.journal_header_id}</td>
+            <td>{line.account_id}</td>
+            <td>₹{line.debit}</td>
+            <td>₹{line.credit}</td>
+            <td>{line.narration}</td>
+        </tr>
+        """
+    
+    output += "</table>"
+    
+    if not related_journal_lines:
+        output += "<p><strong>No journal entries found for this transaction!</strong></p>"
+        output += f"<p>Looking for pattern: MLK-{milk_txn.id}</p>"
+    
+    return output
+
 @milk_bp.route("/milk/debug/routes")
 def debug_routes():
     """Debug route to check if blueprint is working"""
