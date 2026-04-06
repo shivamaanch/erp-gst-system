@@ -159,7 +159,7 @@
             <input type="text" id="accountName" class="form-control" placeholder="Type account name or click + to add new ledger..." 
                    value="{% if edit_mode and txn and txn.account %}{{ txn.account.name }}{% elif default_account %}{{ default_account.name }}{% endif %}" 
                    required autocomplete="off" onkeyup="searchAccountWithBalance()" onfocus="searchAccountWithBalance(true)">
-            <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn %}{{ txn.account_id }}{% elif default_account %}{{ default_account.id }}{% endif %}" required>
+            <input type="hidden" name="party_id" id="partyId" value="{% if edit_mode and txn and txn.account_id %}{{ txn.account_id }}{% elif default_account %}{{ default_account.id }}{% endif %}" required>
             <button class="btn btn-outline-primary" type="button" onclick="openAddAccountModal()" title="Add New Ledger">
               <i class="fas fa-plus"></i>
             </button>
