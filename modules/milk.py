@@ -398,12 +398,11 @@ def sale_list():
                t.bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 7, 
+                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -423,12 +422,11 @@ def sale_list():
                NULL as bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 7, 
+                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -521,12 +519,11 @@ def milk_statement():
                t.bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 7, 
+                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -546,12 +543,11 @@ def milk_statement():
                NULL as bill_id, 
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 7, 
+                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -674,12 +670,12 @@ def milk_import():
            t.rate, t.amount, t.chart_id, t.narration,
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
-               SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 7, 
+               SUBSTRING(t.narration, 
+                      STRPOS(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
@@ -822,12 +818,12 @@ def milk_sale_import():
            t.rate, t.amount, t.chart_id, t.narration,
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
-               SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 7, 
+               SUBSTRING(t.narration, 
+                      STRPOS(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
@@ -1310,12 +1306,11 @@ def get_last_entry():
         SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.clr, t.rate, t.amount, t.txn_type,
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
-                   SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 7, 
+                   SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                            WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -2569,12 +2564,12 @@ def debug_txns():
     SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.narration,
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
-               SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 7, 
+               SUBSTRING(t.narration, 
+                      STRPOS(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
+                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
