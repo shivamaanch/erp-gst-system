@@ -2552,6 +2552,47 @@ def debug_routes():
     print("DEBUG: debug_routes called - blueprint is working!")
     return "Milk blueprint is working! Routes are registered."
 
+@milk_bp.route("/milk/debug/party-names")
+def debug_party_names():
+    """Debug route to test party name extraction SQL."""
+    cid = session.get("company_id")
+    fy = session.get("fin_year")
+    
+    from sqlalchemy import text
+    
+    # Test the party name extraction SQL
+    sql = """
+    SELECT t.id, t.narration,
+           CASE 
+             WHEN t.narration LIKE '%Party:%' THEN 
+               SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7 FOR 
+                      CASE 
+                        WHEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN STRPOS(SUBSTRING(t.narration FROM STRPOS(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - STRPOS(t.narration, 'Party:') - 6
+                      END
+               )
+             ELSE 'Unknown'
+           END as party_name
+    FROM milk_transactions t
+    WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+    LIMIT 5
+    """
+    
+    try:
+        result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+        rows = result.fetchall()
+        
+        output = "<h3>Party Name Extraction Debug</h3>"
+        output += "<table border='1'><tr><th>ID</th><th>Narration</th><th>Extracted Party</th></tr>"
+        for row in rows:
+            output += f"<tr><td>{row.id}</td><td>{row.narration}</td><td><strong>{row.party_name}</strong></td></tr>"
+        output += "</table>"
+        
+        return output
+    except Exception as e:
+        return f"<h3>Error in SQL Query</h3><p>{str(e)}</p>"
+
 @milk_bp.route("/milk/debug/txns")
 def debug_txns():
     """Simple debug route to inspect saved milk transactions."""
