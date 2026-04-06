@@ -399,11 +399,11 @@ def sale_list():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 6, 
+                          INSTR(t.narration, 'Party:') + 7, 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -424,11 +424,11 @@ def sale_list():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 6, 
+                          INSTR(t.narration, 'Party:') + 7, 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -522,11 +522,11 @@ def milk_statement():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 6, 
+                          INSTR(t.narration, 'Party:') + 7, 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -547,11 +547,11 @@ def milk_statement():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 6, 
+                          INSTR(t.narration, 'Party:') + 7, 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -675,11 +675,11 @@ def milk_import():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 6, 
+                      INSTR(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
@@ -823,11 +823,11 @@ def milk_sale_import():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 6, 
+                      INSTR(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
@@ -1311,11 +1311,11 @@ def get_last_entry():
                CASE 
                  WHEN t.narration LIKE '%Party:%' THEN 
                    SUBSTR(t.narration, 
-                          INSTR(t.narration, 'Party:') + 6, 
+                          INSTR(t.narration, 'Party:') + 7, 
                           CASE 
-                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                            WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                            THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                            ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                           END
                    )
                  ELSE 'Unknown'
@@ -2121,6 +2121,28 @@ def edit_entry(txn_id):
                 gst_rate=gst_rate,cgst=gst_amt/2,sgst=gst_amt/2,igst=0)
             db.session.add(item); actual_txn.bill_id=bill.id
         
+        # Update corresponding journal entries to reflect ledger changes
+        print("DEBUG: Updating journal entries for ledger consistency...")
+        from models import JournalHeader, JournalLine, Account
+        
+        # Find journal entries related to this milk transaction
+        related_journal_lines = db.session.query(JournalLine).join(JournalHeader).filter(
+            JournalHeader.company_id == cid,
+            JournalHeader.fin_year == fy,
+            JournalHeader.narration.like(f"%{actual_txn.voucher_no}%")
+        ).all()
+        
+        if related_journal_lines:
+            print(f"DEBUG: Found {len(related_journal_lines)} related journal lines to update")
+            # Update amounts in journal lines
+            for line in related_journal_lines:
+                if line.debit > 0:
+                    line.debit = actual_txn.amount
+                elif line.credit > 0:
+                    line.credit = actual_txn.amount
+                line.narration = actual_txn.narration
+            print("DEBUG: Journal line amounts updated")
+        
         print("DEBUG: Committing to database...")
         db.session.commit()
         session["last_txn_date"] = actual_txn.txn_date.isoformat()
@@ -2178,6 +2200,27 @@ def update_field(txn_id):
         if hasattr(txn, 'rate') and txn.rate > 0 and txn.qty_liters > 0:
             calc = compute_component_breakdown(txn.qty_liters, txn.fat, txn.snf, txn.rate)
             txn.amount = calc["amount"]
+        
+        # Update corresponding journal entries to reflect ledger changes
+        print(f"DEBUG: Updating journal entries for field {field} update...")
+        from models import JournalHeader, JournalLine, Account
+        
+        # Find journal entries related to this milk transaction
+        related_journal_lines = db.session.query(JournalLine).join(JournalHeader).filter(
+            JournalHeader.company_id == cid,
+            JournalHeader.fin_year == fy,
+            JournalHeader.narration.like(f"%{txn.voucher_no}%")
+        ).all()
+        
+        if related_journal_lines:
+            print(f"DEBUG: Found {len(related_journal_lines)} related journal lines to update")
+            # Update amounts in journal lines
+            for line in related_journal_lines:
+                if line.debit > 0:
+                    line.debit = txn.amount
+                elif line.credit > 0:
+                    line.credit = txn.amount
+            print("DEBUG: Journal line amounts updated")
         
         db.session.commit()
         return jsonify({"success": True, "message": "Updated successfully"})
@@ -2527,11 +2570,11 @@ def debug_txns():
            CASE 
              WHEN t.narration LIKE '%Party:%' THEN 
                SUBSTR(t.narration, 
-                      INSTR(t.narration, 'Party:') + 6, 
+                      INSTR(t.narration, 'Party:') + 7, 
                       CASE 
-                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') > 0 
-                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 6), '|') - 1
-                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 5
+                        WHEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') > 0 
+                        THEN INSTR(SUBSTR(t.narration, INSTR(t.narration, 'Party:') + 7), '|') - 1
+                        ELSE LENGTH(t.narration) - INSTR(t.narration, 'Party:') - 6
                       END
                )
              ELSE 'Unknown'
