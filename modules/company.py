@@ -248,3 +248,75 @@ def delete(company_id):
         flash(f"Error deleting company: {str(e)}", "danger")
     
     return redirect(url_for("company.index"))
+
+@company_bp.route("/company/delete_fy/<int:fy_id>", methods=["POST"])
+@login_required
+def delete_fy(fy_id):
+    """Delete a financial year and all its associated data."""
+    cid = session.get("company_id")
+    company = Company.query.get(cid)
+    
+    # Get the financial year to delete
+    fy = FinancialYear.query.filter_by(id=fy_id, company_id=cid).first_or_404()
+    
+    # Prevent deletion of active FY
+    if fy.is_active:
+        flash("Cannot delete the active financial year!", "danger")
+        return redirect(url_for("company.index"))
+    
+    print(f"[DEBUG] Deleting Financial Year: {fy.year_name} (ID: {fy_id})")
+    
+    try:
+        fy_name = fy.year_name
+        fy_period = f"{fy.start_date} to {fy.end_date}"
+        
+        # Delete all related records for this specific FY
+        print(f"[DEBUG] Starting deletion of all data for FY {fy_name}")
+        
+        tables_to_delete = [
+            ("bill_items", "bill_id IN (SELECT id FROM bills WHERE company_id = :cid AND fin_year = :fy)"),
+            ("bills", "company_id = :cid AND fin_year = :fy"),
+            ("milk_transactions", "company_id = :cid AND fin_year = :fy"),
+            ("journal_lines", "journal_header_id IN (SELECT id FROM journal_headers WHERE company_id = :cid AND fin_year = :fy)"),
+            ("journal_headers", "company_id = :cid AND fin_year = :fy"),
+            ("cash_book", "company_id = :cid AND fin_year = :fy"),
+            ("gst_returns", "company_id = :cid AND fin_year = :fy"),
+            ("tds_returns", "company_id = :cid AND fin_year = :fy"),
+            ("bank_transactions", "company_id = :cid AND fin_year = :fy"),
+        ]
+        
+        for table_name, condition in tables_to_delete:
+            try:
+                result = db.session.execute(text(f"DELETE FROM {table_name} WHERE {condition}"), 
+                                         {"cid": cid, "fy": fy_name})
+                print(f"[DEBUG] Deleted {result.rowcount} rows from {table_name}")
+            except Exception as e:
+                print(f"[DEBUG] Error deleting from {table_name}: {e}")
+        
+        # Finally delete the financial year itself
+        print(f"[DEBUG] Deleting financial year record...")
+        db.session.delete(fy)
+        db.session.commit()
+        
+        print(f"[DEBUG] Successfully deleted FY {fy_name}")
+        flash(f"Financial Year '{fy_name}' ({fy_period}) and all its data have been permanently deleted!", "success")
+        
+        # If the deleted FY was the current session FY, switch to another one
+        current_fy = session.get("fin_year")
+        if current_fy == fy_name:
+            # Get another active FY for this company
+            new_active_fy = FinancialYear.query.filter_by(company_id=cid, is_active=True).first()
+            if new_active_fy:
+                session["fin_year"] = new_active_fy.year_name
+            else:
+                # Get most recent FY
+                recent_fy = FinancialYear.query.filter_by(company_id=cid).order_by(FinancialYear.year_name.desc()).first()
+                if recent_fy:
+                    session["fin_year"] = recent_fy.year_name
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[DEBUG] Error deleting financial year: {e}")
+        flash(f"Error deleting financial year: {str(e)}", "danger")
+    
+    return redirect(url_for("company.index"))

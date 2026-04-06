@@ -156,6 +156,20 @@
                   <button class="btn btn-xs btn-sm btn-outline-success py-0">Set Active</button>
                 </form>
                 {% endif %}
+                {% if fy.year_name != active_fy %}
+                <button type="button" class="btn btn-xs btn-sm btn-outline-danger py-0 ms-1" 
+                        data-fy-id="{{ fy.id }}" 
+                        data-fy-name="{{ fy.year_name }}"
+                        data-fy-period="{{ fy.start_date }} to {{ fy.end_date }}"
+                        onclick="confirmDeleteFY(this)" 
+                        title="Delete FY and all related entries">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% else %}
+                <button class="btn btn-xs btn-sm btn-outline-secondary py-0 ms-1" disabled title="Cannot delete active FY">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -176,6 +190,21 @@ function confirmDelete(button) {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `/company/delete/${companyId}`;
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+
+function confirmDeleteFY(button) {
+  const fyId = button.getAttribute('data-fy-id');
+  const fyName = button.getAttribute('data-fy-name');
+  const fyPeriod = button.getAttribute('data-fy-period');
+  
+  if (confirm(`Are you sure you want to delete Financial Year "${fyName}" (${fyPeriod})?\n\n⚠️ WARNING: This will permanently delete ALL data for this financial year:\n• All milk transactions (purchase/sale)\n• All invoices and bills\n• All journal entries\n• All ledger entries\n• All GST records\n• All bank/cash transactions\n\nThis action cannot be undone!`)) {
+    // Create and submit a form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/company/delete_fy/${fyId}`;
     document.body.appendChild(form);
     form.submit();
   }
