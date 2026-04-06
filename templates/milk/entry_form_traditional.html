@@ -254,7 +254,7 @@
                 <div class="card-body text-center py-3">
                   <h6 class="card-title text-info mb-2">SNF % (Auto-calculated)</h6>
                   <div class="display-6 fw-bold text-info" id="snf_display">0.000</div>
-                  <small class="text-muted">From CLR: (CLR/4) + (0.20 × FAT) + 0.14</small>
+                  <small class="text-muted">From CLR: trunc(CLR/4, 2) + (0.20 × FAT) + 0.14</small>
                 </div>
               </div>
             </div>
@@ -484,10 +484,11 @@ function calculateSNF() {
   const fat = parseFloat(document.getElementById('fat').value) || 0;
   let snf;
   
-  // Richmond's Formula: SNF = (CLR/4) + (0.20 × Fat) + 0.14
+  // Richmond's Formula: SNF = trunc(CLR/4, 2) + (0.20 × Fat) + 0.14
   if (clr > 0) {
-    const clrPart = clr / 4; // use full precision
-    snf = clrPart + (0.20 * fat) + 0.14;
+    // Truncate CLR/4 to 2 decimal places (no rounding)
+    const clrDivTruncated = Math.floor((clr / 4) * 100) / 100;
+    snf = clrDivTruncated + (0.20 * fat) + 0.14;
     // Cap at 15.0 to avoid unrealistic values (backend uses same cap)
     snf = Math.min(15.0, snf);
   } else {

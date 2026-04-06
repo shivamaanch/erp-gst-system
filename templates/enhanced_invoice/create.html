@@ -513,14 +513,16 @@ function calculateGSTQuick() {
   document.getElementById('total_with_gst').value = total.toFixed(2);
 }
 
-// Bihar SNF formula: SNF = (CLR/4) + (0.20 × Fat) + 0.14
+// Bihar SNF formula: SNF = trunc(CLR/4, 2) + (0.20 × Fat) + 0.14
 function calculateSNFQuick() {
   const form = _milkQuickForm();
   const clr = parseFloat(form.querySelector('[name="clr"]').value) || 0;
   const fat = parseFloat(form.querySelector('[name="fat"]').value) || 0;
   let snf = 0;
   if (clr > 0) {
-    snf = (clr / 4) + (0.20 * fat) + 0.14;
+    // Truncate CLR/4 to 2 decimal places (no rounding)
+    const clrDivTruncated = Math.floor((clr / 4) * 100) / 100;
+    snf = clrDivTruncated + (0.20 * fat) + 0.14;
     snf = Math.max(7.0, Math.min(15.0, snf));
   }
   document.getElementById('snf_auto').value = snf.toFixed(2);

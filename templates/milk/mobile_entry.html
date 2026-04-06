@@ -778,11 +778,12 @@
         const rate = parseFloat(document.getElementById('rateField').value) || 0;
         
         if (qty > 0 && fat > 0 && clr > 0 && rate > 0) {
-            // Calculate SNF using Richmond's formula
+            // Calculate SNF using Richmond's formula with proper CLR truncation
             let snf;
             if (clr > 0) {
-                const clrPart = clr / 4; // use full precision
-                snf = clrPart + (0.20 * fat) + 0.14;
+                // Truncate CLR/4 to 2 decimal places (no rounding)
+                const clrDivTruncated = Math.floor((clr / 4) * 100) / 100;
+                snf = clrDivTruncated + (0.20 * fat) + 0.14;
                 // Cap at 15.0 to avoid unrealistic values
                 snf = Math.min(15.0, snf);
             } else {
