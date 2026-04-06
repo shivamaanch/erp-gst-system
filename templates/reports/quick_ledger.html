@@ -65,46 +65,79 @@
 </div>
 
 <script>
+let searchTimeout;
+
 function searchAccounts() {
-  const searchTerm = document.getElementById('accountSearch').value.toLowerCase();
-  const items = document.querySelectorAll('.account-item');
-  const milkOnly = document.getElementById('milkToggle').checked;
-  let visibleCount = 0;
-  
-  items.forEach(item => {
-    const name = item.getAttribute('data-name');
-    const type = item.getAttribute('data-type');
-    const isMilk = item.getAttribute('data-is-milk') === 'true';
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const searchTerm = document.getElementById('accountSearch').value.toLowerCase().trim();
+    const items = document.querySelectorAll('.account-item');
+    const milkOnly = document.getElementById('milkToggle').checked;
+    let visibleCount = 0;
     
-    let showItem = true;
+    items.forEach(item => {
+      const name = item.getAttribute('data-name') || '';
+      const type = item.getAttribute('data-type') || '';
+      const isMilk = item.getAttribute('data-is-milk') === 'true';
+      
+      let showItem = true;
+      
+      // Check search filter - improved matching
+      if (searchTerm.length >= 2 && !name.toLowerCase().includes(searchTerm) && !type.toLowerCase().includes(searchTerm)) {
+        showItem = false;
+      }
+      
+      // Check milk filter
+      if (milkOnly && !isMilk) {
+        showItem = false;
+      }
+      
+      if (showItem) {
+        item.style.display = '';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
     
-    // Check search filter
-    if (searchTerm.length >= 2 && !name.includes(searchTerm) && !type.includes(searchTerm)) {
-      showItem = false;
+    if (visibleCount === 0 && searchTerm.length >= 2) {
+      document.getElementById('searchResults').innerHTML = `
+        <div class="text-muted text-center p-4">
+          <i class="bi bi-exclamation-circle display-4"></i>
+          <p>No accounts or parties found matching "${searchTerm}"</p>
+        </div>
+      `;
+    } else if (visibleCount > 0) {
+      // Reset search results message if items are found
+      const searchResults = document.getElementById('searchResults');
+      if (searchResults && searchResults.innerHTML.includes('No accounts or parties found')) {
+        searchResults.innerHTML = '';
+      }
     }
-    
-    // Check milk filter
-    if (milkOnly && !isMilk) {
-      showItem = false;
-    }
-    
-    if (showItem) {
-      item.style.display = '';
-      visibleCount++;
-    } else {
-      item.style.display = 'none';
-    }
-  });
-  
-  if (visibleCount === 0 && searchTerm.length >= 2) {
-    document.getElementById('searchResults').innerHTML = `
-      <div class="text-muted text-center p-4">
-        <i class="bi bi-exclamation-circle display-4"></i>
-        <p>No accounts or parties found matching "${searchTerm}"</p>
-      </div>
-    `;
-  }
+  }, 300); // Debounce search to improve performance
 }
+
+function clearSearch() {
+  document.getElementById('accountSearch').value = '';
+  searchAccounts();
+}
+
+// Add event listeners for better search handling
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('accountSearch');
+  if (searchInput) {
+    // Search on input
+    searchInput.addEventListener('input', searchAccounts);
+    // Search on keyup (for compatibility)
+    searchInput.addEventListener('keyup', searchAccounts);
+    // Clear search on Escape key
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        clearSearch();
+      }
+    });
+  }
+});
 
 function toggleMilkView() {
   // Re-run search with milk filter applied

@@ -497,10 +497,13 @@ def account_ledger(account_id):
             
             if bill.bill_type == 'Purchase':
                 debit = amount; credit = 0
+                print(f"DEBUG: Purchase Bill {bill.bill_no} - Amount: {amount}, Debit: {debit}, Credit: {credit}")
             elif bill.bill_type in ['Sale', 'Sales']:
                 debit = 0; credit = amount
+                print(f"DEBUG: Sale Bill {bill.bill_no} - Amount: {amount}, Debit: {debit}, Credit: {credit}")
             else:
                 debit = amount; credit = 0
+                print(f"DEBUG: Other Bill {bill.bill_no} (Type: {bill.bill_type}) - Amount: {amount}, Debit: {debit}, Credit: {credit}")
             
             # Calculate fat and SNF values for milk transactions using unified milk formula
             fat_value = 0.0

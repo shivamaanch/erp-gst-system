@@ -464,7 +464,21 @@
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">👤 Party</label>
+                    <label class="form-label">� Year</label>
+                    <select name="fin_year" class="form-control" id="yearField" required>
+                        <option value="{{ session.get('fin_year', '2026-27') }}" selected>{{ session.get('fin_year', '2026-27') }}</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🏢 Company</label>
+                    <select name="company_id" class="form-control" id="companyField" required>
+                        <option value="{{ session.get('company_id', 1) }}" selected>{{ session.get('company_name', 'Default Company') }}</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">�👤 Party</label>
                     <div class="position-relative">
                         <input type="text" name="party" class="form-control" id="partyField" placeholder="Type party name..." required>
                         <div id="partySearchResults" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
@@ -513,10 +527,10 @@
         
         <!-- Quick Navigation Buttons -->
         <div class="quick-nav">
-            <a href="{{ url_for('company.index') }}" class="quick-nav-btn home-btn">
+            <a href="{{ url_for('main.dashboard') }}" class="quick-nav-btn home-btn">
                 <i class="bi bi-house-fill"></i>
                 <span>Home</span>
-                <small>Main Menu</small>
+                <small>Dashboard</small>
             </a>
             <a href="{{ url_for('milk.mobile_entry') }}" class="quick-nav-btn active">
                 <i class="bi bi-lightning-fill"></i>
@@ -844,6 +858,8 @@
         // Prepare data
         const data = {
             date: formData.get('date'),
+            fin_year: formData.get('fin_year'),
+            company_id: formData.get('company_id'),
             party: formData.get('party'),
             qty: parseFloat(formData.get('qty')),
             fat: parseFloat(formData.get('fat')),

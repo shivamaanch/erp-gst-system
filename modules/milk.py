@@ -1018,12 +1018,23 @@ def mobile_save_entry():
                     company_id=cid,
                     name=party_name,
                     group_name="Sundry Creditors" if txn_type == "Purchase" else "Sundry Debtors",
-                    opening_dr=0.0 if txn_type == "Purchase" else 0.0,
-                    opening_cr=0.0 if txn_type == "Purchase" else 0.0,
+                    opening_dr=0.0,
+                    opening_cr=0.0,
+                    balance_type="Cr" if txn_type == "Purchase" else "Dr",  # Suppliers have Cr balance, Customers have Dr balance
                     is_active=True
                 )
                 db.session.add(account)
                 db.session.flush()
+            else:
+                # Update existing account to have correct balance type
+                if txn_type == "Purchase" and account.balance_type != "Cr":
+                    account.balance_type = "Cr"
+                    account.group_name = "Sundry Creditors"
+                elif txn_type == "Sale" and account.balance_type != "Dr":
+                    account.balance_type = "Dr"
+                    account.group_name = "Sundry Debtors"
+                print(f"DEBUG: Updated account {account.name} balance_type to {account.balance_type}")
+            
             account_id = account.id
         
         # Create milk transaction using raw SQL to avoid account_id column issues
