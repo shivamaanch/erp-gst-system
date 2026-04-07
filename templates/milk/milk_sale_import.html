@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Apply filters if any parameters are set
   if (partySearch || fromDate || toDate) {
-    applyFilters();
+    // Don't call applyFilters here, sortAndFilterTable will handle it
   }
   
   // Add live search functionality
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
   fromDateInput.addEventListener('change', applyFilters);
   toDateInput.addEventListener('change', applyFilters);
   
-  // Sort the table on load
+  // Sort the table on load (this will apply filters if they exist)
   sortAndFilterTable();
 });
 
