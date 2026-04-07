@@ -238,7 +238,7 @@ def entry_list():
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     except Exception:
@@ -250,7 +250,7 @@ def entry_list():
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     result = db.session.execute(text(sql), params)
@@ -390,7 +390,7 @@ def purchase_list():
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     except Exception:
@@ -402,7 +402,7 @@ def purchase_list():
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     result = db.session.execute(text(sql), params)
@@ -514,7 +514,7 @@ def sale_list():
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     except Exception:
@@ -526,7 +526,7 @@ def sale_list():
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 200
         """
     result = db.session.execute(text(sql), params)
@@ -640,7 +640,7 @@ def milk_statement():
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
         WHERE {where_clause} 
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 500
         """
     except Exception:
@@ -654,7 +654,7 @@ def milk_statement():
                NULL as bill_no
         FROM milk_transactions t
         WHERE {where_clause} 
-        ORDER BY t.txn_date ASC, party_name ASC 
+        ORDER BY t.txn_date ASC, account_name ASC 
         LIMIT 500
         """
     result = db.session.execute(text(sql), params)
@@ -1485,7 +1485,7 @@ def get_last_entry():
                END as party_name
         FROM milk_transactions t
         WHERE {where_clause}
-        ORDER BY t.txn_date ASC, party_name ASC, t.id DESC
+        ORDER BY t.txn_date ASC, account_name ASC, t.id DESC
         LIMIT 1
         """
         
@@ -1594,7 +1594,7 @@ def add_entry():
                {party_name_sql} as account_name
         FROM milk_transactions t
         WHERE t.company_id = :company_id 
-        ORDER BY t.txn_date ASC, party_name ASC, t.id DESC
+        ORDER BY t.txn_date ASC, account_name ASC, t.id DESC
         LIMIT 1
         """
         result = db.session.execute(text(sql), {"company_id": cid})
