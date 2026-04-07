@@ -464,21 +464,28 @@
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">� Year</label>
+                    <label class="form-label">📅 Year</label>
                     <select name="fin_year" class="form-control" id="yearField" required>
-                        <option value="{{ session.get('fin_year', '2026-27') }}" selected>{{ session.get('fin_year', '2026-27') }}</option>
+                        {% for fy in financial_years %}
+                        <option value="{{ fy.year_name }}" {% if fy.year_name == session.get('fin_year') %}selected{% endif %}>
+                            {{ fy.year_name }} {% if fy.is_active %}(Active){% endif %}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">🏢 Company</label>
-                    <select name="company_id" class="form-control" id="companyField" required>
-                        <option value="{{ session.get('company_id', 1) }}" selected>{{ session.get('company_name', 'Default Company') }}</option>
+                    <select name="company_id" class="form-control" id="companyField" required onchange="updateFinancialYears()">
+                        {% for company in companies %}
+                        <option value="{{ company.id }}" {% if company.id == session.get('company_id') %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">�👤 Party</label>
                     <div class="position-relative">
                         <input type="text" name="party" class="form-control" id="partyField" placeholder="Type party name..." required>
                         <div id="partySearchResults" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
@@ -492,12 +499,12 @@
                 
                 <div class="form-group">
                     <label class="form-label">🧈 FAT %</label>
-                    <input type="number" name="fat" class="form-control" id="fatField" step="0.01" placeholder="0.00" required>
+                    <input type="number" name="fat" class="form-control" id="fatField" step="0.01" placeholder="0.00">
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">🔬 CLR</label>
-                    <input type="number" name="clr" class="form-control" id="clrField" step="0.1" placeholder="0.0" required>
+                    <label class="form-label"> CLR</label>
+                    <input type="number" name="clr" class="form-control" id="clrField" step="0.1" placeholder="0.0">
                 </div>
                 
                 <div class="form-group">
@@ -570,10 +577,34 @@
         setupInputHandlers();
     });
     
+    function updateFinancialYears() {
+        const companyId = document.getElementById('companyField').value;
+        const yearField = document.getElementById('yearField');
+        
+        // Fetch financial years for the selected company
+        fetch(`/milk/get-financial-years/${companyId}`)
+            .then(response => response.json())
+            .then(data => {
+                yearField.innerHTML = '';
+                data.fy_list.forEach(fy => {
+                    const option = document.createElement('option');
+                    option.value = fy.year_name;
+                    option.textContent = fy.year_name + (fy.is_active ? ' (Active)' : '');
+                    if (fy.is_active) {
+                        option.selected = true;
+                    }
+                    yearField.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching financial years:', error);
+            });
+    }
+    
     function initializeForm() {
-        // Set today's date
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dateField').value = today;
+        // Set last entry date (not today's date)
+        const lastEntryDate = "{{ last_entry_date }}";
+        document.getElementById('dateField').value = lastEntryDate;
         
         // Focus on first field
         document.getElementById('partyField').focus();
@@ -791,7 +822,7 @@
         const clr = parseFloat(document.getElementById('clrField').value) || 0;
         const rate = parseFloat(document.getElementById('rateField').value) || 0;
         
-        if (qty > 0 && fat > 0 && clr > 0 && rate > 0) {
+        if (qty > 0 && rate > 0) {
             // Calculate SNF using Richmond's formula with proper CLR truncation
             let snf;
             if (clr > 0) {
@@ -814,11 +845,11 @@
             const bf_rate_raw = (rate * fat_share) / std_fat_kg;
             const snf_rate_raw = (rate * snf_share) / std_snf_kg;
             
-            // Calculate BF and SNF kgs
+            // Calculate BF and SNF kgs (allow fat=0)
             const bf_kgs = (qty * fat) / 100.0;
             const snf_kgs = (qty * snf) / 100.0;
             
-            // Calculate final amount
+            // Calculate final amount (works even if fat=0)
             const bf_amount = bf_kgs * bf_rate_raw;
             const snf_amount = snf_kgs * snf_rate_raw;
             const final_amount = bf_amount + snf_amount;
@@ -835,7 +866,7 @@
         const formData = new FormData(form);
         
         // Validate all fields
-        const requiredFields = ['date', 'party', 'qty', 'fat', 'clr', 'rate'];
+        const requiredFields = ['date', 'party', 'qty', 'rate'];
         let isValid = true;
         
         requiredFields.forEach(fieldName => {
@@ -861,10 +892,10 @@
             fin_year: formData.get('fin_year'),
             company_id: formData.get('company_id'),
             party: formData.get('party'),
-            qty: parseFloat(formData.get('qty')),
-            fat: parseFloat(formData.get('fat')),
-            clr: parseFloat(formData.get('clr')),
-            rate: parseFloat(formData.get('rate')),
+            qty: parseFloat(formData.get('qty')) || 0,
+            fat: parseFloat(formData.get('fat')) || 0,
+            clr: parseFloat(formData.get('clr')) || 0,
+            rate: parseFloat(formData.get('rate')) || 0,
             type: currentType,
             amount: parseFloat(document.getElementById('finalAmount').textContent.replace('₹', ''))
         };
@@ -887,17 +918,22 @@
                 updateStatus('Entry saved successfully!', 'success');
                 
                 // Update last entry display
-                showLastEntry(data);
+                showLastEntry(result.entry);
+                
+                // Update date to last entry date
+                if (result.entry && result.entry.date) {
+                    document.getElementById('dateField').value = result.entry.date;
+                }
                 
                 // Update stats
                 loadTodayStats();
                 
-                // Reset form
+                // Reset form (except date)
                 resetForm();
                 
-                // Focus on first field
+                // Focus on date field for new entry
                 setTimeout(() => {
-                    document.getElementById('partyField').focus();
+                    document.getElementById('dateField').focus();
                 }, 1000);
             } else {
                 updateStatus('Error: ' + result.message, 'error');
@@ -911,11 +947,16 @@
     }
     
     function resetForm() {
-        document.getElementById('mobileEntryForm').reset();
+        // Clear all fields except date
+        document.getElementById('partyField').value = '';
+        document.getElementById('fatField').value = '';
+        document.getElementById('clrField').value = '';
+        document.getElementById('qtyField').value = '';
+        document.getElementById('rateField').value = '';
         
-        // Keep the same date
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dateField').value = today;
+        // Keep the same date (last entry date)
+        const lastEntryDate = document.getElementById('dateField').value;
+        document.getElementById('dateField').value = lastEntryDate;
         
         // Reset amount display
         document.getElementById('finalAmount').textContent = '₹0.00';

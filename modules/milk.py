@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, flash, redirect, url_for, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 from extensions import db
-from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem, JournalHeader, JournalLine, Party
+from models import MilkRateChart, MilkTransaction, Account, Bill, BillItem, JournalHeader, JournalLine, Party, Company, FinancialYear
 from datetime import date, datetime, timedelta
 from sqlalchemy import text
 from decimal import Decimal, ROUND_HALF_UP
@@ -201,6 +201,31 @@ def entry_list():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
+    # Get filter parameters
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    party_search = request.args.get("party_search", "").strip()
+    
+    # Build WHERE conditions
+    where_conditions = ["t.company_id = :company_id", "t.fin_year = :fin_year"]
+    params = {"company_id": cid, "fin_year": fy}
+    
+    # Add date filtering
+    if from_date:
+        where_conditions.append("t.txn_date >= :from_date")
+        params["from_date"] = from_date
+    
+    if to_date:
+        where_conditions.append("t.txn_date <= :to_date")
+        params["to_date"] = to_date
+    
+    # Add party search filtering
+    if party_search:
+        where_conditions.append("({party_name_sql} LIKE :party_search)".format(party_name_sql=get_party_name_sql()))
+        params["party_search"] = f"%{party_search.lower()}%"
+    
+    where_clause = " AND ".join(where_conditions)
+    
     # Check if bill_id column exists in milk_transactions
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
@@ -212,7 +237,7 @@ def entry_list():
                t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
@@ -224,11 +249,11 @@ def entry_list():
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
-    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    result = db.session.execute(text(sql), params)
     txns = []
     for row in result:
         # Create a simple object with the data
@@ -310,7 +335,7 @@ def entry_list():
         db.session.commit()
         parties = [default_party]
     
-    return render_template("milk/entry_list_traditional.html", 
+    return render_template("milk/entry_list_traditional.html", from_date=from_date, to_date=to_date, party_search=party_search, 
                      txns=txns, total_qty=total_qty, total_amt=total_amt,
                      avg_fat=avg_fat, avg_snf=avg_snf,
                      total_bf_kgs=total_bf_kgs, total_snf_kgs=total_snf_kgs,
@@ -328,6 +353,31 @@ def purchase_list():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
+    # Get filter parameters
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    party_search = request.args.get("party_search", "").strip()
+    
+    # Build WHERE conditions
+    where_conditions = ["t.company_id = :company_id", "t.fin_year = :fin_year", "t.txn_type = 'Purchase'"]
+    params = {"company_id": cid, "fin_year": fy}
+    
+    # Add date filtering
+    if from_date:
+        where_conditions.append("t.txn_date >= :from_date")
+        params["from_date"] = from_date
+    
+    if to_date:
+        where_conditions.append("t.txn_date <= :to_date")
+        params["to_date"] = to_date
+    
+    # Add party search filtering
+    if party_search:
+        where_conditions.append("({party_name_sql} LIKE :party_search)".format(party_name_sql=get_party_name_sql()))
+        params["party_search"] = f"%{party_search.lower()}%"
+    
+    where_clause = " AND ".join(where_conditions)
+    
     # Check if bill_id column exists in milk_transactions
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
@@ -339,7 +389,7 @@ def purchase_list():
                t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
@@ -351,11 +401,11 @@ def purchase_list():
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Purchase'
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
-    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    result = db.session.execute(text(sql), params)
     txns = []
     for row in result:
         # Create a simple object with the data
@@ -409,7 +459,7 @@ def purchase_list():
     # Get parties for filter dropdown
     parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
     
-    return render_template("milk/purchase_list.html", 
+    return render_template("milk/purchase_list.html", from_date=from_date, to_date=to_date, party_search=party_search, 
                      txns=txns, total_qty=total_qty, total_amt=total_amt,
                      avg_fat=avg_fat, avg_snf=avg_snf,
                      total_bf_kgs=total_bf_kgs, total_snf_kgs=total_snf_kgs,
@@ -427,6 +477,31 @@ def sale_list():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
+    # Get filter parameters
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    party_search = request.args.get("party_search", "").strip()
+    
+    # Build WHERE conditions
+    where_conditions = ["t.company_id = :company_id", "t.fin_year = :fin_year", "t.txn_type = 'Sale'"]
+    params = {"company_id": cid, "fin_year": fy}
+    
+    # Add date filtering
+    if from_date:
+        where_conditions.append("t.txn_date >= :from_date")
+        params["from_date"] = from_date
+    
+    if to_date:
+        where_conditions.append("t.txn_date <= :to_date")
+        params["to_date"] = to_date
+    
+    # Add party search filtering
+    if party_search:
+        where_conditions.append("({party_name_sql} LIKE :party_search)".format(party_name_sql=get_party_name_sql()))
+        params["party_search"] = f"%{party_search.lower()}%"
+    
+    where_clause = " AND ".join(where_conditions)
+    
     # Check if bill_id column exists in milk_transactions
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
@@ -438,7 +513,7 @@ def sale_list():
                t.bill_id, {party_name_sql} as account_name, b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
@@ -450,11 +525,11 @@ def sale_list():
                t.txn_type, t.qty_liters, t.fat, t.snf, t.clr, t.rate, t.amount, t.chart_id, t.narration,
                NULL as bill_id, {party_name_sql} as account_name, NULL as bill_no
         FROM milk_transactions t
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year AND t.txn_type = 'Sale'
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC 
         LIMIT 200
         """
-    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    result = db.session.execute(text(sql), params)
     txns = []
     for row in result:
         # Create a simple object with the data
@@ -508,7 +583,7 @@ def sale_list():
     # Get parties for filter dropdown
     parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
     
-    return render_template("milk/sale_list.html", 
+    return render_template("milk/sale_list.html", from_date=from_date, to_date=to_date, party_search=party_search, 
                      txns=txns, total_qty=total_qty, total_amt=total_amt,
                      avg_fat=avg_fat, avg_snf=avg_snf,
                      total_bf_kgs=total_bf_kgs, total_snf_kgs=total_snf_kgs,
@@ -526,6 +601,31 @@ def milk_statement():
     
     cid = session.get("company_id"); fy = session.get("fin_year")
     
+    # Get filter parameters
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    party_search = request.args.get("party_search", "").strip()
+    
+    # Build WHERE conditions
+    where_conditions = ["t.company_id = :company_id", "t.fin_year = :fin_year"]
+    params = {"company_id": cid, "fin_year": fy}
+    
+    # Add date filtering
+    if from_date:
+        where_conditions.append("t.txn_date >= :from_date")
+        params["from_date"] = from_date
+    
+    if to_date:
+        where_conditions.append("t.txn_date <= :to_date")
+        params["to_date"] = to_date
+    
+    # Add party search filtering
+    if party_search:
+        where_conditions.append("({party_name_sql} LIKE :party_search)".format(party_name_sql=get_party_name_sql()))
+        params["party_search"] = f"%{party_search.lower()}%"
+    
+    where_clause = " AND ".join(where_conditions)
+    
     # Check if bill_id column exists in milk_transactions
     try:
         db.session.execute(text("SELECT bill_id FROM milk_transactions LIMIT 1"))
@@ -539,7 +639,7 @@ def milk_statement():
                b.bill_no
         FROM milk_transactions t
         LEFT JOIN bills b ON t.bill_id = b.id
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        WHERE {where_clause} 
         ORDER BY t.txn_date DESC 
         LIMIT 500
         """
@@ -553,11 +653,11 @@ def milk_statement():
                {party_name_sql} as account_name, 
                NULL as bill_no
         FROM milk_transactions t
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year 
+        WHERE {where_clause} 
         ORDER BY t.txn_date DESC 
         LIMIT 500
         """
-    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    result = db.session.execute(text(sql), params)
     txns = []
     for row in result:
         # Create a simple object with the data
@@ -634,7 +734,7 @@ def milk_statement():
     # Get parties for filter dropdown
     parties = Party.query.filter_by(company_id=cid, is_active=True).order_by(Party.name).all()
     
-    return render_template("milk/milk_statement.html", 
+    return render_template("milk/milk_statement.html", from_date=from_date, to_date=to_date, party_search=party_search, 
                      txns=txns,
                      purchase_total_qty=purchase_total_qty, purchase_total_amount=purchase_total_amt,
                      purchase_avg_fat=purchase_avg_fat, purchase_avg_snf=purchase_avg_snf,
@@ -677,8 +777,8 @@ def milk_import():
     params = {"company_id": cid, "fin_year": fy}
     
     if party_search:
-        sql += " AND t.narration ILIKE :party_search"
-        params["party_search"] = f"%{party_search}%"
+        sql += " AND t.narration LIKE :party_search"
+        params["party_search"] = f"%{party_search.lower()}%"
     
     if from_date:
         try:
@@ -815,8 +915,8 @@ def milk_sale_import():
     params = {"company_id": cid, "fin_year": fy}
     
     if party_search:
-        sql += " AND t.narration ILIKE :party_search"
-        params["party_search"] = f"%{party_search}%"
+        sql += " AND t.narration LIKE :party_search"
+        params["party_search"] = f"%{party_search.lower()}%"
     
     if from_date:
         try:
@@ -931,7 +1031,62 @@ def milk_sale_import():
 @login_required
 def mobile_entry():
     """Mobile-optimized quick entry page"""
-    return render_template("milk/mobile_entry.html")
+    from datetime import date
+    
+    # Get last entry date from session
+    last_entry_date = session.get("last_txn_date")
+    if not last_entry_date:
+        last_entry_date = date.today().isoformat()
+    
+    # Get all available companies for the user
+    if current_user.is_super_admin:
+        companies = Company.query.filter_by(is_active=True).all()
+    else:
+        companies = current_user.accessible_companies.filter_by(is_active=True).all()
+    
+    # Get financial years for the current company
+    cid = session.get("company_id")
+    financial_years = []
+    if cid:
+        financial_years = FinancialYear.query.filter_by(company_id=cid).order_by(FinancialYear.year_name.desc()).all()
+    
+    return render_template("milk/mobile_entry.html", 
+                         last_entry_date=last_entry_date,
+                         companies=companies,
+                         financial_years=financial_years)
+
+@milk_bp.route("/milk/get-financial-years/<int:company_id>")
+@login_required
+def get_financial_years(company_id):
+    """Get financial years for a specific company"""
+    try:
+        # Check if user has access to this company
+        if not current_user.is_super_admin:
+            company = current_user.accessible_companies.filter_by(id=company_id).first()
+            if not company:
+                return jsonify({"success": False, "message": "Access denied"})
+        
+        # Get financial years for the company
+        financial_years = FinancialYear.query.filter_by(company_id=company_id).order_by(FinancialYear.year_name.desc()).all()
+        
+        fy_list = []
+        for fy in financial_years:
+            fy_list.append({
+                "id": fy.id,
+                "year_name": fy.year_name,
+                "is_active": fy.is_active
+            })
+        
+        return jsonify({
+            "success": True,
+            "fy_list": fy_list
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error fetching financial years: {str(e)}"
+        })
 
 @milk_bp.route("/mobile-save-entry", methods=["POST"])
 @login_required
@@ -943,18 +1098,30 @@ def mobile_save_entry():
         
         data = request.get_json()
         
-        # Validate required fields
-        required_fields = ['date', 'party', 'qty', 'fat', 'clr', 'rate', 'type']
+        # Validate required fields (allow 0 for numeric fields)
+        required_fields = ['date', 'party', 'qty', 'rate', 'type']
         for field in required_fields:
-            if field not in data or not data[field]:
+            if field not in data or data[field] is None or data[field] == '':
                 return jsonify({"success": False, "message": f"Missing required field: {field}"})
         
         # Parse and validate data
         from datetime import datetime
         txn_date = datetime.strptime(data['date'], "%Y-%m-%d").date()
         qty = float(data['qty'])
-        fat = float(data['fat'])
-        clr = float(data['clr'])
+        
+        # Handle fat and clr - they might be 0, null, empty string, or missing
+        fat_value = data.get('fat')
+        if fat_value is None or fat_value == '' or fat_value == 'null':
+            fat = 0.0
+        else:
+            fat = float(fat_value)
+            
+        clr_value = data.get('clr')
+        if clr_value is None or clr_value == '' or clr_value == 'null':
+            clr = 0.0
+        else:
+            clr = float(clr_value)
+            
         rate = float(data['rate'])
         party_name = data['party'].strip()
         txn_type = data['type']
@@ -1020,20 +1187,17 @@ def mobile_save_entry():
                     group_name="Sundry Creditors" if txn_type == "Purchase" else "Sundry Debtors",
                     opening_dr=0.0,
                     opening_cr=0.0,
-                    balance_type="Cr" if txn_type == "Purchase" else "Dr",  # Suppliers have Cr balance, Customers have Dr balance
                     is_active=True
                 )
                 db.session.add(account)
                 db.session.flush()
             else:
-                # Update existing account to have correct balance type
-                if txn_type == "Purchase" and account.balance_type != "Cr":
-                    account.balance_type = "Cr"
+                # Update existing account to have correct group name
+                if txn_type == "Purchase":
                     account.group_name = "Sundry Creditors"
-                elif txn_type == "Sale" and account.balance_type != "Dr":
-                    account.balance_type = "Dr"
+                elif txn_type == "Sale":
                     account.group_name = "Sundry Debtors"
-                print(f"DEBUG: Updated account {account.name} balance_type to {account.balance_type}")
+                print(f"DEBUG: Updated account {account.name} group_name to {account.group_name}")
             
             account_id = account.id
         
@@ -1269,7 +1433,18 @@ def mobile_save_entry():
             "entry_id": milk_txn_id,
             "amount": amount,
             "bill_no": bill_no,
-            "voucher_no": voucher_no
+            "voucher_no": voucher_no,
+            "entry": {
+                "id": milk_txn_id,
+                "date": txn_date.isoformat(),
+                "party_name": party_name,
+                "qty_liters": qty,
+                "fat": fat,
+                "snf": snf,
+                "rate": rate,
+                "amount": amount,
+                "voucher_no": voucher_no
+            }
         })
         
     except Exception as e:
@@ -1291,6 +1466,9 @@ def get_last_entry():
         from models import MilkTransaction, Account
         from sqlalchemy import text
         
+        # Define where_clause
+        where_clause = "t.company_id = :company_id AND t.fin_year = :fin_year"
+        
         # Get last entry
         sql = """
         SELECT t.id, t.txn_date, t.qty_liters, t.fat, t.clr, t.rate, t.amount, t.txn_type,
@@ -1306,7 +1484,7 @@ def get_last_entry():
                  ELSE 'Unknown'
                END as party_name
         FROM milk_transactions t
-        WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+        WHERE {where_clause}
         ORDER BY t.txn_date DESC, t.id DESC
         LIMIT 1
         """
@@ -2425,7 +2603,7 @@ def search_parties():
         query = Party.query.filter_by(company_id=cid, is_active=True)
         
         if search_term:
-            query = query.filter(Party.name.ilike(f"%{search_term}%"))
+            query = query.filter(Party.name.LIKE(f"%{search_term}%"))
         
         parties = query.order_by(Party.name).limit(50).all()
         
@@ -2614,7 +2792,7 @@ def debug_journal_entries():
     """
     
     try:
-        result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+        result = db.session.execute(text(sql), params)
         rows = result.fetchall()
         
         output = """
@@ -2722,6 +2900,10 @@ def debug_party_names():
     
     from sqlalchemy import text
     
+    # Define where_clause
+    where_clause = "t.company_id = :company_id AND t.fin_year = :fin_year"
+    params = {"company_id": cid, "fin_year": fy}
+    
     # Test the party name extraction SQL
     sql = """
     SELECT t.id, t.narration,
@@ -2737,12 +2919,12 @@ def debug_party_names():
              ELSE 'Unknown'
            END as party_name
     FROM milk_transactions t
-    WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+    WHERE {where_clause}
     LIMIT 5
     """
     
     try:
-        result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+        result = db.session.execute(text(sql), params)
         rows = result.fetchall()
         
         output = "<h3>Party Name Extraction Debug</h3>"
@@ -2761,6 +2943,10 @@ def debug_txns():
     cid = session.get("company_id")
     fy = session.get("fin_year")
     
+    # Define where_clause and params
+    where_clause = "t.company_id = :company_id AND t.fin_year = :fin_year"
+    params = {"company_id": cid, "fin_year": fy}
+    
     # Use raw SQL to avoid account_id column issues
     from sqlalchemy import text
     sql = """
@@ -2778,10 +2964,10 @@ def debug_txns():
              ELSE 'Unknown'
            END as party_name
     FROM milk_transactions t
-    WHERE t.company_id = :company_id AND t.fin_year = :fin_year
+    WHERE {where_clause}
     ORDER BY t.id
     """
-    result = db.session.execute(text(sql), {"company_id": cid, "fin_year": fy})
+    result = db.session.execute(text(sql), params)
     txns = result.fetchall()
 
     lines = []
@@ -2810,16 +2996,29 @@ def search_accounts():
         accounts = Account.query.filter(
             Account.company_id == cid,
             Account.is_active == True,
-            Account.name.ilike(f"%{query}%")
+            Account.name.LIKE(f"%{query}%")
         ).limit(20).all()
         
         account_data = []
         for account in accounts:
+            # Calculate actual account balance
+            opening_balance = float(account.opening_dr or 0) - float(account.opening_cr or 0)
+            
+            # Get transaction totals for this account
+            from models import JournalLine, JournalHeader
+            txns = db.session.query(JournalLine).join(JournalHeader).filter(
+                JournalLine.account_id == account.id,
+                JournalHeader.company_id == cid
+            ).all()
+            
+            transaction_total = sum(float(line.debit or 0) - float(line.credit or 0) for line in txns)
+            current_balance = opening_balance + transaction_total
+            
             account_data.append({
                 "id": account.id,
                 "name": account.name,
-                "current_balance": 0.0,
-                "balance_display": "Dr 0.00"
+                "current_balance": current_balance,
+                "balance_display": f"{'Dr' if current_balance >= 0 else 'Cr'} {abs(current_balance):.2f}"
             })
         
         return jsonify({"success": True, "accounts": account_data})

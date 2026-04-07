@@ -121,7 +121,7 @@
         <tbody id="purchaseBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Purchase' %}
-          <tr data-transaction-id="{{ txn.id }}" data-account="{{ txn.account.name if txn.account else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
+          <tr data-transaction-id="{{ txn.id }}" data-account="{{ txn.account.name if txn.account and txn.account.name else 'Unknown' }}" data-date="{{ txn.txn_date.strftime('%Y-%m-%d') }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -239,7 +239,7 @@
         <tbody id="saleBody">
           {% for txn in txns %}
           {% if txn.txn_type == 'Sale' %}
-          <tr data-account="{{ txn.account.name if txn.account else '' }}" data-date="{{ txn.txn_date.isoformat() }}">
+          <tr data-account="{{ txn.account.name if txn.account and txn.account.name else 'Unknown' }}" data-date="{{ txn.txn_date.strftime('%Y-%m-%d') }}">
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="{{ url_for('milk.edit_entry', txn_id=txn.id) }}" class="btn btn-outline-warning" title="Edit">
@@ -275,6 +275,23 @@
 </div>
 
 <script>
+// Initialize filter values from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const partySearch = urlParams.get('party_search') || '';
+  const fromDate = urlParams.get('from_date') || '';
+  const toDate = urlParams.get('to_date') || '';
+  
+  document.getElementById('partySearch').value = partySearch;
+  document.getElementById('fromDate').value = fromDate;
+  document.getElementById('toDate').value = toDate;
+  
+  // Apply filters if any parameters are set
+  if (partySearch || fromDate || toDate) {
+    applyFilters();
+  }
+});
+
 function applyFilters() {
   const partySearch = document.getElementById('partySearch').value.toLowerCase();
   const fromDate = document.getElementById('fromDate').value;
@@ -286,7 +303,7 @@ function applyFilters() {
   let purchaseTotals = {qty: 0, fat: 0, snf: 0, amount: 0, bfKgs: 0, snfKgs: 0};
   
   purchaseRows.forEach(row => {
-    const party = row.getAttribute('data-party').toLowerCase();
+    const party = row.getAttribute('data-account').toLowerCase();
     const date = row.getAttribute('data-date') || '';
     const qty = parseFloat(row.cells[5].textContent) || 0;
     const fat = parseFloat(row.cells[6].textContent) || 0;
@@ -329,7 +346,7 @@ function applyFilters() {
   let saleTotals = {qty: 0, fat: 0, snf: 0, amount: 0, bfKgs: 0, snfKgs: 0};
   
   saleRows.forEach(row => {
-    const party = row.getAttribute('data-party').toLowerCase();
+    const party = row.getAttribute('data-account').toLowerCase();
     const date = row.getAttribute('data-date') || '';
     const qty = parseFloat(row.cells[5].textContent) || 0;
     const fat = parseFloat(row.cells[6].textContent) || 0;
