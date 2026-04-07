@@ -799,7 +799,7 @@ def milk_import():
         sql += " AND t.txn_date >= :last_10_days"
         params["last_10_days"] = ten_days_ago
     
-    sql += " ORDER BY t.txn_date DESC"
+    sql += " ORDER BY t.txn_date ASC, " + get_party_name_sql() + " ASC"
     
     result = db.session.execute(text(sql), params)
     purchases = result.fetchall()
@@ -937,7 +937,7 @@ def milk_sale_import():
         sql += " AND t.txn_date >= :last_10_days"
         params["last_10_days"] = ten_days_ago
     
-    sql += " ORDER BY t.txn_date DESC"
+    sql += " ORDER BY t.txn_date ASC, " + get_party_name_sql() + " ASC"
     
     result = db.session.execute(text(sql), params)
     sales = result.fetchall()

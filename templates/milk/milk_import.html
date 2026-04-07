@@ -95,7 +95,7 @@
         </thead>
         <tbody>
           {% for row in data %}
-          <tr>
+          <tr data-date="{{ row.date }}" data-supplier="{{ row.supplier|lower }}">
             <td class="text-center">{{ row.sr_no }}</td>
             <td class="text-center">{{ row.date }}</td>
             <td class="ps-3">{{ row.supplier }}</td>
@@ -302,4 +302,106 @@ document.querySelector('input[name="party_search"]')?.addEventListener('input', 
   }
 }
 </style>
+
+<script>
+// Initialize filter values from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const partySearch = urlParams.get('party_search') || '';
+  const fromDate = urlParams.get('from_date') || '';
+  const toDate = urlParams.get('to_date') || '';
+  
+  document.querySelector('input[name="party_search"]').value = partySearch;
+  document.querySelector('input[name="from_date"]').value = fromDate;
+  document.querySelector('input[name="to_date"]').value = toDate;
+  
+  // Apply filters if any parameters are set
+  if (partySearch || fromDate || toDate) {
+    applyFilters();
+  }
+  
+  // Add live search functionality
+  const partySearchInput = document.querySelector('input[name="party_search"]');
+  const fromDateInput = document.querySelector('input[name="from_date"]');
+  const toDateInput = document.querySelector('input[name="to_date"]');
+  
+  partySearchInput.addEventListener('input', applyFilters);
+  fromDateInput.addEventListener('change', applyFilters);
+  toDateInput.addEventListener('change', applyFilters);
+  
+  // Sort the table on load
+  sortAndFilterTable();
+});
+
+function applyFilters() {
+  sortAndFilterTable();
+}
+
+function sortAndFilterTable() {
+  const partySearch = document.querySelector('input[name="party_search"]').value.toLowerCase();
+  const fromDate = document.querySelector('input[name="from_date"]').value;
+  const toDate = document.querySelector('input[name="to_date"]').value;
+  
+  const tbody = document.querySelector('#importTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  
+  // Filter rows
+  const filteredRows = rows.filter(row => {
+    if (!row.dataset.date) return false; // Skip empty rows
+    
+    // Party search filter
+    const supplier = row.dataset.supplier || '';
+    if (partySearch && !supplier.includes(partySearch)) {
+      return false;
+    }
+    
+    // Date filters
+    const rowDate = row.dataset.date;
+    if (fromDate && rowDate < fromDate) {
+      return false;
+    }
+    if (toDate && rowDate > toDate) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort filtered rows by date (ascending) then by supplier (alphabetical)
+  filteredRows.sort((a, b) => {
+    const dateA = a.dataset.date;
+    const dateB = b.dataset.date;
+    
+    // First sort by date
+    if (dateA !== dateB) {
+      return dateA.localeCompare(dateB);
+    }
+    
+    // Then sort by supplier name alphabetically
+    const supplierA = a.dataset.supplier || '';
+    const supplierB = b.dataset.supplier || '';
+    return supplierA.localeCompare(supplierB);
+  });
+  
+  // Clear and repopulate table
+  tbody.innerHTML = '';
+  
+  if (filteredRows.length === 0) {
+    // Show no results message
+    const noResultsRow = document.createElement('tr');
+    noResultsRow.innerHTML = `
+      <td colspan="7" class="text-center text-muted py-5">
+        <div class="py-3">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          No purchase records found for the selected criteria.
+        </div>
+      </td>
+    `;
+    tbody.appendChild(noResultsRow);
+  } else {
+    // Add filtered and sorted rows
+    filteredRows.forEach(row => tbody.appendChild(row));
+  }
+}
+</script>
 {% endblock %}
