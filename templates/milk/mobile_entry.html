@@ -852,7 +852,7 @@
             // Calculate final amount (works even if fat=0)
             const bf_amount = bf_kgs * bf_rate_raw;
             const snf_amount = snf_kgs * snf_rate_raw;
-            const final_amount = bf_amount + snf_amount;
+            final_amount = bf_amount + snf_amount;
             
             // Update display
             document.getElementById('finalAmount').textContent = `₹${final_amount.toFixed(2)}`;

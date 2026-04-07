@@ -556,6 +556,8 @@ function calculateMarketRates() {
 
 // Main milk calculation
 function calculateMilk() {
+  console.log('calculateMilk() called - DEBUG');
+  
   const qtyElement = document.getElementById('qty');
   const fatElement = document.getElementById('fat');
   const snfElement = document.getElementById('snf_auto');
@@ -567,38 +569,60 @@ function calculateMilk() {
   // Debug logging
   console.log('Debug - qty:', qty, 'fat:', fat, 'snf:', snf);
   
-  // Keep full precision for internal calculation
-  let bfKgs = qty * fat / 100;
-  let snfKgs = qty * snf / 100;
+  // Get daily rate
+  const dailyRate = parseFloat(document.getElementById('rate_per_liter').value) || 0;
   
-  // Get rates after calculation
-  let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
-  let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
+  console.log('Debug - dailyRate:', dailyRate);
   
-  // Use component rates for milk calculation (original method)
+  // Use appropriate calculation method
   let finalAmount, ratePerLiter;
+  let bfKgs, snfKgs; // Define here to fix scope issue
   
-  // Always use component-based calculation for traditional method
-  const bfAmount = bfKgs * fatRate;
-  const snfAmount = snfKgs * snfRate;
-  finalAmount = bfAmount + snfAmount; // no intermediate rounding
-  ratePerLiter = qty > 0 ? finalAmount / qty : 0;
-  
-  // Debug logging
-  console.log('Debug - Component calculation:');
-  console.log('Debug - bfKgs:', bfKgs, '× fatRate:', fatRate, '=', bfAmount);
-  console.log('Debug - snfKgs:', snfKgs, '× snfRate:', snfRate, '=', snfAmount);
-  console.log('Debug - finalAmount:', bfAmount, '+', snfAmount, '=', finalAmount);
+  if (Math.abs(fat) < 0.001) {  // Use tolerance for floating point comparison
+    // Use SNF-only calculation when FAT is 0 (same as mobile entry)
+    bfKgs = 0;
+    snfKgs = qty * snf / 100;
+    
+    let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
+    let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
+    
+    const bfAmount = bfKgs * fatRate; // = 0
+    const snfAmount = snfKgs * snfRate;
+    finalAmount = bfAmount + snfAmount; // Only SNF component
+    ratePerLiter = qty > 0 ? finalAmount / qty : 0;
+    
+    console.log('Debug - SNF-only calculation (FAT=0):');
+    console.log('Debug - bfKgs:', bfKgs, '× fatRate:', fatRate, '=', bfAmount);
+    console.log('Debug - snfKgs:', snfKgs, '× snfRate:', snfRate, '=', snfAmount);
+    console.log('Debug - finalAmount:', bfAmount, '+', snfAmount, '=', finalAmount);
+    console.log('Debug - fat value:', fat, 'Math.abs(fat):', Math.abs(fat));
+  } else {
+    // Use component-based calculation when FAT > 0
+    bfKgs = qty * fat / 100;
+    snfKgs = qty * snf / 100;
+    
+    let fatRate = parseFloat(document.getElementById('fat_rate').value) || 0;
+    let snfRate = parseFloat(document.getElementById('snf_rate').value) || 0;
+    
+    const bfAmount = bfKgs * fatRate;
+    const snfAmount = snfKgs * snfRate;
+    finalAmount = bfAmount + snfAmount; // no intermediate rounding
+    ratePerLiter = qty > 0 ? finalAmount / qty : 0;
+    
+    console.log('Debug - Component calculation (FAT>0):');
+    console.log('Debug - bfKgs:', bfKgs, '× fatRate:', fatRate, '=', bfAmount);
+    console.log('Debug - snfKgs:', snfKgs, '× snfRate:', snfRate, '=', snfAmount);
+    console.log('Debug - finalAmount:', bfAmount, '+', snfAmount, '=', finalAmount);
+  }
   
   // Debug logging
   console.log('Debug - qty:', qty, 'fat:', fat, 'snf:', snf);
-  console.log('Debug - bfKgs:', bfKgs, 'snfKgs:', snfKgs);
-  console.log('Debug - fatRate:', fatRate, 'snfRate:', snfRate);
   console.log('Debug - finalAmount:', finalAmount);
   
   // Update display with precise values
   document.getElementById('bf_kgs').value = bfKgs.toString();
   document.getElementById('snf_kgs').value = snfKgs.toString();
+  
   document.getElementById('rate_per_liter_calc').value = (ratePerLiter * 100).toFixed(2); // Show as per 100kg
   document.getElementById('final_amount').value = finalAmount.toFixed(2);
   document.getElementById('amount').value = finalAmount.toFixed(2);

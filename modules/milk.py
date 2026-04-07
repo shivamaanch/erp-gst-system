@@ -1661,17 +1661,25 @@ def add_entry():
             snf_rate=float(request.form.get("snf_rate", 100))
         
         # Calculate SNF using Richmond's formula
-        if clr > 0 and fat > 0:
+        if clr > 0:
             snf = compute_snf(clr, fat)
         else:
+            # Use SNF from frontend form (calculated by JavaScript)
             snf = float(request.form.get("snf_auto", 8.5))
 
         # Always prefer user-entered Daily Rate (per 100kg) for storage & calculation
         daily_rate = float((request.form.get("rate_per_liter") or 0) or 0)
         if daily_rate > 0:
-            calc = compute_component_breakdown(qty, fat, snf, daily_rate)
-            amount = calc["amount"]
-            rate = daily_rate
+            if fat == 0.0:
+                # Use SNF-only component calculation when FAT is 0 (same as frontend)
+                calc = compute_component_breakdown(qty, fat, snf, daily_rate)
+                amount = calc["amount"]
+                rate = daily_rate
+            else:
+                # Use component breakdown when FAT > 0
+                calc = compute_component_breakdown(qty, fat, snf, daily_rate)
+                amount = calc["amount"]
+                rate = daily_rate
         else:
             amount_str = (request.form.get("amount") or "").strip()
             calc_rate_str = (request.form.get("calc_rate") or "").strip()
