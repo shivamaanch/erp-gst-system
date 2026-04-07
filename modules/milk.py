@@ -2611,7 +2611,7 @@ def search_parties():
         query = Party.query.filter_by(company_id=cid, is_active=True)
         
         if search_term:
-            query = query.filter(Party.name.LIKE(f"%{search_term}%"))
+            query = query.filter(Party.name.ilike(f"%{search_term}%"))
         
         parties = query.order_by(Party.name).limit(50).all()
         
@@ -3004,7 +3004,7 @@ def search_accounts():
         accounts = Account.query.filter(
             Account.company_id == cid,
             Account.is_active == True,
-            Account.name.LIKE(f"%{query}%")
+            Account.name.ilike(f"%{query}%")
         ).limit(20).all()
         
         account_data = []
