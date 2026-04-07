@@ -2,12 +2,43 @@
 {% block title %}Milk Entries{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold">🥛 Milk Transaction Register</h4>
+  <h4 class="fw-bold">?? Milk Transaction Register</h4>
   <div>
     <a href="{{ url_for('milk.add_entry') }}" class="btn btn-sm btn-success">+ New Entry</a>
-    <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">📊 Summary</a>
+    <a href="{{ url_for('milk.summary') }}" class="btn btn-sm btn-outline-secondary ms-2">?? Summary</a>
   </div>
 </div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">?? Party Search</label>
+        <input type="text" name="party_search" class="form-control form-control-sm" value="{{ party_search }}" placeholder="Search party name...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">From Date</label>
+        <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">To Date</label>
+        <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+      </div>
+      <div class="col-md-5">
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-search"></i> Filter
+          </button>
+          <button type="button" onclick="clearFilters()" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x-circle"></i> Clear
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="row g-3 mb-3">
   <div class="col-md-4">
     <div class="card border-0 shadow-sm text-center p-3">
@@ -18,13 +49,13 @@
   <div class="col-md-4">
     <div class="card border-0 shadow-sm text-center p-3">
       <div class="text-muted small">Total Amount</div>
-      <div class="fw-bold fs-5">₹{{ "{:,.2f}".format(total_amt) }}</div>
+      <div class="fw-bold fs-5">¥{{ "{:,.2f}".format(total_amt) }}</div>
     </div>
   </div>
 </div>
 <div class="card border-0 shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover table-sm align-middle mb-0">
+    <table class="table table-hover table-sm align-middle mb-0" id="entryTable">
       <thead class="table-dark">
         <tr><th>Date</th><th>Shift</th><th>Type</th><th>Party</th>
             <th class="text-end">Qty (L)</th><th class="text-center">FAT%</th>
@@ -33,16 +64,16 @@
       </thead>
       <tbody>
         {% for t in txns %}
-        <tr>
+        <tr data-date="{{ t.txn_date.strftime('%Y-%m-%d') }}" data-party="{{ (t.party.name if t.party else '')|lower }}">
           <td>{{ t.txn_date.strftime('%d-%b-%Y') }}</td>
           <td><span class="badge {{ 'bg-warning text-dark' if t.shift=='Evening' else 'bg-info' }}">{{ t.shift }}</span></td>
           <td><span class="badge {{ 'bg-success' if t.txn_type=='Sale' else 'bg-primary' }}">{{ t.txn_type }}</span></td>
-          <td>{{ t.party.name if t.party else '—' }}</td>
+          <td>{{ t.party.name if t.party else 'â' }}</td>
           <td class="text-end">{{ t.qty_liters }}</td>
           <td class="text-center">{{ t.fat }}%</td>
           <td class="text-center">{{ t.snf }}%</td>
-          <td class="text-end">₹{{ t.rate }}</td>
-          <td class="text-end fw-bold">₹{{ "{:,.2f}".format(t.amount) }}</td>
+          <td class="text-end">¥{{ t.rate }}</td>
+          <td class="text-end fw-bold">¥{{ "{:,.2f}".format(t.amount) }}</td>
         </tr>
         {% else %}
         <tr><td colspan="9" class="text-center text-muted py-4">
@@ -53,4 +84,110 @@
     </table>
   </div>
 </div>
+
+<script>
+// Initialize filter values from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const partySearch = urlParams.get('party_search') || '';
+  const fromDate = urlParams.get('from_date') || '';
+  const toDate = urlParams.get('to_date') || '';
+  
+  document.querySelector('input[name="party_search"]').value = partySearch;
+  document.querySelector('input[name="from_date"]').value = fromDate;
+  document.querySelector('input[name="to_date"]').value = toDate;
+  
+  // Apply filters if any parameters are set
+  if (partySearch || fromDate || toDate) {
+    applyFilters();
+  }
+  
+  // Add live search functionality
+  const partySearchInput = document.querySelector('input[name="party_search"]');
+  const fromDateInput = document.querySelector('input[name="from_date"]');
+  const toDateInput = document.querySelector('input[name="to_date"]');
+  
+  partySearchInput.addEventListener('input', applyFilters);
+  fromDateInput.addEventListener('change', applyFilters);
+  toDateInput.addEventListener('change', applyFilters);
+  
+  // Sort the table on load
+  sortAndFilterTable();
+});
+
+function applyFilters() {
+  sortAndFilterTable();
+}
+
+function sortAndFilterTable() {
+  const partySearch = document.querySelector('input[name="party_search"]').value.toLowerCase();
+  const fromDate = document.querySelector('input[name="from_date"]').value;
+  const toDate = document.querySelector('input[name="to_date"]').value;
+  
+  const tbody = document.querySelector('#entryTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  
+  // Filter rows
+  const filteredRows = rows.filter(row => {
+    if (!row.dataset.date) return false; // Skip empty rows
+    
+    // Party search filter
+    const party = row.dataset.party || '';
+    if (partySearch && !party.includes(partySearch)) {
+      return false;
+    }
+    
+    // Date filters
+    const rowDate = row.dataset.date;
+    if (fromDate && rowDate < fromDate) {
+      return false;
+    }
+    if (toDate && rowDate > toDate) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort filtered rows by date (ascending) then by party (alphabetical)
+  filteredRows.sort((a, b) => {
+    const dateA = a.dataset.date;
+    const dateB = b.dataset.date;
+    
+    // First sort by date
+    if (dateA !== dateB) {
+      return dateA.localeCompare(dateB);
+    }
+    
+    // Then sort by party name alphabetically
+    const partyA = a.dataset.party || '';
+    const partyB = b.dataset.party || '';
+    return partyA.localeCompare(partyB);
+  });
+  
+  // Clear and repopulate table
+  tbody.innerHTML = '';
+  
+  if (filteredRows.length === 0) {
+    // Show no results message
+    const noResultsRow = document.createElement('tr');
+    noResultsRow.innerHTML = `
+      <td colspan="9" class="text-center text-muted py-4">
+        No entries found for the selected criteria.
+      </td>
+    `;
+    tbody.appendChild(noResultsRow);
+  } else {
+    // Add filtered and sorted rows
+    filteredRows.forEach(row => tbody.appendChild(row));
+  }
+}
+
+function clearFilters() {
+  document.querySelector('input[name="party_search"]').value = '';
+  document.querySelector('input[name="from_date"]').value = '';
+  document.querySelector('input[name="to_date"]').value = '';
+  window.location.href = "{{ url_for('milk.entry_list') }}";
+}
+</script>
 {% endblock %}

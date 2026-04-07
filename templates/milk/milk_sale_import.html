@@ -107,7 +107,7 @@
         </thead>
         <tbody>
           {% for item in data %}
-          <tr>
+          <tr data-date="{{ item.date }}" data-buyer="{{ item.buyer|lower }}">
             <td class="text-center">{{ item.sr_no }}</td>
             <td class="text-center">{{ item.date }}</td>
             <td class="text-start">{{ item.buyer }}</td>
@@ -307,4 +307,104 @@ function exportToExcel() {
     body { font-size: 10pt; line-height: 1.2; }
   }
 </style>
+
+<script>
+// Initialize filter values from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const partySearch = urlParams.get('party_search') || '';
+  const fromDate = urlParams.get('from_date') || '';
+  const toDate = urlParams.get('to_date') || '';
+  
+  document.querySelector('input[name="party_search"]').value = partySearch;
+  document.querySelector('input[name="from_date"]').value = fromDate;
+  document.querySelector('input[name="to_date"]').value = toDate;
+  
+  // Apply filters if any parameters are set
+  if (partySearch || fromDate || toDate) {
+    applyFilters();
+  }
+  
+  // Add live search functionality
+  const partySearchInput = document.querySelector('input[name="party_search"]');
+  const fromDateInput = document.querySelector('input[name="from_date"]');
+  const toDateInput = document.querySelector('input[name="to_date"]');
+  
+  partySearchInput.addEventListener('input', applyFilters);
+  fromDateInput.addEventListener('change', applyFilters);
+  toDateInput.addEventListener('change', applyFilters);
+  
+  // Sort the table on load
+  sortAndFilterTable();
+});
+
+function applyFilters() {
+  sortAndFilterTable();
+}
+
+function sortAndFilterTable() {
+  const partySearch = document.querySelector('input[name="party_search"]').value.toLowerCase();
+  const fromDate = document.querySelector('input[name="from_date"]').value;
+  const toDate = document.querySelector('input[name="to_date"]').value;
+  
+  const tbody = document.querySelector('#saleTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  
+  // Filter rows
+  const filteredRows = rows.filter(row => {
+    if (!row.dataset.date) return false; // Skip empty rows
+    
+    // Party search filter
+    const buyer = row.dataset.buyer || '';
+    if (partySearch && !buyer.includes(partySearch)) {
+      return false;
+    }
+    
+    // Date filters
+    const rowDate = row.dataset.date;
+    if (fromDate && rowDate < fromDate) {
+      return false;
+    }
+    if (toDate && rowDate > toDate) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort filtered rows by date (ascending) then by buyer (alphabetical)
+  filteredRows.sort((a, b) => {
+    const dateA = a.dataset.date;
+    const dateB = b.dataset.date;
+    
+    // First sort by date
+    if (dateA !== dateB) {
+      return dateA.localeCompare(dateB);
+    }
+    
+    // Then sort by buyer name alphabetically
+    const buyerA = a.dataset.buyer || '';
+    const buyerB = b.dataset.buyer || '';
+    return buyerA.localeCompare(buyerB);
+  });
+  
+  // Clear and repopulate table
+  tbody.innerHTML = '';
+  
+  if (filteredRows.length === 0) {
+    // Show no results message
+    const noResultsRow = document.createElement('tr');
+    noResultsRow.innerHTML = `
+      <td colspan="7" class="text-center text-muted py-4">
+        <i class="bi bi-inbox display-4 d-block mb-2"></i>
+        No sale records found for the selected criteria.
+      </td>
+    `;
+    tbody.appendChild(noResultsRow);
+  } else {
+    // Add filtered and sorted rows
+    filteredRows.forEach(row => tbody.appendChild(row));
+  }
+}
+</script>
 {% endblock %}
