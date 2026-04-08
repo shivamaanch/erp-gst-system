@@ -2039,22 +2039,6 @@ def edit_entry(txn_id):
         session["user_role"] = "admin"
         cid = 1; fy = "2025-26"
     
-    # Add CLR column if it doesn't exist
-    try:
-        check_sql = "SELECT clr FROM milk_transactions LIMIT 1"
-        db.session.execute(text(check_sql))
-        print("DEBUG: CLR column already exists")
-    except Exception as e:
-        print(f"DEBUG: CLR column missing, adding it: {e}")
-        try:
-            alter_sql = "ALTER TABLE milk_transactions ADD COLUMN clr REAL DEFAULT 0.0"
-            db.session.execute(text(alter_sql))
-            db.session.commit()
-            print("DEBUG: CLR column added successfully")
-        except Exception as e2:
-            print(f"DEBUG: Error adding CLR column: {e2}")
-            db.session.rollback()
-    
     from models import Account  # Ensure Account is imported
     accounts = Account.query.filter_by(company_id=cid, is_active=True).order_by(Account.name).all()
     
@@ -2113,6 +2097,7 @@ def edit_entry(txn_id):
         
         # Get account information for this transaction
         account_name = "Cash Account"
+        account_id = None
         # Extract party name from narration if available
         if row.narration and "Party:" in row.narration:
             # Extract party name from "Mobile Purchase | Party: Party Name | ..."
@@ -2120,8 +2105,12 @@ def edit_entry(txn_id):
             for part in parts:
                 if "Party:" in part:
                     account_name = part.split("Party:")[1].strip()
+                    # Try to find the party ID by name
+                    party = Party.query.filter_by(name=account_name, company_id=cid).first()
+                    if party:
+                        account_id = party.id
                     break
-        print(f"  Account: {account_name}")
+        print(f"  Account: {account_name} (ID: {account_id})")
 
         # Get associated bill (if any) so we can show / edit invoice number
         bill = None
@@ -2138,13 +2127,13 @@ def edit_entry(txn_id):
                 self.company_id = row.company_id
                 self.fin_year = row.fin_year
                 self.voucher_no = row.voucher_no
-                self.account_id = None  # No account_id in new schema
+                self.account_id = account_id  # Use extracted account_id
                 # Add account object for template compatibility
                 class SimpleAccount:
                     def __init__(self, name, id):
                         self.name = name
                         self.id = id
-                self.account = SimpleAccount(account_name, None)
+                self.account = SimpleAccount(account_name, account_id)
                 # Convert string date to datetime object for strftime compatibility
                 from datetime import datetime
                 if isinstance(row.txn_date, str):
