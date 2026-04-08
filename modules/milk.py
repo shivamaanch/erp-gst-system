@@ -2074,7 +2074,6 @@ def edit_entry(txn_id):
     charts  = MilkRateChart.query.filter_by(company_id=cid, is_active=True).order_by(MilkRateChart.effective_date.desc()).all()
     
     # Get existing transaction - use raw SQL to avoid ORM issues
-    from sqlalchemy import text
     sql = """
     SELECT id, company_id, fin_year, voucher_no, txn_date, shift, 
            txn_type, qty_liters, fat, snf, clr, rate, amount, chart_id, narration, bill_id
