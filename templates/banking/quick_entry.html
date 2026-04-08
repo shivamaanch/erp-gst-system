@@ -167,9 +167,18 @@ function addRow() {
   const newRow = createRow();
   tbody.appendChild(newRow);
   attachEventListeners();
-  // Re-initialize Select2 for new dropdowns
+  // Re-initialize Select2 for new dropdowns with delay to ensure proper rendering
   if (typeof window.initSelect2 === 'function') {
-    setTimeout(window.initSelect2, 100);
+    setTimeout(() => {
+      window.initSelect2();
+      // Ensure allowClear is false for the new dropdown
+      $(newRow).find('.searchable-select').select2('destroy').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: false,
+        placeholder: "-- Select Account --"
+      });
+    }, 100);
   }
 }
 
@@ -325,7 +334,10 @@ function attachEventListeners() {
   $('.searchable-select').select2({
     theme: 'bootstrap-5',
     width: '100%',
-    allowClear: true
+    allowClear: false,  // Disable clear button to prevent X sign
+    placeholder: function() {
+      return $(this).data('placeholder') || '-- Select Account --';
+    }
   });
 }
 
@@ -371,6 +383,24 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   attachEventListeners();
   calculateTotals();
+  
+  // Initialize Select2 properly for all rows
+  setTimeout(() => {
+    if (typeof window.initSelect2 === 'function') {
+      window.initSelect2();
+      // Ensure all dropdowns have allowClear: false
+      $('.searchable-select').each(function() {
+        if ($(this).data('select2')) {
+          $(this).select2('destroy').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            allowClear: false,
+            placeholder: "-- Select Account --"
+          });
+        }
+      });
+    }
+  }, 200);
 });
 </script>
 
